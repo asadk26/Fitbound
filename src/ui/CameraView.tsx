@@ -3,29 +3,21 @@ import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { POSE_LINKS, tracker } from '../pose/PoseTracker';
 
 /**
- * The live camera feed with the detected skeleton drawn on top. Owns no
- * camera state: it borrows the shared tracker's <video> while mounted.
- * Mirrored for the front camera so it behaves like a mirror.
+ * The live camera feed with the detected skeleton drawn on top.
+ *
+ * It paints the tracker's video frames onto its own canvas rather than
+ * borrowing the <video> element: iOS Safari pauses a playing video whenever
+ * it is moved in the DOM, which froze the camera (and pose tracking) the
+ * moment one screen's preview handed over to the next. The video element now
+ * never moves, and any number of previews can show it at once.
  */
 export function CameraView({ className = '', skeleton = true, good = true, children }: { className?: string; skeleton?: boolean; good?: boolean; children?: React.ReactNode }) {
-  const host = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const raw = useRef<NormalizedLandmark[] | null>(null);
   const goodRef = useRef(good);
   goodRef.current = good;
 
-  useEffect(() => {
-    const h = host.current;
-    if (!h) return;
-    const v = tracker.video;
-    v.className = 'cam-video';
-    h.prepend(v);
-    const off = tracker.subscribe((f) => (raw.current = f.raw));
-    return () => {
-      off();
-      if (v.parentElement === h) tracker.park();
-    };
-  }, []);
+  useEffect(() => tracker.subscribe((f) => (raw.current = f.raw)), []);
 
   useEffect(() => {
     let rafId = 0;
@@ -33,24 +25,31 @@ export function CameraView({ className = '', skeleton = true, good = true, child
       rafId = requestAnimationFrame(draw);
       const c = canvas.current;
       const v = tracker.video;
-      if (!c || !v.videoWidth) return;
-      const box = c.parentElement!.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      if (c.width !== Math.round(box.width * dpr) || c.height !== Math.round(box.height * dpr)) {
-        c.width = Math.round(box.width * dpr);
-        c.height = Math.round(box.height * dpr);
+      if (!c) return;
+      const box = c.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const cw = Math.max(1, Math.round(box.width * dpr));
+      const chh = Math.max(1, Math.round(box.height * dpr));
+      if (c.width !== cw || c.height !== chh) {
+        c.width = cw;
+        c.height = chh;
       }
       const ctx = c.getContext('2d')!;
-      ctx.clearRect(0, 0, c.width, c.height);
-      const lms = raw.current;
-      if (!skeleton || !lms) return;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, c.width, c.height);
+      if (!v.videoWidth || v.readyState < 2) return;
+      // object-fit: contain
       const va = v.videoWidth / v.videoHeight;
       const ca = c.width / c.height;
       const w = va > ca ? c.width : c.height * va;
-      const hh = va > ca ? c.width / va : c.height;
+      const h = va > ca ? c.width / va : c.height;
       const ox = (c.width - w) / 2;
-      const oy = (c.height - hh) / 2;
-      const pt = (l: NormalizedLandmark) => [ox + l.x * w, oy + l.y * hh] as const;
+      const oy = (c.height - h) / 2;
+      ctx.drawImage(v, ox, oy, w, h);
+
+      const lms = raw.current;
+      if (!skeleton || !lms) return;
+      const pt = (l: NormalizedLandmark) => [ox + l.x * w, oy + l.y * h] as const;
       const lw = Math.max(2, Math.min(c.width, c.height) / 90);
       ctx.lineWidth = lw;
       ctx.strokeStyle = goodRef.current ? 'rgba(115,239,247,0.95)' : 'rgba(255,205,117,0.95)';
@@ -79,7 +78,7 @@ export function CameraView({ className = '', skeleton = true, good = true, child
 
   return (
     <div className={`camview ${className}`}>
-      <div className={`camview-feed ${tracker.facing === 'user' ? 'mirrored' : ''}`} ref={host}>
+      <div className={`camview-feed ${tracker.facing === 'user' ? 'mirrored' : ''}`}>
         <canvas ref={canvas} className="cam-overlay" />
       </div>
       {children}

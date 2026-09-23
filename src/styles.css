@@ -985,13 +985,20 @@ details summary {
   transform: scaleX(-1); /* mirror, like a mirror */
 }
 .cam-parked {
+  /* The one live <video>; never moved, never display:none (iOS stops
+     decoding hidden or re-parented videos). Previews paint from it. */
   position: fixed;
-  width: 1px;
-  height: 1px;
+  width: 2px;
+  height: 2px;
   left: 0;
   top: 0;
-  opacity: 0;
+  opacity: 0.01;
   pointer-events: none;
+  z-index: -1;
+}
+.cam-fill {
+  position: absolute;
+  inset: 0;
 }
 .cam-video {
   position: absolute;

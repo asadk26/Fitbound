@@ -79,6 +79,8 @@ export function preloadPose(model: 'full' | 'lite'): void {
   void loadLandmarker(model).catch(() => {});
 }
 
+const clock = () => performance.now();
+
 export class PoseTracker {
   readonly video: HTMLVideoElement;
   private stream: MediaStream | null = null;
@@ -88,6 +90,7 @@ export class PoseTracker {
   private lastVideoTime = -1;
   private lastTs = 0;
   private fps = 0;
+  private lastResume = 0;
   private listeners = new Set<(f: TrackerFrame) => void>();
   private legacy: ((f: TrackerFrame) => void) | null = null;
   /** 'user' = front camera (you can see yourself); 'environment' = back camera. */
@@ -100,6 +103,14 @@ export class PoseTracker {
     this.video.muted = true;
     this.video.autoplay = true;
     this.park();
+    // If anything pauses the stream (iOS does this on DOM moves, interruptions
+    // or returning from the background), start it again while we're running.
+    this.video.addEventListener('pause', () => this.resume());
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && this.resume());
+  }
+
+  private resume(): void {
+    if (this.running && this.video.paused && this.video.srcObject) void this.video.play().catch(() => {});
   }
 
   /**
@@ -163,6 +174,7 @@ export class PoseTracker {
     }
 
     this.running = true;
+    this.resume(); // in case the stream was paused while the model loaded
     this.loop();
   }
 
@@ -186,6 +198,10 @@ export class PoseTracker {
     }
     this.rafId = requestAnimationFrame(this.loop);
     const v = this.video;
+    if (v.paused && clock() - this.lastResume > 1000) {
+      this.lastResume = clock();
+      this.resume();
+    }
     if (!this.landmarker || v.readyState < 2 || v.videoWidth === 0) return;
     if (v.currentTime === this.lastVideoTime) return;
     this.lastVideoTime = v.currentTime;
