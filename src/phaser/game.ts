@@ -1,25 +1,38 @@
 import Phaser from 'phaser';
-import { bus, type BusEvents } from '../game/bus';
+import { bus, type BusEvents, type DioramaState } from '../game/bus';
 import { BattleScene } from './scenes/BattleScene';
 import { BootScene } from './scenes/BootScene';
+import { DioramaScene } from './scenes/DioramaScene';
 import { WorldScene } from './scenes/WorldScene';
 
 let game: Phaser.Game | null = null;
+let booted = false;
+let pending: (() => void) | null = null;
+/** The exploration scene that a battle interrupted, to wake afterwards. */
+let paused: 'World' | 'Diorama' | null = null;
+let dioramaState: DioramaState = { target: null, interact: [], enemies: [], defeated: [], gateOpen: false };
 
 export const getGame = () => game;
 
 export function createGame(parent: HTMLElement): Phaser.Game {
   if (game) return game;
+  bus.on('boot:ready', () => {
+    booted = true;
+    pending?.();
+    pending = null;
+  });
   game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
     backgroundColor: '#1a1c2c',
-    pixelArt: true,
-    roundPixels: true,
+    // Smooth filtering for the diorama art; pixel-art textures opt back into
+    // nearest-neighbour individually in BootScene.
+    antialias: true,
+    roundPixels: false,
     scale: { mode: Phaser.Scale.RESIZE, width: parent.clientWidth || 390, height: parent.clientHeight || 700 },
     input: { activePointers: 2 },
     audio: { noAudio: true },
-    scene: [BootScene, WorldScene, BattleScene],
+    scene: [BootScene, WorldScene, DioramaScene, BattleScene],
   });
   return game;
 }
@@ -39,10 +52,37 @@ export function refreshScale(): void {
   game.scale.refresh();
 }
 
+function whenBooted(fn: () => void): void {
+  if (booted && game) fn();
+  else pending = fn;
+}
+
+/** Show one exploration scene (stopping the others). */
+export function showScene(key: 'World' | 'Diorama', data: object = {}): void {
+  whenBooted(() => {
+    const sm = game!.scene;
+    for (const k of ['World', 'Diorama', 'Battle']) if (k !== key && (sm.isActive(k) || sm.isSleeping(k))) sm.stop(k);
+    paused = null;
+    if (sm.isActive(key) || sm.isSleeping(key)) sm.stop(key);
+    sm.run(key, data);
+  });
+}
+
+export function setDioramaState(s: DioramaState): void {
+  dioramaState = s;
+  bus.emit('diorama:state', s);
+}
+export const getDioramaState = () => dioramaState;
+
 export function startBattle(data: BusEvents['battle:start']): void {
   if (!game) return;
   const sm = game.scene;
-  if (sm.isActive('World')) sm.sleep('World');
+  for (const k of ['World', 'Diorama'] as const) {
+    if (sm.isActive(k)) {
+      sm.sleep(k);
+      paused = k;
+    }
+  }
   if (sm.isActive('Battle') || sm.isSleeping('Battle')) sm.stop('Battle');
   sm.run('Battle', data);
 }
@@ -51,7 +91,10 @@ export function endBattle(): void {
   if (!game) return;
   const sm = game.scene;
   sm.stop('Battle');
-  if (sm.isSleeping('World')) sm.wake('World');
-  else if (!sm.isActive('World')) sm.run('World');
-  bus.emit('world:refresh');
+  const k = paused ?? 'World';
+  paused = null;
+  if (sm.isSleeping(k)) sm.wake(k);
+  else if (!sm.isActive(k)) sm.run(k);
+  if (k === 'World') bus.emit('world:refresh');
+  else bus.emit('diorama:state', dioramaState);
 }

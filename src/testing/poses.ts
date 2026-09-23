@@ -5,8 +5,8 @@
  * can script whole movements ("descend from 170° to 80° over 15 frames") and
  * assert on what the state machines count.
  */
-import { LM } from '../../src/exercise/geometry';
-import type { Landmark, PoseFrame } from '../../src/exercise/types';
+import { LM } from '../exercise/geometry';
+import type { Landmark, PoseFrame } from '../exercise/types';
 
 type P = [number, number];
 
@@ -219,4 +219,70 @@ export function hold(value: number, frames: number): number[] {
 /** One full push-up / squat cycle of angles: top → bottom → top. */
 export function cycle(top: number, bottom: number, framesDown = 15, framesHold = 4, framesUp = 15): number[] {
   return [...ramp(top, bottom, framesDown), ...hold(bottom, framesHold), ...ramp(bottom, top, framesUp)];
+}
+
+export interface StandOpts {
+  /** Torso lean in degrees; positive = toward the player's LEFT. */
+  lean?: number;
+  /** 0..1 lift of each leg (knee and foot rise). */
+  liftL?: number;
+  liftR?: number;
+  rightHand?: 'down' | 'up' | 'shoulder';
+  leftHand?: 'down' | 'up' | 'shoulder';
+  /** Whole body shifted up (a jump) in image units. */
+  bob?: number;
+  /** Scale about the image centre (stepping toward / away from the camera). */
+  scale?: number;
+  noise?: { r: () => number; amp: number };
+}
+
+/**
+ * A player standing and facing an unmirrored front camera, as a phone on a
+ * shelf sees them: the player's LEFT side appears on the image's RIGHT.
+ */
+export function standPose(t: number, o: StandOpts = {}): PoseFrame {
+  const lean = rad(o.lean ?? 0);
+  const b = o.bob ?? 0;
+  const hipY = 0.55 - b;
+  const hc: P = [0.5, hipY];
+  // Rotate an upper-body point about the hip centre toward the player's left (+x).
+  const rot = (dx: number, dy: number): P => [hc[0] + dx * Math.cos(lean) - dy * Math.sin(lean), hc[1] + dx * Math.sin(lean) + dy * Math.cos(lean)];
+  const shL = rot(0.08, -0.25);
+  const shR = rot(-0.08, -0.25);
+  const nose = rot(0, -0.36);
+  const hand = (side: 1 | -1, pose: 'down' | 'up' | 'shoulder' | undefined): { e: P; w: P } => {
+    const sx = side * 0.08;
+    if (pose === 'up') return { e: rot(sx + side * 0.03, -0.4), w: rot(sx + side * 0.02, -0.52) };
+    if (pose === 'shoulder') return { e: rot(sx + side * 0.1, -0.2), w: rot(sx + side * 0.12, -0.3) };
+    return { e: rot(sx + side * 0.02, -0.12), w: rot(sx + side * 0.02, 0) };
+  };
+  const hl = hand(1, o.leftHand);
+  const hr = hand(-1, o.rightHand);
+  const leg = (side: 1 | -1, lift: number) => {
+    const x = 0.5 + side * 0.05;
+    return { k: [x, 0.75 - b - 0.1 * lift] as P, a: [x, 0.95 - b - 0.12 * lift] as P };
+  };
+  const ll = leg(1, o.liftL ?? 0);
+  const lr = leg(-1, o.liftR ?? 0);
+  const pts: Partial<Record<number, P>> = {
+    [LM.NOSE]: nose,
+    [LM.L_SHOULDER]: shL,
+    [LM.R_SHOULDER]: shR,
+    [LM.L_ELBOW]: hl.e,
+    [LM.R_ELBOW]: hr.e,
+    [LM.L_WRIST]: hl.w,
+    [LM.R_WRIST]: hr.w,
+    [LM.L_HIP]: [0.55, hipY],
+    [LM.R_HIP]: [0.45, hipY],
+    [LM.L_KNEE]: ll.k,
+    [LM.R_KNEE]: lr.k,
+    [LM.L_ANKLE]: ll.a,
+    [LM.R_ANKLE]: lr.a,
+  };
+  const s = o.scale ?? 1;
+  if (s !== 1) for (const k of Object.keys(pts)) {
+    const p = pts[+k]!;
+    pts[+k] = [0.5 + (p[0] - 0.5) * s, 0.5 + (p[1] - 0.5) * s];
+  }
+  return frameFrom(pts, 1, t, 0.95, o.noise);
 }

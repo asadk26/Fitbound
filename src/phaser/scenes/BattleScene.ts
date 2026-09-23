@@ -4,11 +4,15 @@ import { ENEMIES } from '../../combat/enemies';
 import { audio } from '../../game/audio';
 import { bus, type BusEvents } from '../../game/bus';
 import { PAL } from '../art';
+import { BG } from '../diorama/backdrops';
+import { FIG_ORIGIN_Y, FIG_H } from '../diorama/figures';
 
 /** Logical stage size; the camera zooms this to fit, keeping pixels crisp. */
 const W = 200;
 const H = 120;
-const FLOOR = 94;
+const FLOOR = 98;
+/** Figurine display height in logical units. */
+const FIG_UNITS = 50;
 const HERO_X = 58;
 const ENEMY_X = 146;
 const FONT = '"Press Start 2P", monospace';
@@ -50,30 +54,38 @@ export class BattleScene extends Phaser.Scene {
     const def = ENEMIES[this.data0.enemyId];
     const cam = this.cameras.main;
     cam.setBackgroundColor(PAL.ink);
-    this.drawBackdrop(def.id === 'dummy');
+    const outdoor = def.id === 'dummy' || this.data0.outdoor === true;
+    this.add
+      .image(BG.ox, BG.oy, outdoor ? 'bg-meadow' : 'bg-dungeon')
+      .setOrigin(0)
+      .setScale(1 / BG.ppu)
+      .setDepth(-10);
+    if (!outdoor) this.addTorchGlows();
 
-    // Hero
-    this.add.image(HERO_X, FLOOR, 'shadow').setScale(1.6, 1.4);
-    this.aura = this.add.image(HERO_X, FLOOR - 14, 'glow').setScale(0).setBlendMode(Phaser.BlendModes.ADD).setTint(0xc77dff);
-    this.hero = this.add.sprite(HERO_X, FLOOR, 'hero', 0).setOrigin(0.5, 1).setScale(2);
-    this.tweens.add({ targets: this.hero, scaleY: 2.06, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-    this.shieldBubble = this.add.image(HERO_X, FLOOR - 16, 'glow').setTint(0x41a6f6).setBlendMode(Phaser.BlendModes.ADD).setScale(1.6).setAlpha(0);
+    // Hero figurine
+    const figScale = FIG_UNITS / FIG_H;
+    this.add.image(HERO_X, FLOOR + 1, 'dshadow').setScale(0.28, 0.22).setAlpha(0.8);
+    this.aura = this.add.image(HERO_X, FLOOR - 20, 'glow').setScale(0).setBlendMode(Phaser.BlendModes.ADD).setTint(0xc77dff);
+    this.hero = this.add.sprite(HERO_X, FLOOR, 'fig-hero').setOrigin(0.5, FIG_ORIGIN_Y).setScale(figScale);
+    this.tweens.add({ targets: this.hero, scaleY: figScale * 1.03, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    this.shieldBubble = this.add.image(HERO_X, FLOOR - 22, 'glow').setTint(0x41a6f6).setBlendMode(Phaser.BlendModes.ADD).setScale(2.2).setAlpha(0);
 
-    // Enemy
+    // Enemy figurine
     const big = def.sprite === 'golem' || def.sprite === 'warden';
-    this.enemyBaseScale = big ? (def.sprite === 'warden' ? 2.1 : 1.8) : 2;
-    this.add.image(ENEMY_X, FLOOR, 'shadow').setScale(big ? 2.6 : 1.8, 1.5);
-    this.enemy = this.add.sprite(ENEMY_X, FLOOR, `enemy-${def.sprite}`, 0).setOrigin(0.5, 1).setScale(this.enemyBaseScale);
+    this.enemyBaseScale = figScale * (def.sprite === 'warden' ? 1.3 : big ? 1.2 : 1);
+    this.add.image(ENEMY_X, FLOOR + 1, 'dshadow').setScale(big ? 0.4 : 0.3, 0.24).setAlpha(0.8);
+    this.enemy = this.add.sprite(ENEMY_X, FLOOR, `fig-${def.sprite}`).setOrigin(0.5, FIG_ORIGIN_Y).setScale(this.enemyBaseScale);
     this.enemyIdleTween = this.tweens.add({ targets: this.enemy, y: FLOOR - 2, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     if (def.id === 'warden') {
       const g = this.add.image(ENEMY_X, FLOOR - 24, 'glow').setTint(0xb13e53).setBlendMode(Phaser.BlendModes.ADD).setScale(3).setAlpha(0.25).setDepth(-1);
       this.tweens.add({ targets: g, alpha: 0.45, duration: 900, yoyo: true, repeat: -1 });
     }
 
-    this.bars = this.add.graphics().setDepth(100);
-    this.labels.push(
+    this.bars = this.add.graphics().setDepth(100).setVisible(this.data0.hud !== false);
+    if (this.data0.hud !== false)
+      this.labels.push(
       this.txt(6, 5, this.data0.heroName.toUpperCase(), 6, PAL.white).setDepth(101),
-      this.txt(W - 6, 5, def.name.toUpperCase(), 6, PAL.white).setOrigin(1, 0).setDepth(101),
+      this.txt(W - 6, 5, (this.data0.enemyName ?? def.name).toUpperCase(), 6, PAL.white).setOrigin(1, 0).setDepth(101),
     );
     this.drawBars();
 
@@ -118,44 +130,10 @@ export class BattleScene extends Phaser.Scene {
     for (const t of this.labels) t.setResolution(Math.max(1, Math.ceil(zoom)));
   }
 
-  private drawBackdrop(outdoor: boolean): void {
-    const g = this.add.graphics().setDepth(-10);
-    if (outdoor) {
-      g.fillStyle(hex(PAL.sky)).fillRect(-200, -200, W + 400, 280);
-      g.fillStyle(hex(PAL.cyan)).fillRect(-200, 50, W + 400, 8);
-      g.fillStyle(hex(PAL.teal)).fillRect(-200, 58, W + 400, 12);
-      for (let x = -200; x < W + 200; x += 22) g.fillStyle(hex(PAL.teal)).fillCircle(x, 60, 12);
-      g.fillStyle(hex(PAL.green)).fillRect(-200, 70, W + 400, 200);
-      for (let i = 0; i < 90; i++) g.fillStyle(hex(i % 3 ? PAL.teal : PAL.lime)).fillRect((i * 37) % (W + 40) - 20, 72 + ((i * 53) % 48), 1, 2);
-      g.fillStyle(hex(PAL.white)).fillCircle(30, 20, 6).fillCircle(38, 18, 8).fillCircle(46, 21, 5);
-      g.fillStyle(hex(PAL.white)).fillCircle(150, 30, 5).fillCircle(157, 27, 7);
-      return;
-    }
-    g.fillStyle(hex(PAL.night)).fillRect(-200, -200, W + 400, 270);
-    // Brick wall
-    for (let row = 0; row < 9; row++) {
-      const y = row * 8 - 2;
-      const off = row % 2 ? 8 : 0;
-      for (let x = -208 + off; x < W + 200; x += 16) {
-        g.fillStyle(hex(PAL.slate)).fillRect(x + 1, y + 1, 14, 6);
-        g.fillStyle(hex(PAL.mist)).fillRect(x + 2, y + 1, 5, 1);
-      }
-    }
-    g.fillStyle(hex(PAL.ink), 0.35).fillRect(-200, -200, W + 400, 270);
-    g.fillStyle(hex(PAL.ink)).fillRect(-200, 68, W + 400, 4);
-    g.fillStyle(hex(PAL.night)).fillRect(-200, 72, W + 400, 200);
-    for (let x = -200; x < W + 200; x += 16) {
-      g.fillStyle(hex(PAL.navy)).fillRect(x, 72, 1, 60);
-      g.fillStyle(hex(PAL.navy)).fillRect(x - 8, 84, 16, 1);
-      g.fillStyle(hex(PAL.navy)).fillRect(x, 100, 16, 1);
-    }
-    // Torches
-    for (const tx of [22, 100, 178]) {
-      g.fillStyle(hex(PAL.brown)).fillRect(tx - 1, 30, 3, 10);
-      const flame = this.add.image(tx, 27, 'glow').setTint(0xffa040).setBlendMode(Phaser.BlendModes.ADD).setScale(1.3).setDepth(-5);
-      this.tweens.add({ targets: flame, scale: 1.7, alpha: 0.7, duration: 300 + Math.random() * 200, yoyo: true, repeat: -1 });
-      g.fillStyle(hex(PAL.orange)).fillRect(tx - 2, 24, 5, 5);
-      g.fillStyle(hex(PAL.gold)).fillRect(tx - 1, 23, 3, 4);
+  private addTorchGlows(): void {
+    for (const tx of [-4, 100, 204]) {
+      const flame = this.add.image(tx, 20, 'glow').setTint(0xffa040).setBlendMode(Phaser.BlendModes.ADD).setScale(2.4).setAlpha(0.5).setDepth(-5);
+      this.tweens.add({ targets: flame, scale: 3, alpha: 0.75, duration: 320 + Math.random() * 220, yoyo: true, repeat: -1 });
     }
   }
 

@@ -1,6 +1,7 @@
 import { EXERCISES, isPlayable, isUnlocked, MAX_LOADOUT } from '../exercise/registry';
 import type { Difficulty } from '../exercise/types';
 import { levelForXp, type Upgrades } from './progression';
+import { DEFAULT_TARGETS, type TrialTargets } from '../trial/config';
 
 export const SAVE_KEY = 'fitbound.save.v1';
 export const SAVE_VERSION = 1;
@@ -14,6 +15,10 @@ export interface Settings {
   difficulty: Difficulty;
   /** Per-exercise +/- adjustment to the difficulty's rep/second target. */
   targetAdjust: Record<string, number>;
+  /** Motion Trial rep targets. */
+  trialTargets: TrialTargets;
+  /** Which phone camera watches the player. */
+  cameraFacing: 'user' | 'environment';
 }
 
 export interface SaveData {
@@ -54,6 +59,8 @@ export function defaultSave(): SaveData {
       model: 'full',
       difficulty: 'beginner',
       targetAdjust: {},
+      trialTargets: { ...DEFAULT_TARGETS },
+      cameraFacing: 'user',
     },
     totals: { cameraReps: 0, manualReps: 0, holdSeconds: 0, battlesWon: 0 },
   };
@@ -135,11 +142,17 @@ export function sanitize(input: unknown): SaveData {
       ...d.settings,
       ...(o.settings ?? {}),
       targetAdjust: { ...(o.settings?.targetAdjust ?? {}) },
+      trialTargets: { ...DEFAULT_TARGETS, ...(o.settings?.trialTargets ?? {}) },
     },
     totals: { ...d.totals, ...(o.totals ?? {}) },
   };
   if (!['beginner', 'intermediate', 'advanced'].includes(out.settings.difficulty)) out.settings.difficulty = 'beginner';
   if (out.settings.model !== 'lite' && out.settings.model !== 'full') out.settings.model = 'full';
+  if (out.settings.cameraFacing !== 'environment') out.settings.cameraFacing = 'user';
+  for (const k of Object.keys(DEFAULT_TARGETS) as (keyof TrialTargets)[]) {
+    const v = Number(out.settings.trialTargets[k]);
+    out.settings.trialTargets[k] = Number.isFinite(v) && v >= 1 && v <= 50 ? Math.round(v) : DEFAULT_TARGETS[k];
+  }
   return reconcileUnlocks(out);
 }
 

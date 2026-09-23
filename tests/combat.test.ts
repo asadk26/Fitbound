@@ -6,7 +6,7 @@ import { getExercise } from '../src/exercise/registry';
 import { ExerciseSessionController } from '../src/exercise/session';
 import type { ExerciseEvent } from '../src/exercise/types';
 import { statsFor } from '../src/game/progression';
-import { cycle, FRAME_MS, hold, pushupPose } from './fixtures/poses';
+import { cycle, FRAME_MS, hold, pushupPose } from '../src/testing/poses';
 
 const stats = statsFor(1, { atk: 0, def: 0, mag: 0 }); // atk/def/mag 10, hp 100
 const fixedRng = () => 0.5; // variance multiplier exactly 1.0

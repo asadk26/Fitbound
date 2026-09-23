@@ -1,6 +1,14 @@
 import Phaser from 'phaser';
 import { CHARACTERS, ENEMY_ART, ICON_ART, paintSprite, PAL, spriteSize, type PixelSprite } from '../art';
 import { paintTileset } from '../tiles';
+import { bus } from '../../game/bus';
+import { FIGURES, paintFigure } from '../diorama/figures';
+import { paintGround, paintTable } from '../diorama/ground';
+import { shadowBlob } from '../diorama/paint';
+import { paintProps } from '../diorama/props';
+import { paintBattleBackdrops } from '../diorama/backdrops';
+
+const NEAREST = Phaser.Textures.FilterMode.NEAREST;
 
 /** Generates every texture procedurally, then hands off to the world. */
 export class BootScene extends Phaser.Scene {
@@ -9,7 +17,18 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.textures.addCanvas('tiles', paintTileset());
+    this.textures.addCanvas('tiles', paintTileset())!.setFilter(NEAREST);
+
+    // Diorama art: smooth-filtered, painted once.
+    for (const k of Object.keys(FIGURES)) this.textures.addCanvas(`fig-${k}`, paintFigure(k));
+    for (const [k, p] of Object.entries(paintProps())) {
+      this.textures.addCanvas(`prop-${k}`, p.canvas);
+      this.registry.set(`prop-${k}`, { originY: p.originY, radius: p.radius, shadow: p.shadow });
+    }
+    this.textures.addCanvas('ground', paintGround());
+    this.textures.addCanvas('table', paintTable());
+    this.textures.addCanvas('dshadow', shadowBlob(128, 48));
+    for (const [k, c] of Object.entries(paintBattleBackdrops())) this.textures.addCanvas(`bg-${k}`, c);
 
     for (const [key, s] of Object.entries(CHARACTERS)) this.addSheet(key, s);
     for (const [key, s] of Object.entries(ENEMY_ART)) this.addSheet(`enemy-${key}`, s);
@@ -64,7 +83,11 @@ export class BootScene extends Phaser.Scene {
       anim(`${k}-walk-up`, k, [7, 6, 8, 6], 8);
     }
 
-    this.scene.start('World');
+    // Pixel-art textures stay crisp; everything else is smooth.
+    for (const key of this.textures.getTextureKeys()) {
+      if (/^(tiles|hero|elder|smith|innkeeper|trainer|enemy-|icon-|px|spark|marker|bubble|shadow)$|^(enemy|icon)-/.test(key)) this.textures.get(key).setFilter(NEAREST);
+    }
+    bus.emit('boot:ready');
   }
 
   private addSheet(key: string, s: PixelSprite): void {

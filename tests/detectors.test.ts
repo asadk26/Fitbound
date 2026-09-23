@@ -4,7 +4,7 @@ import { PlankDetector } from '../src/exercise/detectors/plank';
 import { PushupDetector } from '../src/exercise/detectors/pushup';
 import { SquatDetector, squatConfig } from '../src/exercise/detectors/squat';
 import type { DetectorUpdate, ExerciseDetector, PoseFrame } from '../src/exercise/types';
-import { cycle, FRAME_MS, hingePose, hold, jackPose, plankPose, pushupPose, ramp, rng, squatPose, standingCurlPose } from './fixtures/poses';
+import { cycle, FRAME_MS, hingePose, hold, jackPose, plankPose, pushupPose, ramp, rng, squatPose, standingCurlPose } from '../src/testing/poses';
 
 /** Feed a sequence of frames and collect every update. */
 class Runner {

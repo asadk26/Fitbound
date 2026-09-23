@@ -1,9 +1,29 @@
 import type { CombatEffect } from '../combat/CombatEngine';
 import type { MapId } from '../phaser/maps';
 
+/** What the Motion Trial wants the diorama to show. */
+export interface DioramaState {
+  /** Where the objective beacon points, if anywhere. */
+  target: string | null;
+  /** Spots the hero can interact with right now. */
+  interact: string[];
+  /** Enemies that engage when approached. */
+  enemies: string[];
+  /** Enemies already beaten (removed from the board). */
+  defeated: string[];
+  gateOpen: boolean;
+}
+
 /** Messages between React (UI, camera, rules) and Phaser (world, animation). */
 export interface BusEvents {
   // Phaser → React
+  'boot:ready': undefined;
+  'diorama:near': { id: string | null };
+  'diorama:reached': { id: string };
+  // React → Phaser (diorama)
+  'diorama:state': DioramaState;
+  'diorama:hit': { id: string };
+  'diorama:reset': undefined;
   'world:ready': { map: MapId };
   'world:encounter': { enemyId: string };
   'world:talk': { npcId: string };
@@ -15,7 +35,7 @@ export interface BusEvents {
   'world:goto': { map: MapId; x?: number; y?: number };
   'world:refresh': undefined;
   'world:setPaused': { paused: boolean };
-  'battle:start': { enemyId: string; heroName: string; playerHp: number; playerMaxHp: number; enemyHp: number; enemyMaxHp: number };
+  'battle:start': { enemyId: string; heroName: string; playerHp: number; playerMaxHp: number; enemyHp: number; enemyMaxHp: number; outdoor?: boolean; enemyName?: string; /** false when a React HUD shows HP instead. */ hud?: boolean };
   'battle:effects': { effects: CombatEffect[]; intensity?: number };
   'battle:end': undefined;
   'battle:charge': { level: number; color: string };

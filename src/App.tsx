@@ -4,15 +4,18 @@ import { audio } from './game/audio';
 import { bus } from './game/bus';
 import { levelForXp, xpProgress } from './game/progression';
 import { getSave, updateSave } from './game/store';
-import { CHARACTERS, ENEMY_ART, spriteDataUrl } from './phaser/art';
-import { createGame, refreshScale } from './phaser/game';
+import { CHARACTERS, spriteDataUrl } from './phaser/art';
+import { paintFigure } from './phaser/diorama/figures';
+import { createGame, refreshScale, showScene } from './phaser/game';
 import { MAPS } from './phaser/maps';
 import { Battle, type BattleOutcome } from './ui/Battle';
 import { AbilitiesPanel, DIFFICULTY_INFO, MenuPanel, MessageDialog, NpcDialog } from './ui/Panels';
 import { useSave } from './ui/useSave';
+import { TrialRun } from './ui/TrialRun';
+import { TrialSetup } from './ui/TrialSetup';
 import type { Difficulty } from './exercise/types';
 
-type Screen = 'title' | 'newgame' | 'world' | 'battle';
+type Screen = 'title' | 'newgame' | 'world' | 'battle' | 'trialsetup' | 'trial';
 type Overlay = { kind: 'npc'; id: string } | { kind: 'message'; text: string } | { kind: 'abilities' } | { kind: 'menu' } | null;
 
 export default function App() {
@@ -41,6 +44,11 @@ export default function App() {
     audio.setSound(save.settings.sound);
     audio.voiceOn = save.settings.voice;
   }, [save.settings.sound, save.settings.voice]);
+
+  // The title and trial setup screens float over a slowly drifting diorama.
+  useEffect(() => {
+    if (screen === 'title' || screen === 'trialsetup') showScene('Diorama', { attract: true });
+  }, [screen]);
 
   // World events from Phaser.
   useEffect(() => {
@@ -85,7 +93,7 @@ export default function App() {
     audio.select();
     const s = getSave();
     const loc = s.location ?? { map: 'village' as const, ...MAPS.village.spawn };
-    bus.emit('world:goto', { map: loc.map, x: loc.x, y: loc.y });
+    showScene('World', { map: loc.map, x: loc.x, y: loc.y });
     setScreen('world');
   };
 
@@ -109,6 +117,11 @@ export default function App() {
       {screen === 'title' && (
         <TitleScreen
           canContinue={save.created}
+          onTrial={() => {
+            audio.unlock();
+            audio.select();
+            setScreen('trialsetup');
+          }}
           onContinue={startGame}
           onNew={() => {
             audio.unlock();
@@ -117,6 +130,18 @@ export default function App() {
           }}
         />
       )}
+
+      {screen === 'trialsetup' && (
+        <TrialSetup
+          onBack={() => setScreen('title')}
+          onStart={() => {
+            audio.unlock();
+            setScreen('trial');
+          }}
+        />
+      )}
+
+      {screen === 'trial' && <TrialRun onExit={() => setScreen('title')} />}
 
       {screen === 'newgame' && (
         <NewGame
@@ -193,7 +218,7 @@ export default function App() {
   );
 }
 
-function TitleScreen({ canContinue, onContinue, onNew }: { canContinue: boolean; onContinue: () => void; onNew: () => void }) {
+function TitleScreen({ canContinue, onTrial, onContinue, onNew }: { canContinue: boolean; onTrial: () => void; onContinue: () => void; onNew: () => void }) {
   return (
     <div className="title-screen">
       <div className="title-card">
@@ -201,32 +226,38 @@ function TitleScreen({ canContinue, onContinue, onNew }: { canContinue: boolean;
           FIT<span>BOUND</span>
         </div>
         <p className="tagline">A fantasy adventure you play with your body.</p>
-        <div className="title-sprites">
-          <img src={spriteDataUrl(CHARACTERS.hero, 5, 0)} alt="" />
-          <span className="vs">⚔</span>
-          <img src={enemyArt('skeleton')} alt="" className="flip" />
+        <div className="title-figs">
+          <img src={figureUrl('hero')} alt="" />
+          <img src={figureUrl('skeleton')} alt="" />
         </div>
         <div className="title-buttons">
-          {canContinue && (
-            <button className="btn btn-big" onClick={onContinue}>
-              Continue
-            </button>
-          )}
-          <button className={`btn ${canContinue ? 'btn-ghost' : 'btn-big'}`} onClick={onNew}>
-            {canContinue ? 'New adventure' : 'Begin adventure'}
+          <button className="btn btn-big" onClick={onTrial}>
+            Motion Trial · TV
           </button>
+          <span className="title-sub">Prop up your phone, mirror to a TV, and play with your whole body.</span>
+          <div className="title-classic">
+            {canContinue && (
+              <button className="btn btn-sm btn-ghost" onClick={onContinue}>
+                Continue classic adventure
+              </button>
+            )}
+            <button className="btn btn-sm btn-ghost" onClick={onNew}>
+              {canContinue ? 'New classic adventure' : 'Classic adventure (touch)'}
+            </button>
+          </div>
         </div>
-        <p className="fine">
-          Push-ups swing your sword. Squats raise your shield. Jumping jacks cast magic. Your phone’s camera counts every rep — processed on-device, never recorded or uploaded.
-        </p>
+        <p className="fine">Your phone’s camera counts every rep and reads your movement — processed on-device, never recorded or uploaded.</p>
       </div>
     </div>
   );
 }
 
-function enemyArt(id: string): string {
-  return spriteDataUrl(ENEMY_ART[id], 5, 0);
+const figCache: Record<string, string> = {};
+function figureUrl(name: string): string {
+  return (figCache[name] ??= paintFigure(name).toDataURL());
 }
+
+
 
 function NewGame({ onBack, onStart }: { onBack: () => void; onStart: (name: string, d: Difficulty) => void }) {
   const save = getSave();

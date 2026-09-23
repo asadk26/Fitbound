@@ -88,7 +88,10 @@ export class PoseTracker {
   private lastVideoTime = -1;
   private lastTs = 0;
   private fps = 0;
-  private listener: ((f: TrackerFrame) => void) | null = null;
+  private listeners = new Set<(f: TrackerFrame) => void>();
+  private legacy: ((f: TrackerFrame) => void) | null = null;
+  /** 'user' = front camera (you can see yourself); 'environment' = back camera. */
+  facing: 'user' | 'environment' = 'user';
 
   constructor() {
     this.video = document.createElement('video');
@@ -113,8 +116,17 @@ export class PoseTracker {
     return this.running;
   }
 
+  /** Replace the single "owner" listener (kept for the classic battle and the lab). */
   onFrame(fn: ((f: TrackerFrame) => void) | null): void {
-    this.listener = fn;
+    if (this.legacy) this.listeners.delete(this.legacy);
+    this.legacy = fn;
+    if (fn) this.listeners.add(fn);
+  }
+
+  /** Add a listener; frames go to every listener. Returns an unsubscribe. */
+  subscribe(fn: (f: TrackerFrame) => void): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
   }
 
   async start(model: 'full' | 'lite'): Promise<void> {
@@ -125,7 +137,8 @@ export class PoseTracker {
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
+        // 720p gives the pose model enough pixels for a whole body 2.5–3 m away.
+        video: { facingMode: this.facing, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
       });
     } catch (e) {
       const name = (e as DOMException)?.name;
@@ -153,8 +166,24 @@ export class PoseTracker {
     this.loop();
   }
 
+  /**
+   * Test hook (only reachable via ?debug): stop emitting real camera results
+   * and emit injected frames instead, so browser automation can drive the
+   * real app with a synthetic body.
+   */
+  simulated = false;
+  inject(frame: PoseFrame | null, now: number): void {
+    const raw = frame ? frame.landmarks.map((l) => ({ x: l.x / frame.aspect, y: l.y, z: l.z, visibility: l.visibility })) : null;
+    const f = { frame, raw, now, fps: 30 };
+    this.listeners.forEach((l) => l(f));
+  }
+
   private loop = (): void => {
     if (!this.running) return;
+    if (this.simulated) {
+      this.rafId = requestAnimationFrame(this.loop);
+      return;
+    }
     this.rafId = requestAnimationFrame(this.loop);
     const v = this.video;
     if (!this.landmarker || v.readyState < 2 || v.videoWidth === 0) return;
@@ -174,7 +203,8 @@ export class PoseTracker {
     }
 
     const frame = toPoseFrame(raw, v.videoWidth, v.videoHeight, now);
-    this.listener?.({ frame, raw, now, fps: this.fps });
+    const f = { frame, raw, now, fps: this.fps };
+    this.listeners.forEach((l) => l(f));
   };
 
   stop(): void {

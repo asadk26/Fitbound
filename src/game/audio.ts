@@ -146,6 +146,32 @@ class Audio {
   victory(): void {
     [392, 392, 392, 523, 466, 523].forEach((f, i) => this.tone(f, i === 5 ? 0.5 : 0.14, 'square', 0.3, [0, 0.14, 0.28, 0.42, 0.62, 0.76][i]));
   }
+  /** A bright "go" chord when counting starts. */
+  exerciseStart(): void {
+    [523, 659, 784].forEach((f) => this.tone(f, 0.35, 'square', 0.22));
+    this.tone(1047, 0.4, 'triangle', 0.3, 0.08);
+  }
+  setComplete(): void {
+    [659, 784, 988, 1319].forEach((f, i) => this.tone(f, 0.22, 'square', 0.28, i * 0.08));
+  }
+  /** Two-note chime announcing the next exercise. */
+  nextExercise(): void {
+    this.tone(784, 0.18, 'triangle', 0.35);
+    this.tone(1175, 0.3, 'triangle', 0.35, 0.16);
+  }
+  /** Low double buzz: the camera lost the player. */
+  trackingLost(): void {
+    this.tone(180, 0.16, 'square', 0.3);
+    this.tone(150, 0.22, 'square', 0.3, 0.2);
+  }
+  /** Soft rising blip when a gesture is recognised. */
+  gesture(): void {
+    this.tone(880, 0.08, 'sine', 0.3);
+    this.tone(1320, 0.12, 'sine', 0.3, 0.07);
+  }
+  defeat(): void {
+    [392, 330, 262, 196].forEach((f, i) => this.tone(f, 0.3, 'triangle', 0.3, i * 0.18));
+  }
   phaseBreak(): void {
     this.noise(0.6, 0.5, 0, 900);
     this.tone(110, 0.6, 'sawtooth', 0.35, 0, 55);

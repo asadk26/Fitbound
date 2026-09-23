@@ -98,7 +98,11 @@ export class CombatEngine {
         else if (effect === 'arcane') {
           this.damage(out, ev.exerciseId, effect, (this.stats.mag * 1) / t, 'magic', false, manual, ev.index, t);
           out.push({ kind: 'charge', level: ev.index / t });
-        } else if (effect === 'shield') this.addShield(out, (this.stats.def * 3) / t, false);
+        } else if (effect === 'shield') {
+          this.addShield(out, (this.stats.def * 3) / t, false);
+          // Each squat also shoves with the shield, so a squat set can win a fight.
+          this.damage(out, ev.exerciseId, effect, this.stats.atk / t, 'physical', false, manual, ev.index, t);
+        }
         break;
       }
       case 'holdTick': {
