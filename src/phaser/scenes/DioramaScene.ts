@@ -1,28 +1,26 @@
 import Phaser from 'phaser';
 import { audio } from '../../game/audio';
 import { bus, type DioramaState } from '../../game/bus';
+import { getSave } from '../../game/store';
 import { input } from '../../input/InputHub';
 import { FIG_H, FIG_ORIGIN_Y } from '../diorama/figures';
 import { EDGE, GROUND_SCALE } from '../diorama/ground';
 import { getDioramaState } from '../game';
-import { BOARD, FENCE_X, GATE_GAP, POND, scatter, SPOTS, START, type Placed } from '../diorama/layout';
+import { BOARD, FENCE_X, GATE_GAP, scatter, SPOTS, START, type Placed } from '../diorama/layout';
+import { angleDelta, headingVector, resolveMove, turnHeading, type Obstacle } from '../diorama/steering';
 
 /**
  * The Motion Trial board, explored with the body: march in place to walk,
- * lean to turn. Top-down "tank" steering — the hero walks where they face and
- * leaning rotates that heading — which needs no second axis from the player
- * and stays predictable from a fixed camera.
+ * lean to turn. Steering is discrete — each lean turns the hero exactly one
+ * step (45° by default, 90° optional) and the hero walks straight along that
+ * heading — so the player always knows which way they'll go, can turn while
+ * standing still, and never drifts from a posture wobble.
  */
-const HERO_R = 26;
 const SPEED = 190;
-const TURN_MOVING = 1.9; // rad/s at full lean
-const TURN_STILL = 1.2;
 const INTERACT_R = 150;
 const ENCOUNTER_R = 140;
 const REACH_R = 110;
 const HERO_UNITS = 104;
-
-type Obstacle = { x: number; y: number; r: number };
 
 interface Actor {
   id: string;
@@ -42,7 +40,9 @@ export class DioramaScene extends Phaser.Scene {
   private tilt!: Phaser.GameObjects.Image;
   private obstacles: Obstacle[] = [];
   private actors = new Map<string, Actor>();
+  /** Authoritative heading on the turn grid; `shown` eases toward it. */
   private heading = 0;
+  private shown = 0;
   private speed = 0;
   private walkT = 0;
   private attract = false;
@@ -60,6 +60,7 @@ export class DioramaScene extends Phaser.Scene {
   init(data: { attract?: boolean }): void {
     this.attract = !!data?.attract;
     this.heading = START.heading;
+    this.shown = START.heading;
     this.speed = 0;
     this.near = null;
     this.reached.clear();
@@ -120,7 +121,9 @@ export class DioramaScene extends Phaser.Scene {
 
     // Hero
     this.heroShadow = this.add.image(START.x, START.y, 'dshadow').setScale(0.6, 0.45);
-    this.arrow = this.add.image(START.x, START.y, 'prop-heading').setScale(0.9).setAlpha(0.9).setDepth(-8);
+    // A small facing chevron floating above the head (always visible, even
+    // when the hero faces up the board and would hide a ground marker).
+    this.arrow = this.add.image(START.x, START.y, 'prop-heading').setAlpha(0.95).setDepth(5200);
     this.hero = this.add.image(START.x, START.y, 'fig-hero').setOrigin(0.5, FIG_ORIGIN_Y).setScale(HERO_UNITS / FIG_H);
 
     this.pointer = this.add.text(0, 0, '▲', { fontFamily: 'sans-serif', fontSize: '64px', color: '#ffe38a', stroke: '#1a1c2c', strokeThickness: 10 }).setOrigin(0.5).setDepth(9000).setVisible(false);
@@ -148,6 +151,7 @@ export class DioramaScene extends Phaser.Scene {
     this.events.on('wake', () => {
       this.encounterLock = false;
       this.speed = 0;
+      input.takeTurns();
       audio.music('village');
     });
     this.applyState(getDioramaState());
@@ -248,6 +252,7 @@ export class DioramaScene extends Phaser.Scene {
   private resetHero(): void {
     this.hero.setPosition(START.x, START.y);
     this.heading = START.heading;
+    this.shown = START.heading;
     this.speed = 0;
   }
 
@@ -265,15 +270,21 @@ export class DioramaScene extends Phaser.Scene {
       return;
     }
 
-    const intent = input.intent();
-    const turnRate = intent.forward > 0 ? TURN_MOVING : TURN_STILL;
-    this.heading += intent.turn * turnRate * dt;
-    const target = intent.forward * SPEED;
-    this.speed += (target - this.speed) * Math.min(1, dt * 6);
+    const turns = input.takeTurns();
+    if (turns !== 0) {
+      this.heading = turnHeading(this.heading, turns, getSave().settings.motion.turnStep);
+      audio.select();
+    }
+    // The figure and indicator swing round quickly; movement uses the exact
+    // grid heading straight away.
+    this.shown += angleDelta(this.shown, this.heading) * Math.min(1, dt * 14);
+    const target = input.intent().forward * SPEED;
+    // Start briskly, stop even faster.
+    this.speed += (target - this.speed) * Math.min(1, dt * (target > this.speed ? 9 : 14));
+    if (target === 0 && this.speed < 4) this.speed = 0;
 
-    const dx = Math.sin(this.heading) * this.speed * dt;
-    const dy = -Math.cos(this.heading) * this.speed * dt;
-    this.moveHero(dx, dy);
+    const v = headingVector(this.heading);
+    this.moveHero(v.x * this.speed * dt, v.y * this.speed * dt);
 
     // Marching bob and a little toy wobble.
     const moving = this.speed > 12;
@@ -282,13 +293,15 @@ export class DioramaScene extends Phaser.Scene {
     const bob = moving ? Math.abs(Math.sin(this.walkT)) * 8 : 0;
     this.hero.setScale(hs * (moving ? 1 + Math.sin(this.walkT * 2) * 0.02 : 1), hs * (moving ? 1 - Math.sin(this.walkT * 2) * 0.03 : 1));
     this.hero.setAngle(moving ? Math.sin(this.walkT) * 5 : 0);
+    // Face the direction of travel (the figures are drawn facing right).
     const sx = Math.sin(this.heading);
     if (Math.abs(sx) > 0.2) this.hero.setFlipX(sx < 0);
     const hx = this.hero.x;
     const hy = this.hero.y;
     this.hero.setDepth(hy);
     this.heroShadow.setPosition(hx, hy).setDepth(hy - 1).setAlpha(moving ? 0.7 : 0.85);
-    this.arrow.setPosition(hx, hy).setRotation(this.heading);
+    const ahead = headingVector(this.shown);
+    this.arrow.setPosition(hx + ahead.x * 14, hy - HERO_UNITS * 1.32 + ahead.y * 10 - bob).setRotation(this.shown);
     this.hero.setOrigin(0.5, FIG_ORIGIN_Y + bob / FIG_H);
     if (moving) {
       this.stepSfx += dt;
@@ -303,36 +316,8 @@ export class DioramaScene extends Phaser.Scene {
   }
 
   private moveHero(dx: number, dy: number): void {
-    let x = this.hero.x + dx;
-    let y = this.hero.y + dy;
-    for (const o of this.obstacles) {
-      const ox = x - o.x;
-      const oy = (y - o.y) * 1.6; // ground ellipses are flatter than they are wide
-      const d = Math.hypot(ox, oy);
-      const min = o.r + HERO_R;
-      if (d < min && d > 0.001) {
-        x = o.x + (ox / d) * min;
-        y = o.y + ((oy / d) * min) / 1.6;
-      }
-    }
-    // Pond
-    const px = (x - POND.x) / (POND.rx + HERO_R);
-    const py = (y - POND.y) / (POND.ry + HERO_R * 0.6);
-    const pd = Math.hypot(px, py);
-    if (pd < 1 && pd > 0.001) {
-      x = POND.x + (px / pd) * (POND.rx + HERO_R);
-      y = POND.y + (py / pd) * (POND.ry + HERO_R * 0.6);
-    }
-    // Fence: passable only through the gateway once the ward is down.
-    const through = this.state.gateOpen && y > GATE_GAP.y0 + 10 && y < GATE_GAP.y1 - 10;
-    if (!through) {
-      const wasLeft = this.hero.x < FENCE_X;
-      if (wasLeft && x > FENCE_X - HERO_R) x = FENCE_X - HERO_R;
-      if (!wasLeft && x < FENCE_X + HERO_R) x = FENCE_X + HERO_R;
-    }
-    x = Phaser.Math.Clamp(x, 50, BOARD.w - 50);
-    y = Phaser.Math.Clamp(y, 60, BOARD.h - 30);
-    this.hero.setPosition(x, y);
+    const p = resolveMove(this.hero, dx, dy, { obstacles: this.obstacles, gateOpen: this.state.gateOpen });
+    this.hero.setPosition(p.x, p.y);
   }
 
   private checkSpots(x: number, y: number): void {

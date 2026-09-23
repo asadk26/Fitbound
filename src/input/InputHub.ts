@@ -1,48 +1,59 @@
 import type { PoseFrame } from '../exercise/types';
+import { commandAllowed, isMenuMode, type CommandType, type InputMode } from './modes';
 import { MotionReader, type MotionConfig, type MotionReading, type NeutralPose } from './motion';
 
+export type { InputMode } from './modes';
+
 /**
- * One place that decides which inputs count right now.
+ * One place that decides which inputs count right now (see ./modes.ts).
  *
- *  - calibration: motion is read (for the setup checklist); gestures fire.
- *  - explore:     march + lean move the hero; confirm / back / pause gestures.
- *  - menu:        lean moves a selection; confirm / back / pause gestures;
- *                 marching never moves anything.
- *  - exercise:    motion input is OFF. Only the active exercise detector
- *                 (owned by the battle) sees frames, so a jumping jack can't
- *                 be read as "pause" and a squat can't be read as a step.
- *  - off:         nothing.
+ * Every input source speaks the same small command language — move, turn,
+ * nav, confirm, back, pause, step — and every command goes through
+ * `command()`, which filters it by the current mode:
  *
- * Every mode change resets motion history and disarms gestures: hands that
- * were already up when a mode starts must come down before they count.
+ *   - single-device play: camera frames are fed in here and the local
+ *     MotionReader turns them into commands;
+ *   - Connected Play: the phone runs the MotionReader and sends the same
+ *     commands over the network; after validation they arrive here too;
+ *   - keyboard and touch are always available as a fallback.
  *
- * Inputs come from camera frames or a keyboard; later, a separate phone
- * controller or an auto-walk source can feed the same intents.
+ * Every mode change resets motion history and disarms gestures (hands that
+ * were already up when a mode starts must come down before they count) and
+ * bumps `epoch`, so a command issued for the previous mode can be recognised
+ * and dropped when it arrives late.
  */
-export type InputMode = 'off' | 'calibration' | 'explore' | 'menu' | 'exercise';
+export type InputSource = 'motion' | 'keyboard' | 'touch' | 'remote';
 
 export type InputEvent =
-  | { type: 'confirm' | 'back' | 'pause' | 'step'; source: 'motion' | 'keyboard' | 'touch' }
-  | { type: 'nav'; dir: -1 | 1; source: 'motion' | 'keyboard' };
+  | { type: 'confirm' | 'back' | 'pause' | 'step'; source: InputSource }
+  | { type: 'nav' | 'turn'; dir: -1 | 1; source: InputSource };
+
+export type Command = { type: 'move'; forward: number } | { type: 'turn' | 'nav'; dir: -1 | 1 } | { type: 'confirm' | 'back' | 'pause' | 'step' };
 
 export interface MoveIntent {
-  /** 0..1 forward speed. */
+  /** 0..1 forward speed. Turning is discrete: see takeTurns(). */
   forward: number;
-  /** -1 (turn left) .. +1 (turn right). */
-  turn: number;
 }
 
-const NAV_REPEAT_MS = 900;
+/** Movement stops if no fresh move command arrives for this long. */
+export const MOVE_TIMEOUT_MS = 1200;
+
+const clock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
 export class InputHub {
   mode: InputMode = 'off';
+  /** Increments on every mode change. */
+  epoch = 0;
+  /** 'remote' when a phone controller drives the game (Connected Play). */
+  source: 'local' | 'remote' = 'local';
   readonly reader: MotionReader;
   latest: MotionReading | null = null;
   private listeners = new Set<(e: InputEvent) => void>();
   private readingListeners = new Set<(r: MotionReading | null) => void>();
-  private navDir: -1 | 0 | 1 = 0;
-  private navAt = 0;
-  private keys = { forward: false, left: false, right: false };
+  private modeListeners = new Set<(m: InputMode, epoch: number) => void>();
+  private keys = { forward: false };
+  private move = { forward: 0, at: -Infinity };
+  private turns = 0;
 
   constructor(cfg: Partial<MotionConfig> = {}) {
     this.reader = new MotionReader(cfg);
@@ -51,8 +62,20 @@ export class InputHub {
   setMode(mode: InputMode): void {
     if (mode === this.mode) return;
     this.mode = mode;
+    this.epoch++;
     this.reader.reset();
-    this.navDir = 0;
+    this.stop();
+    if (this.source === 'local') {
+      this.latest = null;
+      this.readingListeners.forEach((f) => f(null));
+    }
+    this.modeListeners.forEach((f) => f(mode, this.epoch));
+  }
+
+  /** Switch between the local camera and a remote phone controller. */
+  useRemote(on: boolean): void {
+    this.source = on ? 'remote' : 'local';
+    this.stop();
     this.latest = null;
     this.readingListeners.forEach((f) => f(null));
   }
@@ -71,83 +94,106 @@ export class InputHub {
     return () => this.readingListeners.delete(fn);
   }
 
+  onMode(fn: (m: InputMode, epoch: number) => void): () => void {
+    this.modeListeners.add(fn);
+    return () => this.modeListeners.delete(fn);
+  }
+
   private emit(e: InputEvent): void {
     this.listeners.forEach((f) => f(e));
   }
 
-  /** Feed one camera frame. Ignored in exercise / off modes. */
+  /**
+   * The single entry point for input. Returns false when the current mode
+   * doesn't allow the command (it is then ignored entirely).
+   */
+  command(cmd: Command, source: InputSource, now = clock()): boolean {
+    const m = this.mode;
+    let type: CommandType = cmd.type;
+    // In menus a turn (lean / arrow key) moves the highlight instead.
+    if (type === 'turn' && isMenuMode(m)) type = 'nav';
+    if (!commandAllowed(m, type)) return false;
+    switch (cmd.type) {
+      case 'move':
+        this.move = { forward: Math.max(0, Math.min(1, cmd.forward)), at: now };
+        return true;
+      case 'turn':
+      case 'nav':
+        if (type === 'turn') this.turns += cmd.dir;
+        this.emit({ type: type === 'turn' ? 'turn' : 'nav', dir: cmd.dir, source });
+        return true;
+      default:
+        this.emit({ type: cmd.type, source });
+        return true;
+    }
+  }
+
+  /** Feed one local camera frame. Ignored in exercise / off modes and while a remote controller drives the game. */
   feed(frame: PoseFrame | null, now: number): MotionReading | null {
     const m = this.mode;
-    if (m === 'off' || m === 'exercise') return null;
+    if (m === 'off' || m === 'exercise' || this.source !== 'local') return null;
     const r = this.reader.update(frame, now);
     this.latest = r;
+    this.command({ type: 'move', forward: r.marching ? r.intensity : 0 }, 'motion', now);
     for (const ev of r.events) {
-      if (ev === 'step' && m !== 'explore' && m !== 'calibration') continue;
-      this.emit({ type: ev, source: 'motion' });
-    }
-    if (m === 'menu') {
-      const d = r.leanDir;
-      if (d !== 0 && (d !== this.navDir || now - this.navAt >= NAV_REPEAT_MS)) {
-        this.navAt = now;
-        this.emit({ type: 'nav', dir: d, source: 'motion' });
-      }
-      this.navDir = d;
+      if (ev === 'turnLeft' || ev === 'turnRight') this.command({ type: 'turn', dir: ev === 'turnLeft' ? -1 : 1 }, 'motion', now);
+      else this.command({ type: ev }, 'motion', now);
     }
     this.readingListeners.forEach((f) => f(r));
     return r;
   }
 
-  /** Movement for the exploration scene; zero outside explore mode. */
-  intent(): MoveIntent {
-    if (this.mode !== 'explore') return { forward: 0, turn: 0 };
-    const k = this.keys;
-    const kTurn = (k.right ? 1 : 0) - (k.left ? 1 : 0);
-    if (k.forward || kTurn) return { forward: k.forward ? 1 : 0, turn: kTurn };
-    const r = this.latest;
-    if (!r || r.tracking === 'lost') return { forward: 0, turn: 0 };
-    return { forward: r.marching ? r.intensity : 0, turn: r.steer };
+  /** A remote controller's latest reading, for the on-screen meters only. */
+  setRemoteReading(r: MotionReading | null): void {
+    if (this.source !== 'remote') return;
+    this.latest = r;
+    this.readingListeners.forEach((f) => f(r));
+  }
+
+  /** Forward speed for the exploration scene; zero outside explore mode. */
+  intent(now = clock()): MoveIntent {
+    if (this.mode !== 'explore') return { forward: 0 };
+    if (this.keys.forward) return { forward: 1 };
+    return { forward: now - this.move.at <= MOVE_TIMEOUT_MS ? this.move.forward : 0 };
+  }
+
+  /** Discrete turns requested since the last call (+1 per right, -1 per left). */
+  takeTurns(): number {
+    const t = this.turns;
+    this.turns = 0;
+    return t;
+  }
+
+  /** Stop all movement at once, e.g. when the controller disconnects. */
+  stop(): void {
+    this.move = { forward: 0, at: -Infinity };
+    this.turns = 0;
   }
 
   /** Keyboard / touch equivalents, filtered by mode like motion input. */
   press(action: 'confirm' | 'back' | 'pause' | 'left' | 'right', source: 'keyboard' | 'touch' = 'keyboard'): void {
-    const m = this.mode;
-    if (m === 'off') return;
-    if (m === 'exercise' && action !== 'pause') return;
-    if (action === 'left' || action === 'right') {
-      if (m === 'menu' && source === 'keyboard') this.emit({ type: 'nav', dir: action === 'left' ? -1 : 1, source });
-      return;
-    }
-    this.emit({ type: action, source });
+    if (action === 'left' || action === 'right') this.command({ type: 'turn', dir: action === 'left' ? -1 : 1 }, source);
+    else this.command({ type: action }, source);
   }
 
-  setKey(key: 'forward' | 'left' | 'right', down: boolean): void {
+  setKey(key: 'forward', down: boolean): void {
     this.keys[key] = down;
   }
 
   /** Arrow keys / WASD / Enter / Esc / P for desktop testing. */
   attachKeyboard(target: Window): () => void {
-    const map: Record<string, 'forward' | 'left' | 'right'> = {
-      ArrowUp: 'forward',
-      KeyW: 'forward',
-      ArrowLeft: 'left',
-      KeyA: 'left',
-      ArrowRight: 'right',
-      KeyD: 'right',
-    };
     const down = (e: KeyboardEvent) => {
-      const k = map[e.code];
-      if (k) {
-        this.setKey(k, true);
-        if (!e.repeat && (k === 'left' || k === 'right')) this.press(k);
-      }
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') this.setKey('forward', true);
       if (e.repeat) return;
+      // One press = one turn, like one lean.
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.press('left');
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') this.press('right');
       if (e.code === 'Enter' || e.code === 'Space') this.press('confirm');
       if (e.code === 'Escape' || e.code === 'Backspace') this.press('back');
       if (e.code === 'KeyP') this.press('pause');
     };
     const up = (e: KeyboardEvent) => {
-      const k = map[e.code];
-      if (k) this.setKey(k, false);
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') this.setKey('forward', false);
     };
     target.addEventListener('keydown', down);
     target.addEventListener('keyup', up);

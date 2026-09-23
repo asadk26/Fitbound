@@ -8,8 +8,8 @@ import './styles.css';
 // `?debug` exposes internals for browser automation. It grants nothing a
 // player couldn't already do from devtools.
 if (new URLSearchParams(location.search).has('debug')) {
-  void Promise.all([import('./testing/poses'), import('./pose/PoseTracker'), import('./input/InputHub'), import('./phaser/diorama/layout')]).then(([poses, pose, hub, layout]) => {
-    (window as unknown as { __fb: unknown }).__fb = { bus, getSave, updateSave, getGame, poses, tracker: pose.tracker, input: hub.input, layout };
+  void Promise.all([import('./testing/poses'), import('./pose/PoseTracker'), import('./input/InputHub'), import('./phaser/diorama/layout'), import('./net/host')]).then(([poses, pose, hub, layout, net]) => {
+    (window as unknown as { __fb: unknown }).__fb = { bus, getSave, updateSave, getGame, poses, tracker: pose.tracker, input: hub.input, layout, host: net.host };
   });
 }
 

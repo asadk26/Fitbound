@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { InputHub, type InputEvent } from '../src/input/InputHub';
-import { MotionReader, NeutralCalibrator, type MotionReading } from '../src/input/motion';
+import { MotionReader, motionPreset, NeutralCalibrator, type MotionReading } from '../src/input/motion';
 import type { PoseFrame } from '../src/exercise/types';
 import { FRAME_MS, jackPose, rng, standPose, type StandOpts } from '../src/testing/poses';
 
@@ -31,6 +31,19 @@ describe('march detection', () => {
     const r = run(new MotionReader(), still(300, { noise }));
     expect(r.out.some((o) => o.marching)).toBe(false);
     expect(r.events.filter((e) => e === 'step')).toHaveLength(0);
+  });
+
+  it('even at high march sensitivity, idle standing and swaying never move', () => {
+    const noise = { r: rng(21), amp: 0.01 };
+    const r = run(new MotionReader(motionPreset({ march: 'high' })), still(300, { noise }));
+    expect(r.out.some((o) => o.marching)).toBe(false);
+    const sway = Array.from({ length: 200 }, (_, i) => ({ lean: 3 * Math.sin(i * 0.2), noise }));
+    expect(run(new MotionReader(motionPreset({ march: 'high' })), sway).out.some((o) => o.marching)).toBe(false);
+  });
+
+  it('smaller knee lifts register than before (no exaggerated high knees needed)', () => {
+    const r = run(new MotionReader(), [...still(20), ...march(120, 0.2)]);
+    expect(r.last.marching).toBe(true);
   });
 
   it('triggers from deliberate marching and stops shortly after marching stops', () => {
@@ -165,10 +178,9 @@ describe('input modes', () => {
     const hub = new InputHub();
     const evs = collect(hub);
     hub.setMode('explore');
-    feed(hub, poses([...still(15), ...march(60, 0.6, { lean: -12 })]));
-    const i = hub.intent();
-    expect(i.forward).toBeGreaterThan(0);
-    expect(i.turn).toBeGreaterThan(0);
+    const t = feed(hub, poses([...still(15), ...march(60, 0.6, { lean: -12 })]));
+    expect(hub.intent(t).forward).toBeGreaterThan(0);
+    expect(hub.takeTurns()).toBe(1);
     feed(hub, poses([...still(15), ...still(30, { rightHand: 'up' })]), 5000);
     expect(evs.some((e) => e.type === 'confirm')).toBe(true);
   });
@@ -185,7 +197,8 @@ describe('input modes', () => {
     );
     expect(t).toBeGreaterThan(0);
     expect(evs).toHaveLength(0);
-    expect(hub.intent()).toEqual({ forward: 0, turn: 0 });
+    expect(hub.intent(t)).toEqual({ forward: 0 });
+    expect(hub.takeTurns()).toBe(0);
     expect(hub.latest).toBeNull();
   });
 
@@ -193,8 +206,8 @@ describe('input modes', () => {
     const hub = new InputHub();
     const evs = collect(hub);
     hub.setMode('menu');
-    feed(hub, poses([...still(15), ...march(60)]));
-    expect(hub.intent()).toEqual({ forward: 0, turn: 0 });
+    const t = feed(hub, poses([...still(15), ...march(60)]));
+    expect(hub.intent(t)).toEqual({ forward: 0 });
     expect(evs.filter((e) => e.type === 'step')).toHaveLength(0);
     feed(hub, poses(still(20, { lean: 12 })), 3000);
     expect(evs.filter((e) => e.type === 'nav')).toEqual([{ type: 'nav', dir: -1, source: 'motion' }]);

@@ -1,0 +1,245 @@
+/* The phone controller: high contrast, large type, no animation beyond a
+   short flash — it has to be readable at a glance from a few metres and
+   cheap enough to leave running with the camera for a whole session. */
+:root {
+  color-scheme: dark;
+  --bg: #000;
+  --fg: #fff;
+  --muted: #b8b8c8;
+  --ok: #7dff9a;
+  --warn: #ffd166;
+  --bad: #ff6b6b;
+  --card: #15151f;
+  --accent: #ffcd75;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 17px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+button {
+  font: inherit;
+  font-weight: 700;
+  color: #000;
+  background: var(--fg);
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  min-height: 48px;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+button:disabled {
+  opacity: 0.5;
+}
+button.big {
+  font-size: 1.25rem;
+  padding: 16px 22px;
+  background: var(--accent);
+  width: 100%;
+}
+button.ghost {
+  background: transparent;
+  color: var(--fg);
+  border: 2px solid #555;
+}
+button.pause {
+  background: var(--warn);
+}
+button.warnbtn {
+  background: var(--warn);
+  width: 100%;
+}
+.pad {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pad-center {
+  min-height: 100dvh;
+  justify-content: center;
+}
+h1 {
+  margin: 0;
+  font-size: 1.7rem;
+}
+h1 span {
+  color: var(--accent);
+}
+p {
+  margin: 0;
+}
+.small {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.bad {
+  color: var(--bad);
+  font-weight: 700;
+}
+.warn {
+  color: var(--warn);
+  font-weight: 700;
+}
+.pair-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pair-form input {
+  font: 700 2.2rem/1 ui-monospace, Menlo, monospace;
+  letter-spacing: 0.3em;
+  text-align: center;
+  padding: 14px;
+  border-radius: 12px;
+  border: 2px solid #666;
+  background: #111;
+  color: var(--fg);
+  width: 100%;
+}
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pill {
+  font-weight: 800;
+  font-size: 0.95rem;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+}
+.pill::before {
+  content: '● ';
+}
+.pill.ok {
+  color: var(--ok);
+}
+.pill.warn {
+  color: var(--warn);
+}
+.pill.bad {
+  color: var(--bad);
+}
+.mode,
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mode small,
+.card small {
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+}
+.mode b {
+  font-size: 1.8rem;
+}
+.card b {
+  font-size: 1.15rem;
+}
+.card b.reps {
+  font-size: 3rem;
+  line-height: 1;
+}
+.card b.reps small {
+  font-size: 1.4rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.bar {
+  height: 12px;
+  border-radius: 6px;
+  background: #333;
+  overflow: hidden;
+}
+.bar i {
+  display: block;
+  height: 100%;
+  background: var(--ok);
+}
+.action {
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 800;
+  min-height: 2.1rem;
+  color: var(--muted);
+}
+.action.on {
+  color: var(--accent);
+}
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.row > * {
+  flex: 1 1 auto;
+}
+.touchpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.touchpad button {
+  min-height: 64px;
+  font-size: 1.05rem;
+}
+.touchpad .walk {
+  background: var(--ok);
+}
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.pad-cam {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  border: 2px solid #333;
+}
+/* Shared with the game: the live <video> stays in the page, nearly invisible. */
+.cam-parked {
+  position: fixed;
+  width: 2px;
+  height: 2px;
+  left: 0;
+  top: 0;
+  opacity: 0.01;
+  pointer-events: none;
+}
+.camview {
+  position: relative;
+  background: #000;
+  overflow: hidden;
+}
+.camview-feed {
+  position: absolute;
+  inset: 0;
+}
+.camview-feed.mirrored {
+  transform: scaleX(-1);
+}
+.cam-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}

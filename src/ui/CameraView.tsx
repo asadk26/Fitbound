@@ -11,7 +11,7 @@ import { POSE_LINKS, tracker } from '../pose/PoseTracker';
  * moment one screen's preview handed over to the next. The video element now
  * never moves, and any number of previews can show it at once.
  */
-export function CameraView({ className = '', skeleton = true, good = true, children }: { className?: string; skeleton?: boolean; good?: boolean; children?: React.ReactNode }) {
+export function CameraView({ className = '', skeleton = true, good = true, fps = 60, children }: { className?: string; skeleton?: boolean; good?: boolean; /** Paint at most this often (the phone controller keeps it low to save battery). */ fps?: number; children?: React.ReactNode }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const raw = useRef<NormalizedLandmark[] | null>(null);
   const goodRef = useRef(good);
@@ -21,8 +21,11 @@ export function CameraView({ className = '', skeleton = true, good = true, child
 
   useEffect(() => {
     let rafId = 0;
-    const draw = () => {
+    let last = 0;
+    const draw = (t = 0) => {
       rafId = requestAnimationFrame(draw);
+      if (t - last < 1000 / fps - 4) return;
+      last = t;
       const c = canvas.current;
       const v = tracker.video;
       if (!c) return;
@@ -74,7 +77,7 @@ export function CameraView({ className = '', skeleton = true, good = true, child
     };
     draw();
     return () => cancelAnimationFrame(rafId);
-  }, [skeleton]);
+  }, [skeleton, fps]);
 
   return (
     <div className={`camview ${className}`}>

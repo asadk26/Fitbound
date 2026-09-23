@@ -2,6 +2,7 @@ import type { TrialTargets } from '../trial/config';
 import { DEFAULT_TARGETS } from '../trial/config';
 import { updateSave } from '../game/store';
 import { useSave } from './useSave';
+import { MotionSettings } from './Connected';
 
 /**
  * One screen of setup before the Motion Trial: where to put the phone, how
@@ -73,6 +74,7 @@ export function TrialSetup({ onStart, onBack }: { onStart: () => void; onBack: (
           <button className="btn btn-sm btn-ghost" onClick={() => updateSave((s) => void (s.settings.trialTargets = { ...DEFAULT_TARGETS }))}>
             Reset rep targets
           </button>
+          <MotionSettings />
           <div className="toggle-row">
             <span>Sound &amp; spoken cues</span>
             <div className="seg">

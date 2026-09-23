@@ -4,12 +4,15 @@ import { audio } from '../game/audio';
 import { levelForXp, statsFor, type PlayerStats } from '../game/progression';
 import { getSave, updateSave } from '../game/store';
 import { input } from '../input/InputHub';
+import { motionPreset } from '../input/motion';
+import { host } from '../net/host';
 import { setDioramaState, showScene } from '../phaser/game';
 import { tracker, TrackerError } from '../pose/PoseTracker';
 import { BOONS, encounterPlan, parseTargets, trialEnemy, type TrialEnemy } from '../trial/config';
 import { AutoBattle, type BattleResult } from './AutoBattle';
 import { Calibration } from './Calibration';
 import { CameraView } from './CameraView';
+import { ControllerLost, ControllerStatus, RemoteCalibration, useLink } from './Connected';
 import { GestureMenu, HoldRing, MotionMeter, useInputEvents, useMotion } from './motionUi';
 
 /**
@@ -53,7 +56,7 @@ interface Log {
   partTimes: Record<string, number>;
 }
 
-export function TrialRun({ onExit }: { onExit: () => void }) {
+export function TrialRun({ onExit, connected = false }: { onExit: () => void; /** Connected Play: a phone is the controller. */ connected?: boolean }) {
   const save = getSave();
   const targets = useMemo(() => parseTargets(location.search, save.settings.trialTargets), [save.settings.trialTargets]);
   const [stage, setStageState] = useState<Stage>('calibrate');
@@ -71,6 +74,8 @@ export function TrialRun({ onExit }: { onExit: () => void }) {
   const [lostBanner, setLostBanner] = useState(false);
   const log = useRef<Log>({ startedAt: Date.now(), calibratedAt: null, exploreSteps: 0, gestures: 0, floorOk: false, trackingLosses: 0, reps: {}, partTimes: {} });
   const r = useMotion();
+  const link = useLink();
+  const ctrlLost = connected && link.controller !== 'connected';
 
   const stats: PlayerStats = useMemo(() => {
     const s = statsFor(levelForXp(save.xp), save.upgrades);
@@ -82,18 +87,28 @@ export function TrialRun({ onExit }: { onExit: () => void }) {
     setStageState(s);
     if (s === 'calibrate') input.setMode('calibration');
     else if (s === 'explore') input.setMode('explore');
+    else if (s === 'dialog') input.setMode('dialogue');
     else if (s !== 'battle') input.setMode('menu');
   };
 
   // Camera + motion input for the whole session.
   useEffect(() => {
     showScene('Diorama', { attract: false });
-    tracker.facing = getSave().settings.cameraFacing;
-    const offFeed = tracker.subscribe((f) => input.feed(f.frame, f.now));
-    tracker
-      .start(getSave().settings.model)
-      .then(() => setCamera({ state: 'running' }))
-      .catch((e) => setCamera({ state: 'error', message: e instanceof TrackerError ? e.message : String(e) }));
+    input.reader.configure(motionPreset(getSave().settings.motion));
+    let offFeed = () => {};
+    if (connected) {
+      // The phone runs the camera and detectors; this page only receives
+      // validated commands (see net/host.ts).
+      host.start();
+    } else {
+      input.useRemote(false);
+      tracker.facing = getSave().settings.cameraFacing;
+      offFeed = tracker.subscribe((f) => input.feed(f.frame, f.now));
+      tracker
+        .start(getSave().settings.model)
+        .then(() => setCamera({ state: 'running' }))
+        .catch((e) => setCamera({ state: 'error', message: e instanceof TrackerError ? e.message : String(e) }));
+    }
     const detach = input.attachKeyboard(window);
     const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } };
     let lock: { release: () => Promise<void> } | null = null;
@@ -117,8 +132,9 @@ export function TrialRun({ onExit }: { onExit: () => void }) {
       offFeed();
       detach();
       offs.forEach((f) => f());
-      tracker.stop();
+      if (!connected) tracker.stop();
       input.setMode('off');
+      if (connected) host.stop();
       lock?.release().catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -148,6 +164,27 @@ export function TrialRun({ onExit }: { onExit: () => void }) {
       audio.say(next.title);
     }
   }
+
+  // Connected Play: losing the phone stops movement at once (the host link
+  // does that) and pauses exploration; resuming needs the phone back, its
+  // camera running and the player in view.
+  useEffect(() => {
+    if (!ctrlLost) return;
+    audio.trackingLost();
+    audio.say('Controller disconnected. The game is paused.', false);
+    if (stageRef.current === 'explore') {
+      setPaused(true);
+      input.setMode('menu');
+    }
+  }, [ctrlLost]);
+
+  // Tell the phone what's going on, for its dashboard.
+  useEffect(() => {
+    if (!connected) return;
+    const o = OBJECTIVES[obj];
+    const title = stage === 'calibrate' ? 'Setup' : stage === 'battle' ? 'Battle' : stage === 'summary' ? 'Trial complete' : (o?.title ?? '');
+    host.send({ type: 'GAME', title, hint: stage === 'explore' ? (o?.hint ?? '') : '', exercise: null, paused, notice: null });
+  }, [connected, stage, obj, paused, link.controller]);
 
   // Tracking-lost cue while exploring.
   const lostSince = useRef<number | null>(null);
@@ -198,11 +235,23 @@ export function TrialRun({ onExit }: { onExit: () => void }) {
   });
 
   const current = OBJECTIVES[obj];
+  // In Connected Play, only resume once the phone is back and ready.
+  const canResume = !connected || (link.controller === 'connected' && host.ready);
   const floorWarn = stage !== 'calibrate' && !log.current.floorOk;
 
   return (
     <div className="trial">
-      {stage === 'calibrate' && (
+      {stage === 'calibrate' && connected && (
+        <RemoteCalibration
+          onDone={(res) => {
+            log.current.calibratedAt = Date.now();
+            log.current.floorOk = res.floorOk;
+            setStage('explore');
+            audio.say(OBJECTIVES[0].title + '. ' + OBJECTIVES[0].hint);
+          }}
+        />
+      )}
+      {stage === 'calibrate' && !connected && (
         <Calibration
           camera={camera}
           onDone={(res) => {
@@ -223,7 +272,13 @@ export function TrialRun({ onExit }: { onExit: () => void }) {
             <b>{current.title}</b>
             <span>{current.hint}</span>
           </div>
-          <CameraView className="tv-pip" good={r?.tracking === 'good'} />
+          {connected ? (
+            <div className="tv-pip tv-pip-ctrl">
+              <ControllerStatus />
+            </div>
+          ) : (
+            <CameraView className="tv-pip" good={r?.tracking === 'good'} />
+          )}
           <div className="tv-bottom">
             <MotionMeter r={r} />
             {current.interact && near === current.interact && <HoldRing value={r?.hold.confirm ?? 0} label={current.prompt ?? 'interact'} hand="right" />}
@@ -260,6 +315,7 @@ export function TrialRun({ onExit }: { onExit: () => void }) {
       {stage === 'battle' && enemyId && (
         <AutoBattle
           key={enemyId}
+          connected={connected}
           enemy={trialEnemy(enemyId, stats, targets)}
           plan={encounterPlan(enemyId, targets)}
           stats={stats}
@@ -318,24 +374,32 @@ export function TrialRun({ onExit }: { onExit: () => void }) {
         <div className="tv-overlay">
           <GestureMenu
             title="Paused"
+            text={ctrlLost ? 'The phone controller disconnected. Resume becomes available once it reconnects and can see you.' : undefined}
             options={[
-              { id: 'resume', label: 'Resume', icon: 'star' },
+              { id: 'resume', label: canResume ? 'Resume' : 'Resume (waiting for the phone…)', icon: 'star' },
               { id: 'recal', label: 'Recalibrate', detail: 'Moved the phone? Run setup again', icon: 'shield' },
               { id: 'quit', label: 'Quit trial', icon: 'lock' },
             ]}
             onChoose={(id) => {
+              if (id === 'resume' && !canResume) {
+                audio.error();
+                return;
+              }
               setPaused(false);
               if (id === 'resume') input.setMode('explore');
               if (id === 'recal') setStage('calibrate');
               if (id === 'quit') onExit();
             }}
             onBack={() => {
+              if (!canResume) return;
               setPaused(false);
               input.setMode('explore');
             }}
           />
         </div>
       )}
+
+      {ctrlLost && stage !== 'summary' && <ControllerLost />}
 
       {floorWarn && stage === 'explore' && obj >= 3 && <div className="tv-warn">Floor check was skipped — push-ups may not track from this phone position.</div>}
     </div>

@@ -1871,3 +1871,102 @@ details summary {
   bottom: 18vh;
   font-size: max(9px, 2.4vh);
 }
+
+/* ── Connected Play (PC side) ─────────────────────────────────────────── */
+.connected-card {
+  max-width: min(980px, 96vw);
+}
+.pair-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 34%) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 640px) {
+  .pair-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.qr {
+  width: 100%;
+  max-width: 320px;
+  border-radius: 10px;
+  image-rendering: pixelated;
+}
+.pair-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pair-info code,
+.warn-box code {
+  word-break: break-all;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.pair-code {
+  font-family: var(--pixel);
+  font-size: clamp(22px, 5vh, 44px);
+  letter-spacing: 0.25em;
+  color: var(--gold);
+}
+.warn-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 3px solid var(--orange);
+  border-radius: 10px;
+  background: rgba(239, 125, 87, 0.15);
+}
+.calib-remote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #10121e;
+}
+.ctrl-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8vh;
+  padding: 1.2vh 1vw;
+  font-size: max(12px, 2.6vh);
+  font-weight: 700;
+}
+.ctrl-status.big {
+  font-size: max(14px, 3.6vh);
+  text-align: center;
+  align-items: center;
+  max-width: 90%;
+}
+.ctrl-status .dot.ok {
+  color: var(--lime);
+}
+.ctrl-status .dot.warn {
+  color: var(--gold);
+}
+.ctrl-status .dot.bad {
+  color: var(--orange);
+}
+.tv-pip-ctrl {
+  aspect-ratio: auto;
+  background: rgba(16, 18, 30, 0.88);
+  display: flex;
+  align-items: center;
+}
+.tv-lost-ctrl {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2vh;
+  text-align: center;
+  z-index: 80;
+  max-width: 80vw;
+  top: calc(3vh + var(--safe-t));
+  transform: translate(-50%, 0);
+  animation: none;
+}
+.tv-lost-ctrl span {
+  font-family: system-ui, sans-serif;
+  font-size: max(12px, 2.6vh);
+}

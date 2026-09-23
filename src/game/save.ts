@@ -2,6 +2,7 @@ import { EXERCISES, isPlayable, isUnlocked, MAX_LOADOUT } from '../exercise/regi
 import type { Difficulty } from '../exercise/types';
 import { levelForXp, type Upgrades } from './progression';
 import { DEFAULT_TARGETS, type TrialTargets } from '../trial/config';
+import type { Sensitivity } from '../input/motion';
 
 export const SAVE_KEY = 'fitbound.save.v1';
 export const SAVE_VERSION = 1;
@@ -19,6 +20,14 @@ export interface Settings {
   trialTargets: TrialTargets;
   /** Which phone camera watches the player. */
   cameraFacing: 'user' | 'environment';
+  /** Body-controller tuning: degrees per lean, and how easily a lean / step registers. */
+  motion: MotionSettings;
+}
+
+export interface MotionSettings {
+  turnStep: 45 | 90;
+  lean: Sensitivity;
+  march: Sensitivity;
 }
 
 export interface SaveData {
@@ -61,6 +70,7 @@ export function defaultSave(): SaveData {
       targetAdjust: {},
       trialTargets: { ...DEFAULT_TARGETS },
       cameraFacing: 'user',
+      motion: { turnStep: 45, lean: 'normal', march: 'normal' },
     },
     totals: { cameraReps: 0, manualReps: 0, holdSeconds: 0, battlesWon: 0 },
   };
@@ -143,12 +153,18 @@ export function sanitize(input: unknown): SaveData {
       ...(o.settings ?? {}),
       targetAdjust: { ...(o.settings?.targetAdjust ?? {}) },
       trialTargets: { ...DEFAULT_TARGETS, ...(o.settings?.trialTargets ?? {}) },
+      motion: { ...d.settings.motion, ...(o.settings?.motion ?? {}) },
     },
     totals: { ...d.totals, ...(o.totals ?? {}) },
   };
   if (!['beginner', 'intermediate', 'advanced'].includes(out.settings.difficulty)) out.settings.difficulty = 'beginner';
   if (out.settings.model !== 'lite' && out.settings.model !== 'full') out.settings.model = 'full';
   if (out.settings.cameraFacing !== 'environment') out.settings.cameraFacing = 'user';
+  const mo = out.settings.motion;
+  if (mo.turnStep !== 90) mo.turnStep = 45;
+  const sens = ['low', 'normal', 'high'];
+  if (!sens.includes(mo.lean)) mo.lean = 'normal';
+  if (!sens.includes(mo.march)) mo.march = 'normal';
   for (const k of Object.keys(DEFAULT_TARGETS) as (keyof TrialTargets)[]) {
     const v = Number(out.settings.trialTargets[k]);
     out.settings.trialTargets[k] = Number.isFinite(v) && v >= 1 && v <= 50 ? Math.round(v) : DEFAULT_TARGETS[k];

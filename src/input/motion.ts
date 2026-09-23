@@ -1,4 +1,4 @@
-import { dist, Ema, inFrame, LM, meanVisibility, mid } from '../exercise/geometry';
+import { dist, inFrame, LM, meanVisibility, mid } from '../exercise/geometry';
 import type { Landmark, PoseFrame, TrackingQuality } from '../exercise/types';
 
 /**
@@ -8,9 +8,12 @@ import type { Landmark, PoseFrame, TrackingQuality } from '../exercise/types';
  *  - Marching in place  → move. A step is an *alternating* difference in the
  *    height of the two legs, so jumping, squatting, bobbing or walking toward
  *    the camera (all of which move both legs together) never register.
- *  - Leaning the torso  → steer. Measured against a calibrated neutral, with a
- *    dead zone, smoothing and hysteresis so posture shifts and marching sway
- *    don't steer.
+ *  - Leaning the torso  → turn. One deliberate lean is exactly one discrete
+ *    turn (45° or 90°, chosen by the game); holding the lean never repeats,
+ *    and the next turn is armed only after the torso comes back to neutral.
+ *    Measured against a calibrated neutral with smoothing, a dead zone,
+ *    hysteresis and a cooldown, so posture shifts and marching sway don't
+ *    turn.
  *  - Raising a hand     → gestures (right = confirm, left = back, both =
  *    pause), each requiring a short hold and a return to neutral before the
  *    next one can fire.
@@ -34,10 +37,18 @@ export interface MotionConfig {
   leanDeadzoneDeg: number;
   /** Lean at which steering is full. */
   leanFullDeg: number;
-  /** Hysteresis for the discrete lean direction used by menus. */
+  /** Hysteresis for the discrete lean direction (calibration checks). */
   leanEnterDeg: number;
   leanExitDeg: number;
   leanSmoothing: number;
+  /** A lean this far from neutral fires one turn. */
+  turnEnterDeg: number;
+  /** The torso must come back inside this... */
+  turnNeutralDeg: number;
+  /** ...for this long before the next turn is armed. */
+  turnNeutralMs: number;
+  /** Minimum time between two turns. */
+  turnCooldownMs: number;
   /** A raised hand's wrist must be above the nose by this × torso length. */
   raiseMargin: number;
   confirmHoldMs: number;
@@ -49,21 +60,34 @@ export interface MotionConfig {
 export const MOTION_DEFAULTS: MotionConfig = {
   minVisibility: 0.5,
   lostGraceMs: 500,
-  stepThreshold: 0.12,
+  stepThreshold: 0.11,
   stepWindowMs: 1600,
   minStepsToMarch: 2,
-  stopAfterMs: 900,
-  legSmoothing: 0.5,
+  stopAfterMs: 750,
+  legSmoothing: 0.6,
   leanDeadzoneDeg: 5,
   leanFullDeg: 16,
   leanEnterDeg: 7,
   leanExitDeg: 4,
   leanSmoothing: 0.3,
+  turnEnterDeg: 8,
+  turnNeutralDeg: 4,
+  turnNeutralMs: 120,
+  turnCooldownMs: 350,
   raiseMargin: 0.1,
   confirmHoldMs: 450,
   pauseHoldMs: 800,
   rearmMs: 250,
 };
+
+export type Sensitivity = 'low' | 'normal' | 'high';
+
+/** Player-facing sensitivity settings mapped onto detector thresholds. */
+export function motionPreset(p: { lean?: Sensitivity; march?: Sensitivity }): Partial<MotionConfig> {
+  const lean = { low: { turnEnterDeg: 11, turnNeutralDeg: 5 }, normal: { turnEnterDeg: 8, turnNeutralDeg: 4 }, high: { turnEnterDeg: 6, turnNeutralDeg: 3 } };
+  const march = { low: { stepThreshold: 0.15 }, normal: { stepThreshold: 0.11 }, high: { stepThreshold: 0.085 } };
+  return { ...lean[p.lean ?? 'normal'], ...march[p.march ?? 'normal'] };
+}
 
 /** A player's standing neutral, measured during calibration. */
 export interface NeutralPose {
@@ -77,7 +101,7 @@ export interface NeutralPose {
   leanDeg: number;
 }
 
-export type MotionEvent = 'step' | 'confirm' | 'back' | 'pause';
+export type MotionEvent = 'step' | 'confirm' | 'back' | 'pause' | 'turnLeft' | 'turnRight';
 
 export interface MotionReading {
   tracking: TrackingQuality;
@@ -92,11 +116,14 @@ export interface MotionReading {
   steps: number;
   /** Which foot last stepped, for the HUD. */
   lastFoot: 'left' | 'right' | null;
-  /** -1 (player's left) .. +1 (player's right); 0 inside the dead zone. */
+  /** -1 (player's left) .. +1 (player's right); 0 inside the dead zone. For
+   *  the lean gauge only — turning is discrete (see turnLeft / turnRight). */
   steer: number;
   leanDeg: number;
-  /** Discrete lean with hysteresis, for menus. */
+  /** Discrete lean with hysteresis, for the calibration checks. */
   leanDir: -1 | 0 | 1;
+  /** True when the next lean will turn (the torso has been back at neutral). */
+  turnArmed: boolean;
   /** 0..1 hold progress for each gesture, for UI rings. */
   hold: { confirm: number; back: number; pause: number };
   /** Gestures are ignored until the player's hands have been down once. */
@@ -193,11 +220,40 @@ export class NeutralCalibrator {
 
 type Gesture = 'confirm' | 'back' | 'pause';
 
+/**
+ * Exponential smoothing by elapsed time rather than per frame: `alpha` is the
+ * weight of one new sample at 30 fps, and is scaled for longer or shorter
+ * gaps. A phone that only manages 10 pose frames a second then lags no more
+ * than one running at 30 — per-frame smoothing would triple the lag and could
+ * stop a lean ever reading as back at neutral.
+ */
+class TimedEma {
+  private v: number | null = null;
+  private at = 0;
+  constructor(private readonly alpha: number) {}
+  push(x: number, now: number): number {
+    if (this.v === null) this.v = x;
+    else {
+      const frames = Math.max(0.25, Math.min(15, (now - this.at) / (1000 / 30)));
+      const a = 1 - Math.pow(1 - this.alpha, frames);
+      this.v += a * (x - this.v);
+    }
+    this.at = now;
+    return this.v;
+  }
+  get value(): number | null {
+    return this.v;
+  }
+  reset(): void {
+    this.v = null;
+  }
+}
+
 export class MotionReader {
   neutral: NeutralPose | null = null;
-  private readonly cfg: MotionConfig;
-  private readonly leg: Ema;
-  private readonly lean: Ema;
+  private cfg: MotionConfig;
+  private readonly leg: TimedEma;
+  private readonly lean: TimedEma;
   private stepTimes: number[] = [];
   private lastFoot: 'left' | 'right' | null = null;
   private steps = 0;
@@ -209,11 +265,23 @@ export class MotionReader {
   private holdSince = 0;
   private armed = false;
   private downSince: number | null = null;
+  private turnArmed = false;
+  private neutralSince: number | null = null;
+  private lastTurnAt = -Infinity;
 
   constructor(cfg: Partial<MotionConfig> = {}) {
     this.cfg = { ...MOTION_DEFAULTS, ...cfg };
-    this.leg = new Ema(this.cfg.legSmoothing);
-    this.lean = new Ema(this.cfg.leanSmoothing);
+    this.leg = new TimedEma(this.cfg.legSmoothing);
+    this.lean = new TimedEma(this.cfg.leanSmoothing);
+  }
+
+  /** Change thresholds (e.g. sensitivity settings) without losing history. */
+  configure(cfg: Partial<MotionConfig>): void {
+    this.cfg = { ...this.cfg, ...cfg };
+  }
+
+  get config(): Readonly<MotionConfig> {
+    return this.cfg;
   }
 
   /** New calibration: restart movement history but keep gesture arming, so
@@ -225,6 +293,12 @@ export class MotionReader {
     this.stepTimes = [];
     this.lastFoot = null;
     this.leanDir = 0;
+    this.disarmTurn();
+  }
+
+  private disarmTurn(): void {
+    this.turnArmed = false;
+    this.neutralSince = null;
   }
 
   /** Clear motion history and disarm gestures, e.g. when the input mode changes. */
@@ -239,6 +313,7 @@ export class MotionReader {
     this.armed = false;
     this.downSince = null;
     this.badSince = null;
+    this.disarmTurn();
   }
 
   update(frame: PoseFrame | null, now: number): MotionReading {
@@ -256,6 +331,7 @@ export class MotionReader {
         this.holding = null;
         this.armed = false;
         this.downSince = null;
+        this.disarmTurn();
       }
       return this.reading(lost ? 'lost' : 'partial', m, events, now);
     }
@@ -263,7 +339,7 @@ export class MotionReader {
     this.everTracked = true;
 
     // ── Marching ────────────────────────────────────────────────────────
-    const diff = this.leg.push(m.legDiff - (this.neutral?.legDiff ?? 0));
+    const diff = this.leg.push(m.legDiff - (this.neutral?.legDiff ?? 0), now);
     let foot: 'left' | 'right' | null = null;
     if (diff > c.stepThreshold && this.lastFoot !== 'right') foot = 'right';
     else if (diff < -c.stepThreshold && this.lastFoot !== 'left') foot = 'left';
@@ -276,7 +352,7 @@ export class MotionReader {
     this.stepTimes = this.stepTimes.filter((t) => now - t <= c.stepWindowMs);
 
     // ── Lean ────────────────────────────────────────────────────────────
-    const lean = this.lean.push(m.leanDeg - (this.neutral?.leanDeg ?? 0));
+    const lean = this.lean.push(m.leanDeg - (this.neutral?.leanDeg ?? 0), now);
     // leanDir -1 = player's left (positive degrees). Enter at leanEnterDeg,
     // release only once back inside leanExitDeg.
     const target: -1 | 0 | 1 = lean >= c.leanEnterDeg ? -1 : lean <= -c.leanEnterDeg ? 1 : 0;
@@ -284,6 +360,19 @@ export class MotionReader {
     else {
       const held = this.leanDir === -1 ? lean : -lean;
       if (held < c.leanExitDeg) this.leanDir = target;
+    }
+
+    // ── Discrete turns ──────────────────────────────────────────────────
+    // One lean = one turn. Holding the lean does nothing more; coming back
+    // to neutral (and staying there briefly) re-arms the next one.
+    if (Math.abs(lean) < c.turnNeutralDeg) {
+      if (this.neutralSince === null) this.neutralSince = now;
+      if (now - this.neutralSince >= c.turnNeutralMs) this.turnArmed = true;
+    } else this.neutralSince = null;
+    if (this.turnArmed && Math.abs(lean) >= c.turnEnterDeg && now - this.lastTurnAt >= c.turnCooldownMs) {
+      events.push(lean > 0 ? 'turnLeft' : 'turnRight');
+      this.lastTurnAt = now;
+      this.turnArmed = false;
     }
 
     // ── Gestures ────────────────────────────────────────────────────────
@@ -342,6 +431,7 @@ export class MotionReader {
       steer,
       leanDeg: lean,
       leanDir: tracking === 'good' ? this.leanDir : 0,
+      turnArmed: tracking === 'good' && this.turnArmed,
       hold: { confirm: holdFrac('confirm'), back: holdFrac('back'), pause: holdFrac('pause') },
       armed: this.armed,
       events,

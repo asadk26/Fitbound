@@ -325,27 +325,20 @@ function ring(): PropArt {
   });
 }
 
-/** Heading arrow painted on the ground under the hero. */
+/** A small facing chevron shown just ahead of the hero (points up at 0°). */
 function heading(): PropArt {
-  return art(120, 120, 0.5, 0, 0, (ctx) => {
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.strokeStyle = 'rgba(40,40,70,0.6)';
+  return art(48, 40, 0.5, 0, 0, (ctx) => {
+    ctx.fillStyle = 'rgba(255,240,190,0.95)';
+    ctx.strokeStyle = 'rgba(40,30,60,0.75)';
     ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.moveTo(60, 4);
-    ctx.lineTo(84, 34);
-    ctx.lineTo(68, 30);
-    ctx.lineTo(68, 44);
-    ctx.lineTo(52, 44);
-    ctx.lineTo(52, 30);
-    ctx.lineTo(36, 34);
+    ctx.moveTo(24, 3);
+    ctx.lineTo(44, 34);
+    ctx.lineTo(24, 25);
+    ctx.lineTo(4, 34);
     ctx.closePath();
     ctx.fill();
-    ctx.stroke();
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.ellipse(60, 60, 50, 50, 0, 0, Math.PI * 2);
     ctx.stroke();
   });
 }

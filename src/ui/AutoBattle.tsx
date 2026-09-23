@@ -11,9 +11,12 @@ import { getSave } from '../game/store';
 import { input } from '../input/InputHub';
 import { iconDataUrl } from '../phaser/art';
 import { endBattle, startBattle } from '../phaser/game';
+import { host } from '../net/host';
+import { RemoteSet, type SetDriver } from '../net/remoteSet';
 import { tracker } from '../pose/PoseTracker';
 import type { PlannedSet } from '../trial/config';
 import { CameraView } from './CameraView';
+import { ControllerStatus, useLink } from './Connected';
 import { GUIDANCE } from './guidance';
 import { GestureMenu, HoldRing, useInputEvents, useMotion } from './motionUi';
 
@@ -44,7 +47,24 @@ type Stage = 'intro' | 'next' | 'set' | 'resolve' | 'victory';
 const REST_FIRST = 5;
 const REST_BETWEEN = 8;
 
-export function AutoBattle({ enemy, plan, stats, hp, heroName, onDone }: { enemy: EnemyDef; plan: PlannedSet[]; stats: PlayerStats; hp: number; heroName: string; onDone: (r: BattleResult) => void }) {
+export function AutoBattle({
+  enemy,
+  plan,
+  stats,
+  hp,
+  heroName,
+  onDone,
+  connected = false,
+}: {
+  enemy: EnemyDef;
+  plan: PlannedSet[];
+  stats: PlayerStats;
+  hp: number;
+  heroName: string;
+  onDone: (r: BattleResult) => void;
+  /** Connected Play: the phone counts reps, this page validates them. */
+  connected?: boolean;
+}) {
   const [engine] = useState(() => {
     const e = new CombatEngine(enemy, stats);
     e.state.playerHp = Math.min(hp, stats.maxHp);
@@ -66,7 +86,10 @@ export function AutoBattle({ enemy, plan, stats, hp, heroName, onDone }: { enemy
   const [hud, setHud] = useState({ p: engine.state.playerHp, max: engine.state.playerMaxHp, e: engine.state.enemyHp, emax: engine.state.enemyMaxHp });
   const [flash, setFlash] = useState(0);
   const [note, setNote] = useState<string | null>(null);
-  const ctrl = useRef<ExerciseSessionController | null>(null);
+  /** The live set: counted locally from the camera, or remotely by the phone. */
+  const ctrl = useRef<SetDriver | null>(null);
+  const link = useLink();
+  const ctrlLost = connected && link.controller !== 'connected';
   const timers = useRef<number[]>([]);
   const stats$ = useRef<BattleResult>({ victory: false, hpLeft: hp, reps: {}, trackingLosses: 0 });
   const lastStage = useRef('');
@@ -105,13 +128,26 @@ export function AutoBattle({ enemy, plan, stats, hp, heroName, onDone }: { enemy
     later(() => announceNext(REST_FIRST), 2400);
     const off = tracker.subscribe((f) => {
       const c = ctrl.current;
-      if (!c || stageRef.current !== 'set') return;
+      if (!(c instanceof ExerciseSessionController) || stageRef.current !== 'set') return;
       const sn = c.update(f.frame, f.now);
       cues(sn, f.now);
       setSnap(sn);
     });
+    // Remote sets are driven by messages; refresh their view ten times a second.
+    const poll = window.setInterval(() => {
+      const c = ctrl.current;
+      if (!(c instanceof RemoteSet) || stageRef.current !== 'set') return;
+      const sn = c.snapshot();
+      cues(sn, performance.now());
+      setSnap(sn);
+    }, 100);
     return () => {
       off();
+      clearInterval(poll);
+      if (host.activeSet) {
+        host.activeSet.end();
+        host.activeSet = null;
+      }
       timers.current.forEach(clearTimeout);
       audio.duck(false);
       endBattle();
@@ -147,16 +183,24 @@ export function AutoBattle({ enemy, plan, stats, hp, heroName, onDone }: { enemy
   function beginSet() {
     const ex = current();
     const s = getSave();
-    const c = new ExerciseSessionController(ex, ex.createDetector!(s.settings.difficulty), target(), onExerciseEvent, { setupStuckMs: 20000, activeStuckMs: 20000 });
-    ctrl.current = c;
     lastStage.current = '';
     lastCount.current = 0;
     wasLost.current = false;
     setSnap(null);
+    if (connected) {
+      // Switch the phone to exercise mode first, then tell it which detector to run.
+      setStage('set');
+      const setId = `${ex.id}-${Date.now().toString(36)}-${planIdxRef.current}`;
+      const rs = new RemoteSet(setId, ex, target(), onExerciseEvent, (m) => host.send(m), s.settings.difficulty);
+      host.activeSet = rs;
+      ctrl.current = rs;
+    } else {
+      ctrl.current = new ExerciseSessionController(ex, ex.createDetector!(s.settings.difficulty), target(), onExerciseEvent, { setupStuckMs: 20000, activeStuckMs: 20000 });
+      setStage('set');
+    }
     emit(engine.beginSet(ex.id));
     if (ex.ability.effect === 'arcane') bus.emit('battle:charge', { level: 0.05, color: ex.ability.color });
     audio.duck(true);
-    setStage('set');
   }
 
   function onExerciseEvent(ev: ExerciseEvent) {
@@ -182,6 +226,7 @@ export function AutoBattle({ enemy, plan, stats, hp, heroName, onDone }: { enemy
 
   function resolve(completed: boolean) {
     ctrl.current = null;
+    if (host.activeSet) host.activeSet = null;
     setStage('resolve');
     if (engine.state.outcome === 'victory') {
       later(win, 1800);
@@ -258,7 +303,24 @@ export function AutoBattle({ enemy, plan, stats, hp, heroName, onDone }: { enemy
     }
   });
 
+  // Connected Play: if the phone drops out mid-set, freeze the set (no reps
+  // can count) and the rest timer; the encounter itself is kept as it is.
+  useEffect(() => {
+    if (!ctrlLost) return;
+    if (stageRef.current === 'set' && !paused) {
+      ctrl.current?.pause();
+      setPaused(true);
+      input.setMode('menu');
+    } else if (stageRef.current === 'next') setPaused(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctrlLost]);
+
+  const canResume = !connected || (link.controller === 'connected' && host.ready);
   const resume = () => {
+    if (!canResume) {
+      audio.error();
+      return;
+    }
     setPaused(false);
     if (stageRef.current === 'set') {
       input.setMode('exercise');
@@ -335,7 +397,12 @@ export function AutoBattle({ enemy, plan, stats, hp, heroName, onDone }: { enemy
       {stage === 'resolve' && note && <div className="tvb-note">{note}</div>}
       {stage === 'victory' && <div className="tvb-victory">VICTORY!</div>}
 
-      {(stage === 'set' || stage === 'next') && (
+      {(stage === 'set' || stage === 'next') && connected && (
+        <div className="tvb-cam tv-pip-ctrl">
+          <ControllerStatus />
+        </div>
+      )}
+      {(stage === 'set' || stage === 'next') && !connected && (
         <CameraView className="tvb-cam" good={tracking === 'good'}>
           <span className={`cam-tag trk-${tracking}`}>{tracking === 'good' ? '● Tracking' : tracking === 'partial' ? '● Weak' : '● Not seen'}</span>
         </CameraView>
@@ -364,9 +431,9 @@ export function AutoBattle({ enemy, plan, stats, hp, heroName, onDone }: { enemy
         <div className="tv-overlay">
           <GestureMenu
             title="Paused"
-            text="Take your time. Your progress in this set is kept."
+            text={ctrlLost ? 'The phone controller disconnected. Your progress in this set is kept; resume once it reconnects and can see you.' : 'Take your time. Your progress in this set is kept.'}
             options={[
-              { id: 'resume', label: 'Resume', icon: 'star' },
+              { id: 'resume', label: canResume ? 'Resume' : 'Resume (waiting for the phone…)', icon: 'star' },
               { id: 'end', label: 'End this set', detail: 'Reps so far still count', icon: 'lock' },
             ]}
             onChoose={(id) => {

@@ -13,9 +13,10 @@ import { AbilitiesPanel, DIFFICULTY_INFO, MenuPanel, MessageDialog, NpcDialog } 
 import { useSave } from './ui/useSave';
 import { TrialRun } from './ui/TrialRun';
 import { TrialSetup } from './ui/TrialSetup';
+import { ConnectedSetup } from './ui/Connected';
 import type { Difficulty } from './exercise/types';
 
-type Screen = 'title' | 'newgame' | 'world' | 'battle' | 'trialsetup' | 'trial';
+type Screen = 'title' | 'newgame' | 'world' | 'battle' | 'trialsetup' | 'trial' | 'connectsetup' | 'connected';
 type Overlay = { kind: 'npc'; id: string } | { kind: 'message'; text: string } | { kind: 'abilities' } | { kind: 'menu' } | null;
 
 export default function App() {
@@ -47,7 +48,7 @@ export default function App() {
 
   // The title and trial setup screens float over a slowly drifting diorama.
   useEffect(() => {
-    if (screen === 'title' || screen === 'trialsetup') showScene('Diorama', { attract: true });
+    if (screen === 'title' || screen === 'trialsetup' || screen === 'connectsetup') showScene('Diorama', { attract: true });
   }, [screen]);
 
   // World events from Phaser.
@@ -97,6 +98,11 @@ export default function App() {
     setScreen('world');
   };
 
+  const startConnected = useCallback(() => {
+    audio.unlock();
+    setScreen('connected');
+  }, []);
+
   const onBattleExit = useCallback((outcome: BattleOutcome) => {
     setEnemyId(null);
     setScreen('world');
@@ -122,6 +128,11 @@ export default function App() {
             audio.select();
             setScreen('trialsetup');
           }}
+          onConnected={() => {
+            audio.unlock();
+            audio.select();
+            setScreen('connectsetup');
+          }}
           onContinue={startGame}
           onNew={() => {
             audio.unlock();
@@ -142,6 +153,9 @@ export default function App() {
       )}
 
       {screen === 'trial' && <TrialRun onExit={() => setScreen('title')} />}
+
+      {screen === 'connectsetup' && <ConnectedSetup onBack={() => setScreen('title')} onStart={startConnected} />}
+      {screen === 'connected' && <TrialRun connected onExit={() => setScreen('title')} />}
 
       {screen === 'newgame' && (
         <NewGame
@@ -218,7 +232,7 @@ export default function App() {
   );
 }
 
-function TitleScreen({ canContinue, onTrial, onContinue, onNew }: { canContinue: boolean; onTrial: () => void; onContinue: () => void; onNew: () => void }) {
+function TitleScreen({ canContinue, onTrial, onConnected, onContinue, onNew }: { canContinue: boolean; onTrial: () => void; onConnected: () => void; onContinue: () => void; onNew: () => void }) {
   return (
     <div className="title-screen">
       <div className="title-card">
@@ -231,10 +245,14 @@ function TitleScreen({ canContinue, onTrial, onContinue, onNew }: { canContinue:
           <img src={figureUrl('skeleton')} alt="" />
         </div>
         <div className="title-buttons">
-          <button className="btn btn-big" onClick={onTrial}>
-            Motion Trial · TV
+          <button className="btn btn-big" onClick={onConnected}>
+            Connected Play · PC + phone
           </button>
-          <span className="title-sub">Prop up your phone, mirror to a TV, and play with your whole body.</span>
+          <span className="title-sub">This computer runs the game on your TV; your phone is the motion controller.</span>
+          <button className="btn" onClick={onTrial}>
+            Motion Trial · phone only
+          </button>
+          <span className="title-sub">Prop up your phone and play on it (or mirror it to a TV).</span>
           <div className="title-classic">
             {canContinue && (
               <button className="btn btn-sm btn-ghost" onClick={onContinue}>

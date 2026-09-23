@@ -99,7 +99,9 @@ export interface MenuOption {
 /**
  * A menu you drive with your body: lean left/right to move the highlight,
  * raise your right hand to choose, left hand to go back. Taps and arrow
- * keys work too.
+ * keys work too. Only a mouse that actually moves changes the highlight — a
+ * cursor left resting where the menu happens to open must not pick an option
+ * the player then confirms with a gesture.
  */
 export function GestureMenu({ title, text, options, onChoose, onBack, initial = 0 }: { title: string; text?: string; options: MenuOption[]; onChoose: (id: string) => void; onBack?: () => void; initial?: number }) {
   const [sel, setSel] = useState(initial);
@@ -124,7 +126,7 @@ export function GestureMenu({ title, text, options, onChoose, onBack, initial = 
       {text && <p className="gmenu-text">{text}</p>}
       <div className="gmenu-options">
         {options.map((o, i) => (
-          <button key={o.id} className={`gmenu-opt ${i === sel ? 'sel' : ''}`} onClick={() => onChoose(o.id)} onPointerEnter={() => setSel(i)}>
+          <button key={o.id} className={`gmenu-opt ${i === sel ? 'sel' : ''}`} onClick={() => onChoose(o.id)} onPointerMove={(e) => (e.movementX || e.movementY) && setSel(i)}>
             {o.icon && <img src={iconDataUrl(o.icon)} alt="" className="pix-icon" />}
             <b>{o.label}</b>
             {o.detail && <span>{o.detail}</span>}

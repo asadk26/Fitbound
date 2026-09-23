@@ -25,7 +25,7 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 2000,
     rolldownOptions: {
-      input: { main: 'index.html', lab: 'lab.html' },
+      input: { main: 'index.html', lab: 'lab.html', controller: 'controller.html' },
     },
   },
   test: {
