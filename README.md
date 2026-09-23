@@ -2,9 +2,6 @@
 
 A mobile-first pixel-art fantasy RPG you play with real bodyweight exercises. Your phone's camera watches you through MediaPipe Pose, and every counted repetition becomes an attack, a shield or a spell.
 
-> **Repository note.** This project lives on the orphan branch `claude/fitbound-fitness-rpg-14fzez` of `asadk26/The_Town`. It shares no history or files with The Town, and nothing here touches `main` or the Pages deploy. To move it into its own repository, create an empty repo and run
-> `git push <new-remote> claude/fitbound-fitness-rpg-14fzez:main`.
-
 ## Run it
 
 ```bash
@@ -21,7 +18,7 @@ Node 20+ is recommended (developed on Node 22). `npm run dev`/`build` first copy
 
 Browsers only allow the camera on secure (HTTPS) origins, so plain `http://<your-ip>:5173` will not work on a phone. Pick one of these:
 
-1. **Deploy (recommended).** Import the repo/branch into Vercel. `vercel.json` sets the build command (`npm run build`) and output (`dist`). Open the HTTPS URL in Safari.
+1. **Deploy (recommended).** Import this repository into Vercel (Add New → Project → `asadk26/Fitbound`, default settings). `vercel.json` sets the build command (`npm run build`) and output (`dist`). Open the HTTPS URL in Safari.
 2. **Local HTTPS.** Run `npm run dev:https`, then on the iPhone (same Wi-Fi) open `https://<your-computer-ip>:5173`. Safari will warn about the self-signed certificate; choose *Show Details → visit this website*.
 3. **Tunnel.** Run `npm run dev` plus any HTTPS tunnel (e.g. `cloudflared tunnel --url http://localhost:5173`).
 
