@@ -30,6 +30,20 @@ export interface EnemyDef {
 }
 
 export const ENEMIES: Record<string, EnemyDef> = {
+  dummy: {
+    id: 'dummy',
+    name: 'Training Dummy',
+    title: 'Straw Sparring Partner',
+    sprite: 'dummy',
+    maxHp: 60,
+    atk: 0,
+    resist: { physical: 0, magic: 0 },
+    xp: 10,
+    gold: 5,
+    intro: 'The Training Dummy wobbles expectantly.',
+    tip: 'Practice here: find a good phone position for each exercise. The dummy never hits back.',
+    pattern: [{ name: 'Wobble', mult: 0 }],
+  },
   skeleton: {
     id: 'skeleton',
     name: 'Skeleton',

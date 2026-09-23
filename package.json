@@ -8,10 +8,10 @@
     "predev": "npm run assets",
     "dev": "vite --host",
     "prebuild": "npm run assets",
-    "build": "tsc -b && vite build",
+    "build": "tsc --noEmit -p . && vite build",
     "preview": "vite preview --host",
     "test": "vitest run",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
