@@ -7,19 +7,28 @@ import type { Difficulty, DetectorUpdate, ExerciseDetector, GuidanceCode, Landma
  *
  * STANDING → LOWERING → BOTTOM_POSITION → RISING → COMPLETED_REPETITION
  *
- * Primary signal is knee flexion (hip–knee–ankle), averaged over both legs
- * when both are visible. A second, independent check requires the hips to
- * actually drop by a fraction of thigh length below the standing baseline,
- * so bending the knees while leaning or bobbing in place doesn't count.
+ * Primary signal is *thigh rise*: the vertical hip-to-knee distance divided by
+ * the thigh length measured while standing. Standing tall it is ~1; with the
+ * thighs parallel to the floor it is ~0. Unlike the 2D knee angle — which
+ * barely changes when a squat is seen from the front, because hip, knee and
+ * ankle stay stacked in the image — this works from the front and the side.
+ *
+ * The standing thigh length is calibrated continuously while the player
+ * stands, so moving nearer or farther between reps is fine. Hinging at the
+ * hips (bending over) keeps the hips high over the knees and never counts.
  */
 export interface SquatConfig {
   minConfidence: number;
-  standAngle: number;
-  descendAngle: number;
-  bottomAngle: number;
-  riseAngle: number;
-  /** Required hip drop at the bottom, as a fraction of thigh length. */
-  minHipDrop: number;
+  /** Thigh rise at or above which the player is standing. */
+  standRatio: number;
+  /** Thigh rise below which a descent has started. */
+  descendRatio: number;
+  /** Thigh rise at or below which the squat is deep enough. */
+  bottomRatio: number;
+  /** Thigh rise above which the player is rising out of the bottom. */
+  riseRatio: number;
+  /** Min 2D knee angle to accept a standing calibration frame. */
+  standKneeAngle: number;
   /** Min torso incline from horizontal while standing (90 = upright). */
   minUprightIncline: number;
   minRepMs: number;
@@ -30,21 +39,22 @@ export interface SquatConfig {
 
 export const SQUAT_DEFAULTS: SquatConfig = {
   minConfidence: 0.5,
-  standAngle: 160,
-  descendAngle: 148,
-  bottomAngle: 112,
-  riseAngle: 126,
-  minHipDrop: 0.25,
+  standRatio: 0.88,
+  descendRatio: 0.82,
+  bottomRatio: 0.6,
+  riseRatio: 0.68,
+  standKneeAngle: 155,
   minUprightIncline: 60,
-  minRepMs: 550,
+  minRepMs: 400,
   readyFrames: 5,
   lostGraceMs: 450,
-  smoothing: 0.55,
+  smoothing: 0.5,
 };
 
 export function squatConfig(d: Difficulty): SquatConfig {
-  if (d === 'beginner') return { ...SQUAT_DEFAULTS, bottomAngle: 128, riseAngle: 140, minHipDrop: 0.15 };
-  if (d === 'advanced') return { ...SQUAT_DEFAULTS, bottomAngle: 100, riseAngle: 115, minHipDrop: 0.35 };
+  // Beginners: a half squat or a chair squat counts.
+  if (d === 'beginner') return { ...SQUAT_DEFAULTS, bottomRatio: 0.72, riseRatio: 0.78 };
+  if (d === 'advanced') return { ...SQUAT_DEFAULTS, bottomRatio: 0.45, riseRatio: 0.55 };
   return SQUAT_DEFAULTS;
 }
 
@@ -58,25 +68,26 @@ export class SquatDetector implements ExerciseDetector {
   private phase: Phase = 'SETUP';
   private readonly gate: TrackingGate;
   private readonly ready: StableCounter;
-  private readonly knee: Ema;
-  private readonly baselineHipY = new Ema(0.2);
-  private deepestHipY = 0;
-  private thighLen = 0.2;
+  private readonly rise: Ema;
+  /** Thigh length while standing, in image units. */
+  private readonly thigh = new Ema(0.2);
+  private baseline: number | null = null;
   private repStart = 0;
   private cue: { code: GuidanceCode; until: number } | null = null;
 
   constructor(private readonly cfg: SquatConfig = SQUAT_DEFAULTS) {
     this.gate = new TrackingGate(cfg.lostGraceMs);
     this.ready = new StableCounter(cfg.readyFrames);
-    this.knee = new Ema(cfg.smoothing);
+    this.rise = new Ema(cfg.smoothing);
   }
 
   reset(): void {
     this.phase = 'SETUP';
     this.gate.reset();
     this.ready.reset();
-    this.knee.reset();
-    this.baselineHipY.reset();
+    this.rise.reset();
+    this.thigh.reset();
+    this.baseline = null;
     this.cue = null;
   }
 
@@ -84,8 +95,7 @@ export class SquatDetector implements ExerciseDetector {
     const c = this.cfg;
     let confidence = 0;
     let setupIssue: GuidanceCode | null = null;
-    let kneeAngle = 180;
-    let hipY = 0;
+    let legs: LegReading | null = null;
     let upright = false;
 
     if (frame) {
@@ -94,71 +104,66 @@ export class SquatDetector implements ExerciseDetector {
       const ankles = [lms[LM.L_ANKLE], lms[LM.R_ANKLE]];
       const anklesOk = ankles.some((a) => a.visibility > 0.5 && inFrame(a, frame.aspect));
       const headOk = inFrame(lms[LM.NOSE], frame.aspect, 0.02) || lms[LM.NOSE].visibility < 0.3;
-
-      const legs = legAngles(lms);
-      kneeAngle = legs.angle;
-      thighFrom(lms, (t) => (this.thighLen = t));
+      legs = readLegs(lms);
       const hips = mid(lms[LM.L_HIP], lms[LM.R_HIP]);
       const shoulders = mid(lms[LM.L_SHOULDER], lms[LM.R_SHOULDER]);
-      hipY = hips.y;
       upright = inclineFromHorizontal(shoulders, hips) >= c.minUprightIncline;
 
       if (!anklesOk && !headOk) setupIssue = 'MOVE_BACK';
       else if (!anklesOk) setupIssue = 'LEGS_NOT_VISIBLE';
       else if (!headOk) setupIssue = 'MOVE_BACK';
-      else if (legs.count === 0) setupIssue = 'LEGS_NOT_VISIBLE';
+      else if (!legs) setupIssue = 'LEGS_NOT_VISIBLE';
     }
 
-    const trackedOk = frame !== null && confidence >= c.minConfidence && setupIssue === null;
+    const trackedOk = frame !== null && confidence >= c.minConfidence && setupIssue === null && legs !== null;
     const g = this.gate.check(trackedOk, now);
-    if (g !== 'ok') {
+    if (g !== 'ok' || !legs) {
       if (g === 'lost') this.toSetup();
-      return untrackedUpdate(this.phase, g, this.gate.hadTracking, frame !== null, confidence, setupIssue);
+      return untrackedUpdate(this.phase, g === 'ok' ? 'grace' : g, this.gate.hadTracking, frame !== null, confidence, setupIssue);
     }
 
-    const k = this.knee.push(kneeAngle);
+    // Calibrate standing thigh length. In SETUP, average standing frames.
+    // Once standing, the baseline only rises to a longer reading or decays
+    // very slowly (~1.5%/s): the start of a front-view squat foreshortens the
+    // thigh, and letting the baseline follow it would hide the squat.
+    const looksStanding = legs.kneeAngle >= c.standKneeAngle && legs.verticality >= 0.9 && upright;
+    if (looksStanding) {
+      if (this.phase === 'SETUP') this.thigh.push(legs.length);
+      else if (this.phase === 'STANDING' && this.baseline !== null) this.baseline = Math.max(this.baseline * 0.9995, legs.length);
+    }
+    if (this.phase === 'SETUP') this.baseline = this.thigh.value;
+    const baseline = this.baseline;
+    const r = this.rise.push(baseline ? legs.drop / baseline : 1);
+
     let repCompleted = false;
     let partialRep = false;
 
     switch (this.phase) {
       case 'SETUP':
-        if (this.ready.push(k >= c.standAngle && upright)) {
-          this.phase = 'STANDING';
-          this.baselineHipY.reset();
-          this.baselineHipY.push(hipY);
-        }
+        if (this.ready.push(looksStanding && baseline !== null)) this.phase = 'STANDING';
         break;
       case 'STANDING':
-        if (k >= c.standAngle) this.baselineHipY.push(hipY);
-        if (k < c.descendAngle) {
+        if (r < c.descendRatio) {
           this.phase = 'LOWERING';
           this.repStart = now;
-          this.deepestHipY = hipY;
         }
         break;
       case 'LOWERING':
-        this.deepestHipY = Math.max(this.deepestHipY, hipY);
-        if (k <= c.bottomAngle) this.phase = 'BOTTOM_POSITION';
-        else if (k >= c.standAngle) {
+        if (r <= c.bottomRatio) this.phase = 'BOTTOM_POSITION';
+        else if (r >= c.standRatio) {
           this.phase = 'STANDING';
           partialRep = true;
           this.cue = { code: 'GO_LOWER', until: now + 1800 };
         }
         break;
       case 'BOTTOM_POSITION':
-        this.deepestHipY = Math.max(this.deepestHipY, hipY);
-        if (k >= c.riseAngle) this.phase = 'RISING';
+        if (r >= c.riseRatio) this.phase = 'RISING';
         break;
       case 'RISING':
-        if (k <= c.bottomAngle) this.phase = 'BOTTOM_POSITION';
-        else if (k >= c.standAngle) {
+        if (r <= c.bottomRatio) this.phase = 'BOTTOM_POSITION';
+        else if (r >= c.standRatio) {
           this.phase = 'STANDING';
-          const drop = this.deepestHipY - (this.baselineHipY.value ?? hipY);
-          const deepEnough = drop >= c.minHipDrop * this.thighLen;
-          if (!deepEnough) {
-            partialRep = true;
-            this.cue = { code: 'GO_LOWER', until: now + 1800 };
-          } else if (now - this.repStart >= c.minRepMs) repCompleted = true;
+          if (now - this.repStart >= c.minRepMs) repCompleted = true;
         }
         break;
     }
@@ -176,34 +181,45 @@ export class SquatDetector implements ExerciseDetector {
       ready: this.phase !== 'SETUP',
       repCompleted,
       partialRep,
-      progress: clamp01((c.standAngle - k) / (c.standAngle - c.bottomAngle)),
+      progress: clamp01((c.standRatio - r) / (c.standRatio - c.bottomRatio)),
+      metrics: { thighRise: +r.toFixed(2), knee2d: Math.round(legs.kneeAngle), upright: upright ? 1 : 0 },
     };
   }
 
   private toSetup(): void {
     this.phase = 'SETUP';
     this.ready.reset();
+    this.thigh.reset();
+    this.baseline = null;
   }
 }
 
-function legAngles(lms: Landmark[]): { angle: number; count: number } {
-  const legs: number[] = [];
+interface LegReading {
+  /** Vertical knee-minus-hip distance (positive when hips are above knees). */
+  drop: number;
+  /** Hip–knee distance in the image. */
+  length: number;
+  /** drop / length: 1 when the thigh is vertical in the image. */
+  verticality: number;
+  kneeAngle: number;
+}
+
+/** Average the legs that are clearly visible. */
+function readLegs(lms: Landmark[]): LegReading | null {
   const sides: [number, number, number][] = [
     [LM.L_HIP, LM.L_KNEE, LM.L_ANKLE],
     [LM.R_HIP, LM.R_KNEE, LM.R_ANKLE],
   ];
+  const got: LegReading[] = [];
   for (const [h, k, a] of sides) {
     if (lms[h].visibility > 0.5 && lms[k].visibility > 0.5 && lms[a].visibility > 0.5) {
-      legs.push(angle(lms[h], lms[k], lms[a]));
+      const length = dist(lms[h], lms[k]);
+      if (length < 1e-3) continue;
+      const drop = lms[k].y - lms[h].y;
+      got.push({ drop, length, verticality: drop / length, kneeAngle: angle(lms[h], lms[k], lms[a]) });
     }
   }
-  if (legs.length === 0) return { angle: 180, count: 0 };
-  return { angle: legs.reduce((s, x) => s + x, 0) / legs.length, count: legs.length };
-}
-
-function thighFrom(lms: Landmark[], set: (t: number) => void): void {
-  const l = dist(lms[LM.L_HIP], lms[LM.L_KNEE]);
-  const r = dist(lms[LM.R_HIP], lms[LM.R_KNEE]);
-  const t = Math.max(l, r);
-  if (t > 0.02) set(t);
+  if (got.length === 0) return null;
+  const avg = (f: (l: LegReading) => number) => got.reduce((s, l) => s + f(l), 0) / got.length;
+  return { drop: avg((l) => l.drop), length: avg((l) => l.length), verticality: avg((l) => l.verticality), kneeAngle: avg((l) => l.kneeAngle) };
 }

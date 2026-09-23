@@ -77,6 +77,7 @@ export function Battle({ enemyId, onExit }: Props) {
   const lastCount = useRef(-1);
   const lastSpoken = useRef<{ code: GuidanceCode | null; at: number }>({ code: null, at: 0 });
   const committed = useRef(false);
+  const heldSeconds = useRef(0);
   const wakeLock = useRef<{ release: () => Promise<void> } | null>(null);
   const snapRef = useRef<SessionSnapshot | null>(null);
   snapRef.current = snap;
@@ -216,6 +217,7 @@ export function Battle({ enemyId, onExit }: Props) {
       audio.rep(ev.index, ev.target);
       if (ev.index < ev.target) audio.say(String(ev.index));
     } else if (ev.type === 'holdTick') {
+      heldSeconds.current += 5;
       const left = Math.round((ev.targetMs - ev.heldMs) / 1000);
       audio.say(`${left} seconds`);
     } else if (ev.type === 'setComplete' || ev.type === 'setEnded') {
@@ -308,6 +310,7 @@ export function Battle({ enemyId, onExit }: Props) {
     updateSave((s) => {
       s.totals.cameraReps += r.camera;
       s.totals.manualReps += r.manual;
+      s.totals.holdSeconds += heldSeconds.current;
     });
   };
 

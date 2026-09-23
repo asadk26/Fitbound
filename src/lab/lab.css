@@ -1,0 +1,127 @@
+.lab {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  padding: calc(10px + var(--safe-t)) 12px calc(16px + var(--safe-b));
+  -webkit-user-select: text;
+  user-select: text;
+}
+.lab header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.lab h1 {
+  font-family: var(--pixel);
+  font-size: 14px;
+  color: var(--gold);
+  margin: 6px 0;
+}
+.lab h1 span {
+  color: var(--cyan);
+}
+.lab-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.lab-controls select {
+  font-size: 15px;
+  padding: 8px;
+  background: var(--ink);
+  color: var(--white);
+  border: 3px solid var(--slate);
+  border-radius: 0;
+}
+.lab-controls label.btn {
+  display: inline-flex;
+  align-items: center;
+}
+.lab-status {
+  font-size: 14px;
+  color: var(--mist);
+  margin: 4px 0 8px;
+}
+.lab-main {
+  display: grid;
+  gap: 10px;
+}
+@media (min-width: 800px) {
+  .lab-main {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+.lab-view {
+  background: #000;
+  border: 3px solid var(--night);
+  min-height: 200px;
+}
+.lab-view canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  transform: scaleX(-1);
+}
+.lab-big {
+  font-family: var(--pixel);
+  font-size: 48px;
+  color: var(--white);
+  text-shadow: 4px 4px 0 var(--ink);
+}
+.lab-big small {
+  font-size: 12px;
+  color: var(--mist);
+  margin-left: 8px;
+}
+.lab table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin: 8px 0;
+}
+.lab th {
+  text-align: left;
+  color: var(--mist);
+  font-weight: normal;
+  padding: 3px 8px 3px 0;
+  width: 40%;
+}
+.lab td {
+  font-family: ui-monospace, monospace;
+}
+.trk-good {
+  color: var(--lime);
+}
+.trk-partial {
+  color: var(--gold);
+}
+.trk-lost {
+  color: var(--red);
+}
+.lab-log {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  font-size: 13px;
+  font-family: ui-monospace, monospace;
+}
+.lab-log li {
+  padding: 3px 0;
+  border-bottom: 1px solid var(--night);
+}
+.lab-log span {
+  color: var(--mist);
+}
+.log-rep {
+  color: var(--lime);
+}
+.log-partial {
+  color: var(--orange);
+}
+.lab-foot {
+  margin-top: 12px;
+}

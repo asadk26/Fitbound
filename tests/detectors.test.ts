@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { JumpingJackDetector } from '../src/exercise/detectors/jumpingJack';
 import { PlankDetector } from '../src/exercise/detectors/plank';
 import { PushupDetector } from '../src/exercise/detectors/pushup';
-import { SquatDetector } from '../src/exercise/detectors/squat';
+import { SquatDetector, squatConfig } from '../src/exercise/detectors/squat';
 import type { DetectorUpdate, ExerciseDetector, PoseFrame } from '../src/exercise/types';
-import { cycle, FRAME_MS, hold, jackPose, plankPose, pushupPose, ramp, rng, squatPose, standingCurlPose } from './fixtures/poses';
+import { cycle, FRAME_MS, hingePose, hold, jackPose, plankPose, pushupPose, ramp, rng, squatPose, standingCurlPose } from './fixtures/poses';
 
 /** Feed a sequence of frames and collect every update. */
 class Runner {
@@ -121,37 +121,52 @@ describe('PushupDetector', () => {
 });
 
 describe('SquatDetector', () => {
-  it('counts one complete squat exactly once', () => {
-    const r = new Runner(new SquatDetector()).feed(squat([...hold(175, 10), ...cycle(175, 95), ...hold(175, 10)]));
-    expect(r.reps).toBe(1);
-    expect(r.phases).toEqual(['SETUP', 'STANDING', 'LOWERING', 'BOTTOM_POSITION', 'RISING', 'COMPLETED_REPETITION', 'STANDING']);
-  });
+  for (const view of ['front', 'side'] as const) {
+    it(`counts one complete squat exactly once (${view} view)`, () => {
+      const r = new Runner(new SquatDetector()).feed(squat([...hold(0, 10), ...cycle(0, 75), ...hold(0, 10)], { view }));
+      expect(r.reps).toBe(1);
+      expect(r.phases).toEqual(['SETUP', 'STANDING', 'LOWERING', 'BOTTOM_POSITION', 'RISING', 'COMPLETED_REPETITION', 'STANDING']);
+    });
 
-  it('counts eight squats as eight', () => {
-    const angles = [...hold(175, 10)];
-    for (let i = 0; i < 8; i++) angles.push(...cycle(175, 100), ...hold(175, 3));
-    expect(new Runner(new SquatDetector()).feed(squat(angles)).reps).toBe(8);
-  });
+    it(`counts eight squats as eight (${view} view)`, () => {
+      const angles = [...hold(0, 10)];
+      for (let i = 0; i < 8; i++) angles.push(...cycle(0, 70), ...hold(0, 3));
+      expect(new Runner(new SquatDetector()).feed(squat(angles, { view })).reps).toBe(8);
+    });
+  }
 
   it('does not count a shallow knee bend', () => {
-    const r = new Runner(new SquatDetector()).feed(squat([...hold(175, 10), ...cycle(175, 140), ...hold(175, 10)]));
+    const r = new Runner(new SquatDetector()).feed(squat([...hold(0, 10), ...cycle(0, 38), ...hold(0, 10)]));
+    expect(r.reps).toBe(0);
+    expect(r.updates.some((u) => u.partialRep)).toBe(true);
+  });
+
+  it('beginner level accepts a half squat that intermediate does not', () => {
+    const half = [...hold(0, 10), ...cycle(0, 47), ...hold(0, 10)];
+    expect(new Runner(new SquatDetector(squatConfig('beginner'))).feed(squat(half)).reps).toBe(1);
+    expect(new Runner(new SquatDetector(squatConfig('intermediate'))).feed(squat(half)).reps).toBe(0);
+  });
+
+  it('does not count bending over at the hips with straight legs', () => {
+    const bends = [...hold(0, 10), ...ramp(0, 80, 15), ...hold(80, 10), ...ramp(80, 0, 15), ...hold(0, 10)];
+    const r = new Runner(new SquatDetector()).feed(bends.map((b) => (t: number) => hingePose(b, t)));
     expect(r.reps).toBe(0);
   });
 
   it('does not repeat counts while holding the bottom, even with noise', () => {
-    const noise = { r: rng(3), amp: 0.01 };
-    const r = new Runner(new SquatDetector()).feed(squat([...hold(175, 10), ...ramp(175, 95, 15), ...hold(95, 150), ...ramp(95, 175, 15), ...hold(175, 10)], { noise }));
+    const noise = { r: rng(3), amp: 0.008 };
+    const r = new Runner(new SquatDetector()).feed(squat([...hold(0, 10), ...ramp(0, 75, 15), ...hold(75, 150), ...ramp(75, 0, 15), ...hold(0, 10)], { noise }));
     expect(r.reps).toBe(1);
   });
 
   it('asks for the legs when the ankles are out of view and counts nothing', () => {
-    const r = new Runner(new SquatDetector()).feed(squat([...hold(175, 10), ...cycle(175, 95), ...hold(175, 10)], { hideAnkles: true }));
+    const r = new Runner(new SquatDetector()).feed(squat([...hold(0, 10), ...cycle(0, 75), ...hold(0, 10)], { hideAnkles: true }));
     expect(r.reps).toBe(0);
     expect(r.last.guidance).toBe('LEGS_NOT_VISIBLE');
   });
 
   it('does not award a rep when tracking is lost at the bottom', () => {
-    const r = new Runner(new SquatDetector()).feed([...squat([...hold(175, 10), ...ramp(175, 95, 15)]), ...nothing(40), ...squat(hold(175, 20))]);
+    const r = new Runner(new SquatDetector()).feed([...squat([...hold(0, 10), ...ramp(0, 75, 15)]), ...nothing(40), ...squat(hold(0, 20))]);
     expect(r.reps).toBe(0);
   });
 });

@@ -41,7 +41,7 @@ export function ExercisePanel(p: Props) {
     v.className = 'cam-video';
     host.prepend(v);
     return () => {
-      if (v.parentElement === host) host.removeChild(v);
+      if (v.parentElement === host) tracker.park();
     };
   }, []);
 

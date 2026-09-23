@@ -94,6 +94,8 @@ export class JumpingJackDetector implements ExerciseDetector {
     let legsOpen = false;
     let legsClosed = false;
     let progress = 0;
+    let armLift = 0;
+    let legSpread = 0;
 
     if (frame) {
       const lms = frame.landmarks;
@@ -117,6 +119,8 @@ export class JumpingJackDetector implements ExerciseDetector {
       armsUp = lUp >= c.armsUpRatio && rUp >= c.armsUpRatio;
       armsDown = lUp <= -c.armsDownRatio && rUp <= -c.armsDownRatio;
       const spread = Math.abs(la.x - ra.x) / shoulderW;
+      armLift = Math.min(lUp, rUp);
+      legSpread = spread;
       legsOpen = spread >= c.legsOpenRatio;
       legsClosed = spread <= c.legsClosedRatio;
 
@@ -188,6 +192,7 @@ export class JumpingJackDetector implements ExerciseDetector {
       repCompleted,
       partialRep,
       progress,
+      metrics: { armLift: +armLift.toFixed(2), legSpread: +legSpread.toFixed(2) },
     };
   }
 

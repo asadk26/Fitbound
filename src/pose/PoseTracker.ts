@@ -32,7 +32,7 @@ const BASE = import.meta.env.BASE_URL;
 let landmarkerPromise: Promise<PoseLandmarker> | null = null;
 let landmarkerModel: string | null = null;
 
-async function loadLandmarker(model: 'full' | 'lite'): Promise<PoseLandmarker> {
+export async function loadLandmarker(model: 'full' | 'lite'): Promise<PoseLandmarker> {
   if (landmarkerPromise && landmarkerModel === model) return landmarkerPromise;
   if (landmarkerPromise) {
     const old = landmarkerPromise;
@@ -63,6 +63,17 @@ async function loadLandmarker(model: 'full' | 'lite'): Promise<PoseLandmarker> {
   return landmarkerPromise;
 }
 
+/** Convert MediaPipe's normalized landmarks to isotropic detector input. */
+export function toPoseFrame(raw: NormalizedLandmark[] | null, width: number, height: number, now: number): PoseFrame | null {
+  if (!raw) return null;
+  const aspect = width / height;
+  return {
+    timestamp: now,
+    aspect,
+    landmarks: raw.map((l) => ({ x: l.x * aspect, y: l.y, z: l.z, visibility: l.visibility ?? 0 })),
+  };
+}
+
 /** Start downloading the model early (e.g. when a battle begins). */
 export function preloadPose(model: 'full' | 'lite'): void {
   void loadLandmarker(model).catch(() => {});
@@ -85,6 +96,17 @@ export class PoseTracker {
     this.video.setAttribute('muted', '');
     this.video.muted = true;
     this.video.autoplay = true;
+    this.park();
+  }
+
+  /**
+   * Keep the video in the document when no panel is showing it: iOS Safari
+   * can stop delivering frames to a detached <video>.
+   */
+  park(): void {
+    const v = this.video;
+    v.className = 'cam-parked';
+    if (typeof document !== 'undefined' && document.body) document.body.appendChild(v);
   }
 
   get active(): boolean {
@@ -151,14 +173,7 @@ export class PoseTracker {
       console.warn('pose detection failed for a frame', e);
     }
 
-    const aspect = v.videoWidth / v.videoHeight;
-    const frame: PoseFrame | null = raw
-      ? {
-          timestamp: now,
-          aspect,
-          landmarks: raw.map((l) => ({ x: l.x * aspect, y: l.y, z: l.z, visibility: l.visibility ?? 0 })),
-        }
-      : null;
+    const frame = toPoseFrame(raw, v.videoWidth, v.videoHeight, now);
     this.listener?.({ frame, raw, now, fps: this.fps });
   };
 

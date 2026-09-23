@@ -120,7 +120,7 @@ export function MenuPanel({ onClose, onQuitToTitle }: { onClose: () => void; onQ
           <span>XP {save.xp}</span>
         </div>
         <p className="muted small">
-          Lifetime: {save.totals.cameraReps} camera-verified reps · {save.totals.manualReps} manual reps · {save.totals.battlesWon} battles won · dungeon cleared {save.clears}×
+          Lifetime: {save.totals.cameraReps} camera-verified reps · {save.totals.manualReps} manual reps · {save.totals.holdSeconds}s of planks · {save.totals.battlesWon} battles won · dungeon cleared {save.clears}×
         </p>
       </section>
 

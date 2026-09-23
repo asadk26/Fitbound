@@ -89,6 +89,7 @@ export class PushupDetector implements ExerciseDetector {
     let elbowAngle = 0;
     let inPosition = false;
     let hipAngle = 180;
+    let torsoIncline = 0;
 
     if (frame) {
       const lms = frame.landmarks;
@@ -100,7 +101,7 @@ export class PushupDetector implements ExerciseDetector {
       const knee = lms[s.knee];
       elbowAngle = angle(sh, lms[s.elbow], lms[s.wrist]);
 
-      const torsoIncline = inclineFromHorizontal(sh, hip);
+      torsoIncline = inclineFromHorizontal(sh, hip);
       const torsoLen = dist(sh, hip);
       const shoulderSpread = dist(lms[LM.L_SHOULDER], lms[LM.R_SHOULDER]);
       if (knee.visibility > 0.4) hipAngle = angle(sh, hip, knee);
@@ -174,6 +175,7 @@ export class PushupDetector implements ExerciseDetector {
       repCompleted,
       partialRep,
       progress,
+      metrics: { elbow: Math.round(e), torsoIncline: Math.round(torsoIncline), hipAngle: Math.round(hipAngle) },
     };
   }
 

@@ -984,6 +984,15 @@ details summary {
   inset: 0;
   transform: scaleX(-1); /* mirror, like a mirror */
 }
+.cam-parked {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 .cam-video {
   position: absolute;
   inset: 0;

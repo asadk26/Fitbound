@@ -70,6 +70,8 @@ export interface DetectorUpdate {
   holding?: boolean;
   /** True on the update where a started rep was abandoned without counting. */
   partialRep?: boolean;
+  /** Raw measurements behind the decision, for the Detector Lab and tuning. */
+  metrics?: Record<string, number>;
 }
 
 export interface ExerciseDetector {

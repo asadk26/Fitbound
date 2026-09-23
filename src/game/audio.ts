@@ -34,7 +34,20 @@ class Audio {
     } catch {
       /* audio unavailable */
     }
+    // iOS only lets speech start from a user gesture; a silent utterance
+    // during the first tap unlocks it for later cues.
+    if (!this.speechPrimed && typeof speechSynthesis !== 'undefined') {
+      this.speechPrimed = true;
+      try {
+        const u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0;
+        speechSynthesis.speak(u);
+      } catch {
+        /* speech unavailable */
+      }
+    }
   }
+  private speechPrimed = false;
 
   setSound(on: boolean): void {
     this.soundOn = on;

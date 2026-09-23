@@ -74,6 +74,8 @@ export class PlankDetector implements ExerciseDetector {
     let confidence = 0;
     let setupIssue: GuidanceCode | null = null;
     let valid = false;
+    let incline = 0;
+    let bodyLine = 0;
 
     if (frame) {
       const lms = frame.landmarks;
@@ -86,8 +88,8 @@ export class PlankDetector implements ExerciseDetector {
       const hip = lms[s.hip];
       const foot = lms[footIdx];
       const elbow = lms[s.elbow];
-      const incline = inclineFromHorizontal(sh, foot);
-      const bodyLine = this.line.push(angle(sh, hip, foot));
+      incline = inclineFromHorizontal(sh, foot);
+      bodyLine = this.line.push(angle(sh, hip, foot));
       // Supported on the arms: the elbow sits below the shoulder.
       const supported = elbow.y > sh.y;
 
@@ -127,6 +129,7 @@ export class PlankDetector implements ExerciseDetector {
       progress: clamp01(this.heldMs / 60000),
       holdMs: this.heldMs,
       holding,
+      metrics: { bodyLine: Math.round(bodyLine), incline: Math.round(incline) },
     };
   }
 }

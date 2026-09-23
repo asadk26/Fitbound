@@ -87,27 +87,44 @@ export function standingCurlPose(elbowDeg: number, t: number): PoseFrame {
   return frameFrom(pts, 4 / 3, t);
 }
 
-/** Front-view squat at a given knee angle (degrees). */
-export function squatPose(kneeDeg: number, t: number, opts: { noise?: { r: () => number; amp: number }; hideAnkles?: boolean } = {}): PoseFrame {
+/**
+ * Squat at a given thigh angle from vertical (0 = standing, 90 = thighs
+ * parallel). The shin leans about half as much as the thigh, as in a real
+ * squat. `view: 'front'` projects the pose as a front-facing camera sees it:
+ * hip, knee and ankle stay stacked and only vertical distances change.
+ */
+export function squatPose(
+  thighDeg: number,
+  t: number,
+  opts: { noise?: { r: () => number; amp: number }; hideAnkles?: boolean; view?: 'front' | 'side'; torsoLean?: number } = {},
+): PoseFrame {
   const L = 0.2; // thigh = shin
-  const a = rad((180 - kneeDeg) / 2);
+  const th = rad(thighDeg);
+  const sh = rad(thighDeg * 0.5);
+  const side = opts.view === 'side';
   const legs = (ax: number) => {
     const A: P = [ax, 0.95];
-    const K: P = [ax + L * Math.sin(a), 0.95 - L * Math.cos(a)];
-    const H: P = [ax, 0.95 - 2 * L * Math.cos(a)];
+    const K: P = [ax + (side ? L * Math.sin(sh) : 0), 0.95 - L * Math.cos(sh)];
+    const H: P = [K[0] - (side ? L * Math.sin(th) : 0), K[1] - L * Math.cos(th)];
     return { A, K, H };
   };
-  const l = legs(0.45);
-  const r = legs(0.55);
+  const l = legs(side ? 0.5 : 0.45);
+  const r = legs(side ? 0.5 : 0.55);
   const hipY = l.H[1];
+  const hx = (l.H[0] + r.H[0]) / 2;
+  // Torso leans forward as the thighs drop (side view shows it).
+  const lean = rad(opts.torsoLean ?? thighDeg * 0.4);
+  const tx = side ? Math.sin(lean) * 0.26 : 0;
+  const ty = Math.cos(lean) * 0.26;
+  const sw = side ? 0.005 : 0.08;
   const pts: Partial<Record<number, P>> = {
-    [LM.NOSE]: [0.5, hipY - 0.37],
-    [LM.L_SHOULDER]: [0.42, hipY - 0.26],
-    [LM.R_SHOULDER]: [0.58, hipY - 0.26],
-    [LM.L_ELBOW]: [0.4, hipY - 0.12],
-    [LM.R_ELBOW]: [0.6, hipY - 0.12],
-    [LM.L_WRIST]: [0.4, hipY],
-    [LM.R_WRIST]: [0.6, hipY],
+    [LM.NOSE]: [hx + tx * 1.4, hipY - ty - 0.11],
+    [LM.L_SHOULDER]: [hx + tx - sw, hipY - ty],
+    [LM.R_SHOULDER]: [hx + tx + sw, hipY - ty],
+    [LM.L_ELBOW]: [hx + tx - sw, hipY - ty + 0.13],
+    [LM.R_ELBOW]: [hx + tx + sw, hipY - ty + 0.13],
+    [LM.L_WRIST]: [hx + tx - sw, hipY - ty + 0.25],
+    [LM.R_WRIST]: [hx + tx + sw, hipY - ty + 0.25],
     [LM.L_HIP]: l.H,
     [LM.R_HIP]: r.H,
     [LM.L_KNEE]: l.K,
@@ -118,6 +135,29 @@ export function squatPose(kneeDeg: number, t: number, opts: { noise?: { r: () =>
     pts[LM.R_ANKLE] = r.A;
   }
   return frameFrom(pts, 1, t, 0.95, opts.noise);
+}
+
+/** Standing side-on, hinging forward at the hips with straight legs. */
+export function hingePose(bendDeg: number, t: number): PoseFrame {
+  const lean = rad(bendDeg);
+  const H: P = [0.5 - 0.05 * Math.sin(lean), 0.55];
+  const S: P = [H[0] + Math.sin(lean) * 0.26, H[1] - Math.cos(lean) * 0.26];
+  const pts: Partial<Record<number, P>> = {
+    [LM.NOSE]: [S[0] + Math.sin(lean) * 0.1, S[1] - Math.cos(lean) * 0.1],
+    [LM.L_SHOULDER]: S,
+    [LM.R_SHOULDER]: [S[0] + 0.005, S[1]],
+    [LM.L_ELBOW]: [S[0], S[1] + 0.13],
+    [LM.R_ELBOW]: [S[0], S[1] + 0.13],
+    [LM.L_WRIST]: [S[0], S[1] + 0.25],
+    [LM.R_WRIST]: [S[0], S[1] + 0.25],
+    [LM.L_HIP]: H,
+    [LM.R_HIP]: H,
+    [LM.L_KNEE]: [0.5, 0.75],
+    [LM.R_KNEE]: [0.5, 0.75],
+    [LM.L_ANKLE]: [0.5, 0.95],
+    [LM.R_ANKLE]: [0.5, 0.95],
+  };
+  return frameFrom(pts, 1, t);
 }
 
 /** Front-view jumping jack. arms/legs in 0 (closed) .. 1 (open). */
