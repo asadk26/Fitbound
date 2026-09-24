@@ -55,6 +55,10 @@ export interface MotionConfig {
   pauseHoldMs: number;
   /** A gesture re-arms only after both hands have been down this long. */
   rearmMs: number;
+  /** Standing tall, hands relaxed: how long it must (mostly) hold. */
+  readyHoldMs: number;
+  /** Max lean from neutral that still counts as standing tall. */
+  readyLeanDeg: number;
 }
 
 export const MOTION_DEFAULTS: MotionConfig = {
@@ -78,6 +82,8 @@ export const MOTION_DEFAULTS: MotionConfig = {
   confirmHoldMs: 450,
   pauseHoldMs: 800,
   rearmMs: 250,
+  readyHoldMs: 500,
+  readyLeanDeg: 10,
 };
 
 export type Sensitivity = 'low' | 'normal' | 'high';
@@ -99,9 +105,17 @@ export interface NeutralPose {
   legDiff: number;
   /** Resting torso lean in degrees (positive = player's left). */
   leanDeg: number;
+  /**
+   * Camera roll estimated from the standing torso, in image degrees
+   * (positive = the image is rotated so upright bodies lean toward image
+   * right). A standing person is vertical, so this is how far the phone is
+   * tilted sideways, to within their natural posture. Optional for saves
+   * made before it existed.
+   */
+  rollDeg?: number;
 }
 
-export type MotionEvent = 'step' | 'confirm' | 'back' | 'pause' | 'turnLeft' | 'turnRight';
+export type MotionEvent = 'step' | 'confirm' | 'back' | 'pause' | 'turnLeft' | 'turnRight' | 'ready';
 
 export interface MotionReading {
   tracking: TrackingQuality;
@@ -128,6 +142,8 @@ export interface MotionReading {
   hold: { confirm: number; back: number; pause: number };
   /** Gestures are ignored until the player's hands have been down once. */
   armed: boolean;
+  /** 0..1 progress of the standing-tall "ready" hold. */
+  readyProgress: number;
   events: MotionEvent[];
   metrics: { legDiff: number; rightUp: number; leftUp: number };
 }
@@ -144,6 +160,12 @@ interface Measure {
   rightUp: number;
   leftUp: number;
   handsDown: boolean;
+  /** Both wrists below the middle of the torso (or out of sight): hands relaxed at the sides. */
+  handsLow: boolean;
+  /** Ankles no wider than about shoulder width. */
+  feetTogether: boolean;
+  /** Torso angle in image space (degrees, + = top toward image right). */
+  imgTorsoDeg: number;
 }
 
 /** Raw per-frame measurements, before any calibration or smoothing. */
@@ -173,11 +195,16 @@ export function measure(frame: PoseFrame, neutral?: NeutralPose | null): Measure
   const leftUp = up(l[LM.L_WRIST]);
   const below = (w: Landmark, s: Landmark) => w.visibility < 0.5 || w.y > s.y;
   const handsDown = below(l[LM.R_WRIST], l[LM.R_SHOULDER]) && below(l[LM.L_WRIST], l[LM.L_SHOULDER]);
+  const midTorsoY = (shoulders.y + hips.y) / 2;
+  const handsLow = below(l[LM.R_WRIST], { ...shoulders, y: midTorsoY }) && below(l[LM.L_WRIST], { ...shoulders, y: midTorsoY });
+  const hipW = Math.max(dist(l[LM.L_HIP], l[LM.R_HIP]), 1e-3);
+  const feetTogether = Math.abs(l[LM.L_ANKLE].x - l[LM.R_ANKLE].x) < hipW * 2.2;
+  const imgTorsoDeg = (Math.atan2(shoulders.x - hips.x, Math.max(hips.y - shoulders.y, 1e-3)) * 180) / Math.PI;
 
   const inside = (i: number) => l[i].visibility >= 0.5 && inFrame(l[i], frame.aspect, 0);
   const fullBody = confidence >= 0.5 && inside(LM.NOSE) && inside(LM.L_ANKLE) && inside(LM.R_ANKLE);
 
-  return { confidence, fullBody, thigh, torso, legDiff, leanDeg, rightUp, leftUp, handsDown };
+  return { confidence, fullBody, thigh, torso, legDiff, leanDeg, rightUp, leftUp, handsDown, handsLow, feetTogether, imgTorsoDeg };
 }
 
 /** Collects a still, standing neutral pose. */
@@ -209,7 +236,11 @@ export class NeutralCalibrator {
       const v = this.samples.map(f).sort((a, b) => a - b);
       return v[Math.floor(v.length / 2)];
     };
-    return { progress: 1, still, neutral: { thigh: med((s) => s.thigh), torso: med((s) => s.torso), legDiff: med((s) => s.legDiff), leanDeg: med((s) => s.leanDeg) } };
+    return {
+      progress: 1,
+      still,
+      neutral: { thigh: med((s) => s.thigh), torso: med((s) => s.torso), legDiff: med((s) => s.legDiff), leanDeg: med((s) => s.leanDeg), rollDeg: med((s) => s.imgTorsoDeg) },
+    };
   }
 
   reset(): void {
@@ -268,6 +299,9 @@ export class MotionReader {
   private turnArmed = false;
   private neutralSince: number | null = null;
   private lastTurnAt = -Infinity;
+  private readyMs = 0;
+  private readyAt = 0;
+  private readyFired = false;
 
   constructor(cfg: Partial<MotionConfig> = {}) {
     this.cfg = { ...MOTION_DEFAULTS, ...cfg };
@@ -314,6 +348,8 @@ export class MotionReader {
     this.downSince = null;
     this.badSince = null;
     this.disarmTurn();
+    this.readyMs = 0;
+    this.readyFired = false;
   }
 
   update(frame: PoseFrame | null, now: number): MotionReading {
@@ -332,6 +368,7 @@ export class MotionReader {
         this.armed = false;
         this.downSince = null;
         this.disarmTurn();
+        this.readyMs = 0;
       }
       return this.reading(lost ? 'lost' : 'partial', m, events, now);
     }
@@ -397,6 +434,20 @@ export class MotionReader {
       }
     }
 
+    // ── Standing tall, hands relaxed ("ready") ──────────────────────────
+    // Forgiving: brief wobbles only slow the hold down instead of resetting
+    // it, and no stillness is required beyond not marching.
+    const dt = Math.max(0, Math.min(200, now - this.readyAt));
+    this.readyAt = now;
+    const stepping = this.stepTimes.length > 0 && now - this.stepTimes[this.stepTimes.length - 1] < 600;
+    const tall = m.fullBody && m.handsLow && m.feetTogether && !stepping && Math.abs(lean) < c.readyLeanDeg;
+    this.readyMs = tall ? this.readyMs + dt : Math.max(0, this.readyMs - dt * 2);
+    if (this.readyMs >= c.readyHoldMs && !this.readyFired) {
+      events.push('ready');
+      this.readyFired = true;
+    }
+    if (this.readyMs === 0) this.readyFired = false;
+
     return this.reading('good', m, events, now);
   }
 
@@ -434,6 +485,7 @@ export class MotionReader {
       turnArmed: tracking === 'good' && this.turnArmed,
       hold: { confirm: holdFrac('confirm'), back: holdFrac('back'), pause: holdFrac('pause') },
       armed: this.armed,
+      readyProgress: tracking === 'good' ? Math.min(1, this.readyMs / c.readyHoldMs) : 0,
       events,
       metrics: { legDiff: this.leg.value ?? 0, rightUp: m?.rightUp ?? 0, leftUp: m?.leftUp ?? 0 },
     };

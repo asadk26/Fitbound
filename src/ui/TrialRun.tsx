@@ -3,9 +3,13 @@ import { bus } from '../game/bus';
 import { audio } from '../game/audio';
 import { levelForXp, statsFor, type PlayerStats } from '../game/progression';
 import { getSave, updateSave } from '../game/store';
-import { input } from '../input/InputHub';
+import { GamepadInput } from '../input/gamepad';
+import { input, type InputMode } from '../input/InputHub';
 import { motionPreset } from '../input/motion';
+import { tilt } from '../input/tilt';
 import { host } from '../net/host';
+import { iconDataUrl } from '../phaser/art';
+import { travel } from '../phaser/diorama/travel';
 import { setDioramaState, showScene } from '../phaser/game';
 import { tracker, TrackerError } from '../pose/PoseTracker';
 import { BOONS, encounterPlan, parseTargets, trialEnemy, type TrialEnemy } from '../trial/config';
@@ -14,35 +18,41 @@ import { Calibration } from './Calibration';
 import { CameraView } from './CameraView';
 import { ControllerLost, ControllerStatus, RemoteCalibration, useLink } from './Connected';
 import { GestureMenu, HoldRing, MotionMeter, useInputEvents, useMotion } from './motionUi';
+import { useSave } from './useSave';
 
 /**
  * The Motion Trial: place the phone once, calibrate, then play a short
- * adventure entirely with your body.
+ * adventure with your body.
  *
- *   Part 1 (exploration): march to the banner, steer to the dummy and strike
- *   it, read the signpost and accept the trial.
- *   Part 2 (combat): push-ups, squats, jumping jacks, then a three-phase boss.
+ *   Part 1 (exploration): march to the banner, on to the training dummy
+ *   (strike it), then the signpost (accept the trial). With Guided
+ *   Traversal the trail leads there; a fork offers a detour to a shrine.
+ *   Part 2 (combat): the Skeleton, then the Golem and the Mage in whichever
+ *   order you choose at the fork, then the Warden.
+ *
+ * Pause works from every phase: both hands up while standing, the touch
+ * Pause button, P on the keyboard, or Start on a gamepad.
  */
 type Stage = 'calibrate' | 'explore' | 'dialog' | 'battle' | 'reward' | 'summary';
 
 interface Objective {
   id: string;
   title: string;
-  hint: string;
+  hint: { guided: string; free: string };
   target: string;
   interact?: string;
   prompt?: string;
-  enemy?: TrialEnemy;
+  /** Guardians to defeat (any order) before the objective is complete. */
+  enemies?: TrialEnemy[];
 }
 
-const OBJECTIVES: Objective[] = [
-  { id: 'banner', title: 'March to the banner', hint: 'March in place — lift your knees — to walk forward.', target: 'banner' },
-  { id: 'dummy', title: 'Steer to the training dummy', hint: 'Keep marching and lean left or right to turn.', target: 'dummy', interact: 'dummy', prompt: 'strike the dummy' },
-  { id: 'signpost', title: 'Read the signpost by the gate', hint: 'Follow the trail. Lean to steer.', target: 'signpost', interact: 'signpost', prompt: 'read the sign' },
-  { id: 'skeleton', title: 'Face the Skeleton', hint: 'Walk up to it. Push-ups ahead!', target: 'skeleton', enemy: 'skeleton' },
-  { id: 'golem', title: 'Face the Stone Golem', hint: 'Walk up to it. Squats ahead!', target: 'golem', enemy: 'golem' },
-  { id: 'mage', title: 'Face the Shadow Mage', hint: 'Walk up to it. Jumping jacks ahead!', target: 'mage', enemy: 'mage' },
-  { id: 'warden', title: 'Challenge the Dungeon Warden', hint: 'The final guardian: push-ups, squats and jumping jacks.', target: 'warden', enemy: 'warden' },
+export const OBJECTIVES: Objective[] = [
+  { id: 'banner', title: 'March to the banner', hint: { guided: 'March in place — lift your knees — and the trail carries you there.', free: 'March in place — lift your knees — to walk forward.' }, target: 'banner' },
+  { id: 'dummy', title: 'Visit the training dummy', hint: { guided: 'Keep marching. The trail leads you there.', free: 'Keep marching and lean left or right to turn.' }, target: 'dummy', interact: 'dummy', prompt: 'strike the dummy' },
+  { id: 'signpost', title: 'Read the signpost by the gate', hint: { guided: 'March on. At the fork, lean toward the path you want.', free: 'Follow the trail. Lean to steer.' }, target: 'signpost', interact: 'signpost', prompt: 'read the sign' },
+  { id: 'skeleton', title: 'Face the Skeleton', hint: { guided: 'March through the gate. Push-ups ahead!', free: 'Walk up to it. Push-ups ahead!' }, target: 'skeleton', enemies: ['skeleton'] },
+  { id: 'pair', title: 'Face the Golem and the Mage', hint: { guided: 'At the fork, lean to choose who to face first.', free: 'Walk up to either: the Golem (squats) or the Mage (jumping jacks).' }, target: 'golem', enemies: ['golem', 'mage'] },
+  { id: 'warden', title: 'Challenge the Dungeon Warden', hint: { guided: 'The final guardian: push-ups, squats and jumping jacks.', free: 'The final guardian: push-ups, squats and jumping jacks.' }, target: 'warden', enemies: ['warden'] },
 ];
 
 interface Log {
@@ -56,9 +66,21 @@ interface Log {
   partTimes: Record<string, number>;
 }
 
+type Choice = { prompt: string; options: { dir: -1 | 1; label: string; detail: string; icon: string }[] };
+
+const MODE_FOR: Record<Stage, InputMode | null> = { calibrate: 'calibration', explore: 'explore', dialog: 'dialogue', reward: 'menu', summary: 'menu', battle: null };
+
+/** Switch Active ⇄ Assisted traversal (keeps the run and its rewards). */
+export function toggleTraversal(): void {
+  updateSave((s) => void (s.settings.motion.traversal = s.settings.motion.traversal === 'active' ? 'assisted' : 'active'));
+  const t = getSave().settings.motion.traversal;
+  audio.select();
+  audio.say(t === 'active' ? 'Active traversal. March to move.' : 'Assisted traversal. Use the controller to move.', false);
+}
+
 export function TrialRun({ onExit, connected = false }: { onExit: () => void; /** Connected Play: a phone is the controller. */ connected?: boolean }) {
-  const save = getSave();
-  const targets = useMemo(() => parseTargets(location.search, save.settings.trialTargets), [save.settings.trialTargets]);
+  const save = useSave();
+  const targets = useMemo(() => parseTargets(location.search, getSave().settings.trialTargets), []);
   const [stage, setStageState] = useState<Stage>('calibrate');
   const stageRef = useRef<Stage>('calibrate');
   const [camera, setCamera] = useState<{ state: string; message?: string }>({ state: 'starting' });
@@ -67,15 +89,25 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
   const [near, setNear] = useState<string | null>(null);
   const [gateOpen, setGateOpen] = useState(false);
   const [defeated, setDefeated] = useState<string[]>([]);
+  const defeatedRef = useRef<string[]>([]);
   const [enemyId, setEnemyId] = useState<TrialEnemy | null>(null);
   const [bonus, setBonus] = useState({ atk: 0, def: 0, mag: 0 });
   const [hp, setHp] = useState<number | null>(null);
-  const [paused, setPaused] = useState(false);
+  const [paused, setPausedState] = useState(false);
+  const pausedRef = useRef(false);
   const [lostBanner, setLostBanner] = useState(false);
+  const [choice, setChoice] = useState<Choice | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [rejoining, setRejoining] = useState(false);
+  const [shrineUsed, setShrineUsed] = useState(false);
+  const [tiltMoved, setTiltMoved] = useState(false);
+  const calKind = useRef<'full' | 'quick'>('full');
   const log = useRef<Log>({ startedAt: Date.now(), calibratedAt: null, exploreSteps: 0, gestures: 0, floorOk: false, trackingLosses: 0, reps: {}, partTimes: {} });
   const r = useMotion();
   const link = useLink();
   const ctrlLost = connected && link.controller !== 'connected';
+  const guided = save.settings.motion.navigation === 'guided';
+  const assisted = guided && save.settings.motion.traversal === 'assisted';
 
   const stats: PlayerStats = useMemo(() => {
     const s = statsFor(levelForXp(save.xp), save.upgrades);
@@ -85,15 +117,30 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
   const setStage = (s: Stage) => {
     stageRef.current = s;
     setStageState(s);
-    if (s === 'calibrate') input.setMode('calibration');
-    else if (s === 'explore') input.setMode('explore');
-    else if (s === 'dialog') input.setMode('dialogue');
-    else if (s !== 'battle') input.setMode('menu');
+    if (s === 'calibrate') input.calibrationKind = calKind.current;
+    const m = MODE_FOR[s];
+    if (m && !pausedRef.current) input.setMode(m);
+  };
+
+  const setPaused = (p: boolean) => {
+    pausedRef.current = p;
+    setPausedState(p);
+    if (p) input.setMode('menu');
+    else {
+      const m = MODE_FOR[stageRef.current];
+      if (m) input.setMode(m);
+    }
+  };
+
+  const flash = (text: string, ms = 2600) => {
+    setNotice(text);
+    window.setTimeout(() => setNotice((n) => (n === text ? null : n)), ms);
   };
 
   // Camera + motion input for the whole session.
   useEffect(() => {
     showScene('Diorama', { attract: false });
+    travel.reset();
     input.reader.configure(motionPreset(getSave().settings.motion));
     let offFeed = () => {};
     if (connected) {
@@ -110,27 +157,43 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
         .catch((e) => setCamera({ state: 'error', message: e instanceof TrackerError ? e.message : String(e) }));
     }
     const detach = input.attachKeyboard(window);
+    const pad = new GamepadInput(input, toggleTraversal);
+    pad.start();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'KeyT' && !e.repeat) toggleTraversal();
+    };
+    window.addEventListener('keydown', onKey);
     const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } };
     let lock: { release: () => Promise<void> } | null = null;
     nav.wakeLock
       ?.request('screen')
       .then((l) => (lock = l))
       .catch(() => {});
+    const tiltTimer = window.setInterval(() => setTiltMoved(tilt.moved), 1000);
     const offs = [
       bus.on('diorama:near', ({ id }) => setNear(id)),
       bus.on('diorama:reached', ({ id }) => {
-        if (id === OBJECTIVES[objRef.current]?.target && !OBJECTIVES[objRef.current].interact) advance();
+        const o = OBJECTIVES[objRef.current];
+        if (id === o?.target && !o.interact && !o.enemies) advance();
       }),
       bus.on('world:encounter', ({ enemyId }) => {
-        if (stageRef.current !== 'explore') return;
+        if (stageRef.current !== 'explore' || pausedRef.current) return;
+        setChoice(null);
         setEnemyId(enemyId as TrialEnemy);
         setStage('battle');
       }),
+      bus.on('trail:choice', (c) => setChoice(c)),
+      bus.on('trail:chosen', ({ label }) => flash(`Heading for the ${label}`)),
+      bus.on('trail:rejoin', ({ active }) => setRejoining(active)),
     ];
-    input.setMode('calibration');
+    calKind.current = 'full';
+    setStage('calibrate');
     return () => {
       offFeed();
       detach();
+      pad.stop();
+      window.removeEventListener('keydown', onKey);
+      clearInterval(tiltTimer);
       offs.forEach((f) => f());
       if (!connected) tracker.stop();
       input.setMode('off');
@@ -143,15 +206,16 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
   // Keep the diorama in sync with the objective.
   useEffect(() => {
     const o = OBJECTIVES[obj];
-    // Only the current guardian engages; the others wait on the board.
+    const remaining = (o?.enemies ?? []).filter((e) => !defeated.includes(e));
     setDioramaState({
-      target: o?.target ?? null,
-      interact: o?.interact ? [o.interact] : [],
-      enemies: o?.enemy && !defeated.includes(o.enemy) ? [o.enemy] : [],
+      target: remaining[0] ?? o?.target ?? null,
+      alt: remaining.slice(1),
+      interact: [...(o?.interact ? [o.interact] : []), ...(shrineUsed ? [] : ['shrine'])],
+      enemies: remaining,
       defeated,
       gateOpen,
     });
-  }, [obj, gateOpen, defeated]);
+  }, [obj, gateOpen, defeated, shrineUsed]);
 
   function advance() {
     const name = OBJECTIVES[objRef.current]?.id;
@@ -172,10 +236,8 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
     if (!ctrlLost) return;
     audio.trackingLost();
     audio.say('Controller disconnected. The game is paused.', false);
-    if (stageRef.current === 'explore') {
-      setPaused(true);
-      input.setMode('menu');
-    }
+    if (stageRef.current === 'explore' || stageRef.current === 'dialog' || stageRef.current === 'reward') setPaused(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctrlLost]);
 
   // Tell the phone what's going on, for its dashboard.
@@ -183,8 +245,9 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
     if (!connected) return;
     const o = OBJECTIVES[obj];
     const title = stage === 'calibrate' ? 'Setup' : stage === 'battle' ? 'Battle' : stage === 'summary' ? 'Trial complete' : (o?.title ?? '');
-    host.send({ type: 'GAME', title, hint: stage === 'explore' ? (o?.hint ?? '') : '', exercise: null, paused, notice: null });
-  }, [connected, stage, obj, paused, link.controller]);
+    const choiceText = choice ? choice.options.map((x) => `${x.dir < 0 ? '◀ lean left' : 'lean right ▶'}: ${x.label}`).join(' · ') : null;
+    host.send({ type: 'GAME', title, hint: stage === 'explore' ? (o?.hint[guided ? 'guided' : 'free'] ?? '') : '', exercise: null, paused, notice: choiceText });
+  }, [connected, stage, obj, paused, link.controller, choice, guided]);
 
   // Tracking-lost cue while exploring.
   const lostSince = useRef<number | null>(null);
@@ -216,15 +279,23 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
   useInputEvents((e) => {
     if (e.type === 'step' && stageRef.current === 'explore') log.current.exploreSteps++;
     if (e.type === 'confirm' || e.type === 'back' || e.type === 'pause') log.current.gestures++;
-    if (stageRef.current !== 'explore') return;
-    if (e.type === 'pause') {
+    const st = stageRef.current;
+    // Pause from exploration, dialogue and reward menus (battles handle their own).
+    if (e.type === 'pause' && !pausedRef.current && (st === 'explore' || st === 'dialog' || st === 'reward')) {
       setPaused(true);
-      input.setMode('menu');
       audio.gesture();
       return;
     }
-    if (paused) return;
+    if (pausedRef.current || st !== 'explore') return;
     const o = OBJECTIVES[objRef.current];
+    if (e.type === 'confirm' && near === 'shrine' && !shrineUsed) {
+      audio.heal();
+      audio.say('The shrine restores you.');
+      setHp(stats.maxHp);
+      setShrineUsed(true);
+      flash('The Mossy Shrine restores your health');
+      return;
+    }
     if (e.type === 'confirm' && o?.interact && near === o.interact) {
       audio.gesture();
       if (o.interact === 'dummy') {
@@ -235,42 +306,34 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
   });
 
   const current = OBJECTIVES[obj];
+  const floorWarn = stage !== 'calibrate' && !log.current.floorOk;
   // In Connected Play, only resume once the phone is back and ready.
   const canResume = !connected || (link.controller === 'connected' && host.ready);
-  const floorWarn = stage !== 'calibrate' && !log.current.floorOk;
+  const phoneMoved = connected ? !!link.status?.moved : tiltMoved;
+  const interactPrompt = near === 'shrine' && !shrineUsed ? 'rest at the shrine' : current?.interact && near === current.interact ? current.prompt : null;
+  const combatN = defeated.length + 1;
+
+  const onCalibrated = (res: { floorOk: boolean }) => {
+    const first = calKind.current === 'full';
+    log.current.calibratedAt = Date.now();
+    if (first) log.current.floorOk = res.floorOk;
+    if (!connected) tilt.setReference();
+    calKind.current = 'quick';
+    setStage('explore');
+    if (first) audio.say(OBJECTIVES[0].title + '. ' + OBJECTIVES[0].hint[guided ? 'guided' : 'free']);
+  };
 
   return (
     <div className="trial">
-      {stage === 'calibrate' && connected && (
-        <RemoteCalibration
-          onDone={(res) => {
-            log.current.calibratedAt = Date.now();
-            log.current.floorOk = res.floorOk;
-            setStage('explore');
-            audio.say(OBJECTIVES[0].title + '. ' + OBJECTIVES[0].hint);
-          }}
-        />
-      )}
-      {stage === 'calibrate' && !connected && (
-        <Calibration
-          camera={camera}
-          onDone={(res) => {
-            log.current.calibratedAt = Date.now();
-            log.current.floorOk = res.floorOk;
-            setStage('explore');
-            audio.say(OBJECTIVES[0].title + '. ' + OBJECTIVES[0].hint);
-          }}
-        />
-      )}
+      {stage === 'calibrate' && connected && <RemoteCalibration kind={calKind.current} onDone={onCalibrated} />}
+      {stage === 'calibrate' && !connected && <Calibration kind={calKind.current} camera={camera} onDone={onCalibrated} />}
 
       {stage === 'explore' && current && (
         <>
           <div className="tv-objective">
-            <small>
-              {obj < 3 ? `Part 1 · Exploration ${obj + 1}/3` : `Part 2 · Combat ${obj - 2}/4`}
-            </small>
+            <small>{obj < 3 ? `Part 1 · Exploration ${obj + 1}/3` : `Part 2 · Combat ${Math.min(combatN, 4)}/4`}</small>
             <b>{current.title}</b>
-            <span>{current.hint}</span>
+            <span>{assisted ? 'Assisted traversal: move with the gamepad stick or arrow keys.' : current.hint[guided ? 'guided' : 'free']}</span>
           </div>
           {connected ? (
             <div className="tv-pip tv-pip-ctrl">
@@ -280,10 +343,30 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
             <CameraView className="tv-pip" good={r?.tracking === 'good'} />
           )}
           <div className="tv-bottom">
-            <MotionMeter r={r} />
-            {current.interact && near === current.interact && <HoldRing value={r?.hold.confirm ?? 0} label={current.prompt ?? 'interact'} hand="right" />}
+            {!assisted && <MotionMeter r={r} steering={!guided} />}
+            {assisted && <span className="hint-chip">🎮 Assisted · Select / T to march again</span>}
+            {interactPrompt && <HoldRing value={r?.hold.confirm ?? 0} label={interactPrompt} hand="right" />}
             <HoldRing value={r?.hold.pause ?? 0} label="pause" hand="both" />
           </div>
+          {choice && !paused && (
+            <div className="trail-choice">
+              <b>{choice.prompt}</b>
+              <div className="trail-options">
+                {[...choice.options]
+                  .sort((a, b) => a.dir - b.dir)
+                  .map((o) => (
+                    <button key={o.label} className={`trail-opt ${o.dir < 0 ? 'left' : 'right'}`} onClick={() => input.press(o.dir < 0 ? 'left' : 'right', 'touch')}>
+                      <span className="trail-lean">{o.dir < 0 ? '◀ Lean left' : 'Lean right ▶'}</span>
+                      <img src={iconDataUrl(o.icon)} alt="" className="pix-icon" />
+                      <b>{o.label}</b>
+                      <span>{o.detail}</span>
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
+          {notice && <div className="tv-notice">{notice}</div>}
+          {rejoining && <div className="tv-notice">Heading back to the trail…</div>}
           {lostBanner && <div className="tv-lost">Tracking lost — step back into view</div>}
           <button className="btn btn-sm btn-ghost tv-touch-pause" onClick={() => input.press('pause', 'touch')}>
             Pause
@@ -294,6 +377,7 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
       {stage === 'dialog' && (
         <div className="tv-overlay">
           <GestureMenu
+            active={!paused}
             title="The Trial Gate"
             text={`Four guardians wait beyond the ward: ${targets.pushup} push-ups, ${targets.squat} squats and ${targets.jumping_jack} jumping jacks — then the Warden, who demands all three. Keep the phone where it is; the game will tell you how to face it for each exercise.`}
             options={[
@@ -337,7 +421,8 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
               s.totals.cameraReps += Object.values(res.reps).reduce((a, b) => a + b.camera, 0);
               s.totals.manualReps += Object.values(res.reps).reduce((a, b) => a + b.manual, 0);
             });
-            setDefeated((d) => [...d, enemyId]);
+            defeatedRef.current = [...defeatedRef.current, enemyId];
+            setDefeated(defeatedRef.current);
             setEnemyId(null);
             if (enemyId === 'warden') {
               log.current.partTimes.warden = Date.now();
@@ -353,6 +438,7 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
       {stage === 'reward' && (
         <div className="tv-overlay">
           <GestureMenu
+            active={!paused}
             title="Choose a reward"
             text="The guardian falls! Pick a boon for the rest of the trial."
             options={BOONS.map((b) => ({ id: b.id, label: b.name, detail: b.text, icon: b.icon }))}
@@ -362,7 +448,9 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
               else setBonus((b) => ({ ...b, [id]: b[id as 'atk' | 'def' | 'mag'] + 3 }));
               audio.levelUp();
               setStage('explore');
-              advance();
+              // Objectives with two guardians finish when both are down.
+              const o = OBJECTIVES[objRef.current];
+              if (!o?.enemies || o.enemies.every((x) => defeatedRef.current.includes(x))) advance();
             }}
           />
         </div>
@@ -370,14 +458,15 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
 
       {stage === 'summary' && <Summary log={log.current} onExit={onExit} onAgain={() => location.reload()} />}
 
-      {paused && stage === 'explore' && (
-        <div className="tv-overlay">
+      {paused && stage !== 'battle' && stage !== 'summary' && (
+        <div className="tv-overlay tv-overlay-top">
           <GestureMenu
             title="Paused"
             text={ctrlLost ? 'The phone controller disconnected. Resume becomes available once it reconnects and can see you.' : undefined}
             options={[
               { id: 'resume', label: canResume ? 'Resume' : 'Resume (waiting for the phone…)', icon: 'star' },
-              { id: 'recal', label: 'Recalibrate', detail: 'Moved the phone? Run setup again', icon: 'shield' },
+              { id: 'recal', label: 'Recalibrate', detail: 'Quick: stand in view, then stand still', icon: 'shield' },
+              ...(guided ? [{ id: 'traverse', label: assisted ? 'Switch to Active' : 'Switch to Assisted', detail: assisted ? 'March to move along the trail' : 'Move with a gamepad or the keyboard', icon: 'wind' }] : []),
               { id: 'quit', label: 'Quit trial', icon: 'lock' },
             ]}
             onChoose={(id) => {
@@ -385,26 +474,38 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
                 audio.error();
                 return;
               }
+              if (id === 'traverse') {
+                toggleTraversal();
+                return;
+              }
+              if (id === 'recal') {
+                calKind.current = 'quick';
+                pausedRef.current = false;
+                setPausedState(false);
+                setStage('calibrate');
+                return;
+              }
               setPaused(false);
-              if (id === 'resume') input.setMode('explore');
-              if (id === 'recal') setStage('calibrate');
               if (id === 'quit') onExit();
             }}
             onBack={() => {
               if (!canResume) return;
               setPaused(false);
-              input.setMode('explore');
             }}
           />
         </div>
       )}
 
+      {phoneMoved && stage !== 'calibrate' && stage !== 'summary' && <div className="tv-warn tv-warn-top">The phone moved since calibration — put it back, or Pause → Recalibrate.</div>}
       {ctrlLost && stage !== 'summary' && <ControllerLost />}
 
       {floorWarn && stage === 'explore' && obj >= 3 && <div className="tv-warn">Floor check was skipped — push-ups may not track from this phone position.</div>}
     </div>
   );
 }
+
+/** The hero figure is ~104 board units tall, about 1.7 m: metres per board unit. */
+const BOARD_M = 1.7 / 104;
 
 function Summary({ log, onExit, onAgain }: { log: Log; onExit: () => void; onAgain: () => void }) {
   const mins = Math.max(1, Math.round((Date.now() - log.startedAt) / 60000));
@@ -434,6 +535,18 @@ function Summary({ log, onExit, onAgain }: { log: Log; onExit: () => void; onAga
               <td>{log.exploreSteps}</td>
               <td />
             </tr>
+            <tr>
+              <th>Trail by marching</th>
+              <td>{Math.round(travel.active * BOARD_M)} m</td>
+              <td />
+            </tr>
+            {travel.assisted > 50 && (
+              <tr>
+                <th>Trail by controller</th>
+                <td>{Math.round(travel.assisted * BOARD_M)} m</td>
+                <td>not counted as exercise</td>
+              </tr>
+            )}
             <tr>
               <th>Gestures used</th>
               <td>{log.gestures}</td>

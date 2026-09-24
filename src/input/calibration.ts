@@ -33,6 +33,30 @@ export const CAL_STEPS: { id: CalStep; title: string; say: string }[] = [
 
 export const CAL_STEP_IDS = CAL_STEPS.map((s) => s.id);
 
+/**
+ * 'full' is the first-time checklist. 'quick' re-measures only what drifts
+ * when the phone is nudged or the player moves — body in view and the
+ * standing neutral (lean baseline and camera roll) — so it can run in the
+ * middle of a battle without repeating the floor check or marching.
+ */
+export type CalKind = 'full' | 'quick';
+
+const QUICK: readonly CalStep[] = ['body', 'neutral', 'done'];
+
+export function calSteps(kind: CalKind): typeof CAL_STEPS {
+  return kind === 'quick' ? CAL_STEPS.filter((s) => QUICK.includes(s.id)) : CAL_STEPS;
+}
+
+const QUICK_SAY: Partial<Record<CalStep, string>> = {
+  body: 'Quick recalibration. Stand where you play, whole body in view.',
+  neutral: 'Stand still with your arms down.',
+  done: 'Recalibrated.',
+};
+
+export function calSay(step: CalStep, kind: CalKind): string {
+  return (kind === 'quick' ? QUICK_SAY[step] : undefined) ?? CAL_STEPS.find((s) => s.id === step)!.say;
+}
+
 export interface CalState {
   step: CalStep;
   progress: number;
@@ -54,6 +78,7 @@ export class CalibrationFlow {
     private readonly onChange: (s: CalState, stepChanged: boolean) => void,
     /** Called once the standing neutral has been measured. */
     private readonly onNeutral: (n: NeutralPose) => void,
+    readonly kind: CalKind = 'full',
   ) {}
 
   private set(patch: Partial<CalState>): void {
@@ -81,7 +106,7 @@ export class CalibrationFlow {
     if (s === 'body') {
       const q = frameIssue(frame);
       this.set({ hint: q });
-      if (this.need(q === null, 20)) this.go('arms');
+      if (this.need(q === null, 20)) this.go(this.kind === 'quick' ? 'neutral' : 'arms');
     } else if (s === 'arms') {
       const ok = !!frame && armsUpInFrame(frame);
       this.set({ hint: frame && !ok ? 'Both hands above your head — make sure they stay in the picture' : null });
@@ -92,7 +117,7 @@ export class CalibrationFlow {
       if (res.neutral) {
         this.neutral = res.neutral;
         this.onNeutral(res.neutral);
-        this.go('confirm');
+        this.go(this.kind === 'quick' ? 'done' : 'confirm');
       }
     } else if (s === 'leanL' || s === 'leanR') {
       const want = s === 'leanL' ? -1 : 1;

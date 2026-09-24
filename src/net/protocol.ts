@@ -1,7 +1,8 @@
 import { CAL_STEP_IDS, type CalStep } from '../input/calibration';
 import { INPUT_MODES, type InputMode } from '../input/modes';
 import type { SessionStage } from '../exercise/session';
-import type { GuidanceCode, RepSource, TrackingQuality } from '../exercise/types';
+import type { DiagBlocker, DiagEvent, GuidanceCode, RepSource, TrackingQuality } from '../exercise/types';
+import type { DiagSummary } from '../exercise/diagnostics';
 
 /**
  * The Connected Play wire protocol: small JSON messages between the phone
@@ -34,16 +35,18 @@ export interface Telemetry {
   turnArmed: boolean;
   hold: { confirm: number; back: number; pause: number };
   armed: boolean;
+  /** 0..1 standing-tall "ready" hold. */
+  readyProgress: number;
 }
 
 export type CtrlPayload =
   | { type: 'HELLO'; version: number; facing: 'user' | 'environment' }
   | { type: 'HEARTBEAT' }
-  | { type: 'STATUS'; camera: CameraState; model: ModelState; calibrated: boolean; tracking: TrackingQuality; error?: string }
+  | { type: 'STATUS'; camera: CameraState; model: ModelState; calibrated: boolean; tracking: TrackingQuality; error?: string; moved?: boolean }
   | { type: 'TELEMETRY'; r: Telemetry }
   | { type: 'MOVE_START'; intensity: number }
   | { type: 'MOVE_STOP' }
-  | { type: 'TURN_LEFT' | 'TURN_RIGHT' | 'INTERACT' | 'BACK' | 'PAUSE' | 'STEP'; via: 'motion' | 'touch' }
+  | { type: 'TURN_LEFT' | 'TURN_RIGHT' | 'INTERACT' | 'BACK' | 'PAUSE' | 'STEP' | 'READY'; via: 'motion' | 'touch' }
   | { type: 'NAV'; dir: -1 | 1; via: 'motion' | 'touch' }
   | { type: 'CALIBRATION'; step: CalStep; progress: number; hint: string | null; floorOk: boolean }
   | {
@@ -56,14 +59,19 @@ export type CtrlPayload =
       guidance: GuidanceCode | null;
       ready: boolean;
       fallbackAvailable: boolean;
+      /** Why the detector is blocked right now (push-ups report this). */
+      blocker?: DiagBlocker | null;
+      /** 0..1 progress of the mid-set pause gesture. */
+      pauseProgress?: number;
     }
+  | { type: 'EXERCISE_DIAG'; setId: string; summary: DiagSummary }
   | { type: 'EXERCISE_REP'; setId: string; exerciseId: string; index: number; source: RepSource }
   | { type: 'MANUAL_MODE'; setId: string };
 
 export type CtrlMsg = CtrlPayload & { seq: number; epoch: number };
 
 export type GameMsg =
-  | { type: 'MODE'; mode: InputMode; epoch: number }
+  | { type: 'MODE'; mode: InputMode; epoch: number; calibration?: 'full' | 'quick' }
   | { type: 'SETTINGS'; turnStep: 45 | 90; lean: 'low' | 'normal' | 'high'; march: 'low' | 'normal' | 'high'; facing: 'user' | 'environment'; model: 'full' | 'lite'; pcSound: boolean }
   | { type: 'EXERCISE_BEGIN'; setId: string; exerciseId: string; difficulty: 'beginner' | 'intermediate' | 'advanced' }
   | { type: 'EXERCISE_PROGRESS'; setId: string; count: number; target: number; manualMode: boolean; paused: boolean }
@@ -103,6 +111,27 @@ const GUIDANCE = [
   'REPOSITION',
 ] as const;
 const VIA = ['motion', 'touch'] as const;
+const BLOCKERS = ['NO_BODY', 'BODY_HIDDEN', 'ARMS_HIDDEN', 'NOT_LEVEL', 'NOT_SIDEWAYS', 'HIPS_PIKED', 'ARMS_NOT_STRAIGHT'] as const;
+const EVENTS = ['partial-depth', 'no-return', 'too-fast', 'lost-mid-rep', 'reset-mid-rep'] as const;
+
+/** A map of known keys to small non-negative numbers; anything else fails. */
+function counts<K extends string>(v: unknown, keys: readonly K[], max: number): Partial<Record<K, number>> | null {
+  if (!isObj(v)) return null;
+  const out: Partial<Record<K, number>> = {};
+  for (const [k, n] of Object.entries(v)) {
+    if (!keys.includes(k as K) || !num(n, 0, max)) return null;
+    out[k as K] = n;
+  }
+  return out;
+}
+
+function diagSummary(v: unknown): DiagSummary | null {
+  if (!isObj(v) || typeof v.started !== 'boolean' || !(v.startBlocker === null || oneOf(v.startBlocker, BLOCKERS)) || !int(v.counted, 0, 10_000)) return null;
+  const blockedMs = counts(v.blockedMs, BLOCKERS, 3_600_000);
+  const events = counts(v.events, EVENTS, 10_000);
+  if (!blockedMs || !events) return null;
+  return { started: v.started, startBlocker: v.startBlocker as DiagBlocker | null, blockedMs, events: events as Partial<Record<DiagEvent, number>>, counted: v.counted };
+}
 const SENS = ['low', 'normal', 'high'] as const;
 
 function telemetry(v: unknown): Telemetry | null {
@@ -123,7 +152,8 @@ function telemetry(v: unknown): Telemetry | null {
     num(h.confirm, 0, 1) &&
     num(h.back, 0, 1) &&
     num(h.pause, 0, 1) &&
-    typeof v.armed === 'boolean';
+    typeof v.armed === 'boolean' &&
+    num(v.readyProgress, 0, 1);
   if (!ok) return null;
   return {
     tracking: v.tracking as TrackingQuality,
@@ -139,6 +169,7 @@ function telemetry(v: unknown): Telemetry | null {
     turnArmed: v.turnArmed as boolean,
     hold: { confirm: h.confirm as number, back: h.back as number, pause: h.pause as number },
     armed: v.armed as boolean,
+    readyProgress: v.readyProgress as number,
   };
 }
 
@@ -158,7 +189,8 @@ export function parseCtrlMsg(v: unknown): CtrlMsg | null {
     case 'STATUS':
       if (!oneOf(v.camera, ['off', 'starting', 'running', 'error'] as const) || !oneOf(v.model, ['loading', 'ready', 'error'] as const) || typeof v.calibrated !== 'boolean' || !oneOf(v.tracking, TRACKING)) return null;
       if (v.error !== undefined && !text(v.error, 200)) return null;
-      return { ...base, type: 'STATUS', camera: v.camera, model: v.model, calibrated: v.calibrated, tracking: v.tracking, ...(v.error ? { error: v.error as string } : {}) };
+      if (v.moved !== undefined && typeof v.moved !== 'boolean') return null;
+      return { ...base, type: 'STATUS', camera: v.camera, model: v.model, calibrated: v.calibrated, tracking: v.tracking, ...(v.error ? { error: v.error as string } : {}), ...(v.moved ? { moved: true } : {}) };
     case 'TELEMETRY': {
       const r = telemetry(v.r);
       return r ? { ...base, type: 'TELEMETRY', r } : null;
@@ -171,6 +203,7 @@ export function parseCtrlMsg(v: unknown): CtrlMsg | null {
     case 'BACK':
     case 'PAUSE':
     case 'STEP':
+    case 'READY':
       return oneOf(v.via, VIA) ? { ...base, type: v.type, via: v.via } : null;
     case 'NAV':
       return oneOf(v.dir, [-1, 1] as const) && oneOf(v.via, VIA) ? { ...base, type: 'NAV', dir: v.dir, via: v.via } : null;
@@ -178,7 +211,12 @@ export function parseCtrlMsg(v: unknown): CtrlMsg | null {
       return oneOf(v.step, CAL_STEP_IDS) && num(v.progress, 0, 1) && (v.hint === null || text(v.hint, 200)) && typeof v.floorOk === 'boolean'
         ? { ...base, type: 'CALIBRATION', step: v.step, progress: v.progress, hint: v.hint as string | null, floorOk: v.floorOk }
         : null;
+    case 'EXERCISE_DIAG': {
+      const summary = diagSummary(v.summary);
+      return str(v.setId, 40) && summary ? { ...base, type: 'EXERCISE_DIAG', setId: v.setId, summary } : null;
+    }
     case 'EXERCISE_STATUS':
+      if ((v.blocker !== undefined && !(v.blocker === null || oneOf(v.blocker, BLOCKERS))) || (v.pauseProgress !== undefined && !num(v.pauseProgress, 0, 1))) return null;
       return str(v.setId, 40) && oneOf(v.stage, STAGES) && num(v.countdownLeftMs, 0, 60_000) && oneOf(v.tracking, TRACKING) && num(v.confidence, 0, 1) && oneOf(v.guidance, GUIDANCE) && typeof v.ready === 'boolean' && typeof v.fallbackAvailable === 'boolean'
         ? {
             ...base,
@@ -191,6 +229,8 @@ export function parseCtrlMsg(v: unknown): CtrlMsg | null {
             guidance: v.guidance,
             ready: v.ready,
             fallbackAvailable: v.fallbackAvailable,
+            blocker: (v.blocker as DiagBlocker | null | undefined) ?? null,
+            pauseProgress: (v.pauseProgress as number | undefined) ?? 0,
           }
         : null;
     case 'EXERCISE_REP':
@@ -209,7 +249,8 @@ export function parseGameMsg(v: unknown): GameMsg | null {
   if (!isObj(v) || typeof v.type !== 'string') return null;
   switch (v.type) {
     case 'MODE':
-      return oneOf(v.mode, INPUT_MODES) && int(v.epoch, 0, 1e9) ? { type: 'MODE', mode: v.mode, epoch: v.epoch } : null;
+      if (v.calibration !== undefined && !oneOf(v.calibration, ['full', 'quick'] as const)) return null;
+      return oneOf(v.mode, INPUT_MODES) && int(v.epoch, 0, 1e9) ? { type: 'MODE', mode: v.mode, epoch: v.epoch, ...(v.calibration ? { calibration: v.calibration as 'full' | 'quick' } : {}) } : null;
     case 'SETTINGS':
       return oneOf(v.turnStep, [45, 90] as const) && oneOf(v.lean, SENS) && oneOf(v.march, SENS) && oneOf(v.facing, ['user', 'environment'] as const) && oneOf(v.model, ['full', 'lite'] as const) && typeof v.pcSound === 'boolean'
         ? { type: 'SETTINGS', turnStep: v.turnStep, lean: v.lean, march: v.march, facing: v.facing, model: v.model, pcSound: v.pcSound }

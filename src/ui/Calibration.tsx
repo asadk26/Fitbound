@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { audio } from '../game/audio';
-import { CAL_STEPS, CalibrationFlow, type CalState } from '../input/calibration';
+import { calSay, calSteps, CalibrationFlow, type CalKind, type CalState } from '../input/calibration';
 import { input } from '../input/InputHub';
 import type { MotionReading } from '../input/motion';
 import { tracker } from '../pose/PoseTracker';
@@ -18,7 +18,7 @@ export interface CalibrationResult {
 
 /** Voice and sound for step changes, and the hand-off once done. The PC is
  *  the only device that speaks. */
-export function useCalibrationCues(state: CalState, onDone: (r: CalibrationResult) => void): void {
+export function useCalibrationCues(state: CalState, onDone: (r: CalibrationResult) => void, kind: CalKind = 'full'): void {
   const last = useRef<string | null>(null);
   const done = useRef(onDone);
   done.current = onDone;
@@ -26,7 +26,7 @@ export function useCalibrationCues(state: CalState, onDone: (r: CalibrationResul
     if (last.current === state.step) return;
     const first = last.current === null;
     last.current = state.step;
-    audio.say(CAL_STEPS.find((x) => x.id === state.step)!.say);
+    audio.say(calSay(state.step, kind));
     if (!first) audio.gesture();
     if (state.step === 'done') {
       audio.levelUp();
@@ -36,17 +36,18 @@ export function useCalibrationCues(state: CalState, onDone: (r: CalibrationResul
   }, [state.step, state.floorOk]);
 }
 
-export function Calibration({ onDone, camera }: { onDone: (r: CalibrationResult) => void; camera: { state: string; message?: string } }) {
+export function Calibration({ onDone, camera, kind = 'full' }: { onDone: (r: CalibrationResult) => void; camera: { state: string; message?: string }; kind?: CalKind }) {
   const [state, setState] = useState<CalState>({ step: 'body', progress: 0, hint: null, floorOk: false });
   const flow = useRef<CalibrationFlow | null>(null);
   const r = useMotion();
-  useCalibrationCues(state, onDone);
+  useCalibrationCues(state, onDone, kind);
 
   useEffect(() => {
     input.setMode('calibration');
     const f = new CalibrationFlow(
       (s) => setState(s),
       (n) => input.setNeutral(n),
+      kind,
     );
     flow.current = f;
     return tracker.subscribe(({ frame }) => f.frame(frame, input.latest?.leanDir ?? 0));
@@ -57,7 +58,7 @@ export function Calibration({ onDone, camera }: { onDone: (r: CalibrationResult)
   });
 
   return (
-    <CalibrationPanel state={state} r={r}>
+    <CalibrationPanel state={state} r={r} kind={kind}>
       <CameraView className="calib-cam" good={r?.tracking === 'good'}>
         {camera.state !== 'running' && (
           <div className="cam-msg">
@@ -77,14 +78,15 @@ export function Calibration({ onDone, camera }: { onDone: (r: CalibrationResult)
 }
 
 /** The checklist itself. `children` fills the left side (camera or controller status). */
-export function CalibrationPanel({ state, r, children }: { state: CalState; r: MotionReading | null; children: React.ReactNode }) {
+export function CalibrationPanel({ state, r, children, kind = 'full' }: { state: CalState; r: MotionReading | null; children: React.ReactNode; kind?: CalKind }) {
+  const CAL_STEPS = calSteps(kind);
   const idx = Math.max(0, CAL_STEPS.findIndex((x) => x.id === state.step));
   const step = state.step;
   return (
     <div className="calib">
       {children}
       <div className="calib-side">
-        <h2>Setup</h2>
+        <h2>{kind === 'quick' ? 'Quick recalibration' : 'Setup'}</h2>
         <ol className="calib-steps">
           {CAL_STEPS.slice(0, -1).map((s, i) => (
             <li key={s.id} className={i < idx ? 'done' : i === idx ? 'now' : ''}>

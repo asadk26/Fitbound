@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import qrcode from 'qrcode-generator';
 import { updateSave } from '../game/store';
 import { host, type LinkState } from '../net/host';
-import type { CalState } from '../input/calibration';
+import type { CalKind, CalState } from '../input/calibration';
 import { CalibrationPanel, useCalibrationCues, type CalibrationResult } from './Calibration';
 import { useMotion } from './motionUi';
 import { useSave } from './useSave';
@@ -58,9 +58,14 @@ export function MotionSettings() {
   );
   return (
     <>
-      {seg('Turn per lean', m.turnStep, [[45, '45°'], [90, '90°']], (v) => updateSave((s) => void (s.settings.motion.turnStep = v)))}
+      {seg('Getting around', m.navigation, [['guided', 'Guided trail'], ['freeroam', 'Free roam (experimental)']], (v) => updateSave((s) => void (s.settings.motion.navigation = v)))}
+      {m.navigation === 'guided' &&
+        seg('Traversal', m.traversal, [['active', 'Active (march)'], ['assisted', 'Assisted (gamepad/keys)']], (v) => updateSave((s) => void (s.settings.motion.traversal = v)))}
+      {m.navigation === 'freeroam' && seg('Turn per lean', m.turnStep, [[45, '45°'], [90, '90°']], (v) => updateSave((s) => void (s.settings.motion.turnStep = v)))}
       {seg('Lean sensitivity', m.lean, [['low', 'Low'], ['normal', 'Normal'], ['high', 'High']], (v) => updateSave((s) => void (s.settings.motion.lean = v)))}
       {seg('March sensitivity', m.march, [['low', 'Low'], ['normal', 'Normal'], ['high', 'High']], (v) => updateSave((s) => void (s.settings.motion.march = v)))}
+      {seg('Rep diagnostics', m.diagnostics ? 'on' : 'off', [['on', 'Show after sets'], ['off', 'Hide']], (v) => updateSave((s) => void (s.settings.motion.diagnostics = v === 'on')))}
+      <p className="muted small">Assisted traversal lets you explore with a gamepad (paired with this computer) or the arrow keys when you want a break from marching. Controller movement isn't counted as exercise; battles still use the camera. Switch any time with Select on the gamepad, T on the keyboard, or from Pause.</p>
     </>
   );
 }
@@ -189,13 +194,13 @@ export function ConnectedSetup({ onStart, onBack }: { onStart: () => void; onBac
 }
 
 /** The TV side of calibration in Connected Play: the phone runs the checks. */
-export function RemoteCalibration({ onDone }: { onDone: (r: CalibrationResult) => void }) {
+export function RemoteCalibration({ onDone, kind = 'full' }: { onDone: (r: CalibrationResult) => void; kind?: CalKind }) {
   const s = useLink();
   const r = useMotion();
   const state: CalState = s.calibration ?? { step: 'body', progress: 0, hint: null, floorOk: false };
-  useCalibrationCues(state, onDone);
+  useCalibrationCues(state, onDone, kind);
   return (
-    <CalibrationPanel state={state} r={r}>
+    <CalibrationPanel state={state} r={r} kind={kind}>
       <div className="calib-cam calib-remote">
         <ControllerStatus big />
       </div>

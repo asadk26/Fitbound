@@ -95,6 +95,10 @@ export class PoseTracker {
   private legacy: ((f: TrackerFrame) => void) | null = null;
   /** 'user' = front camera (you can see yourself); 'environment' = back camera. */
   facing: 'user' | 'environment' = 'user';
+  /** A specific camera (from listCameras); overrides `facing` when set. */
+  deviceId: string | null = null;
+  /** Ask for the camera's widest zoom (e.g. 0.5× on phones that expose it). */
+  wide = false;
 
   constructor() {
     this.video = document.createElement('video');
@@ -146,11 +150,18 @@ export class PoseTracker {
     if (!navigator.mediaDevices?.getUserMedia) throw new TrackerError('unsupported', 'This browser does not support camera access.');
 
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        // 720p gives the pose model enough pixels for a whole body 2.5–3 m away.
-        video: { facingMode: this.facing, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
-      });
+      // 720p gives the pose model enough pixels for a whole body 2.5–3 m away.
+      const size = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } };
+      const pick = this.deviceId ? { deviceId: { exact: this.deviceId } } : { facingMode: this.facing };
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { ...pick, ...size } });
+      } catch (e) {
+        // A remembered camera may be gone (other phone, iOS update): fall back.
+        if (!this.deviceId || (e as DOMException)?.name !== 'OverconstrainedError') throw e;
+        this.deviceId = null;
+        this.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: this.facing, ...size } });
+      }
+      if (this.wide) await this.applyWidest();
     } catch (e) {
       const name = (e as DOMException)?.name;
       if (name === 'NotAllowedError' || name === 'SecurityError') throw new TrackerError('denied', 'Camera permission was denied.');
@@ -222,6 +233,31 @@ export class PoseTracker {
     const f = { frame, raw, now, fps: this.fps };
     this.listeners.forEach((l) => l(f));
   };
+
+  /** Video cameras this browser exposes (labels appear once permission is granted). */
+  async listCameras(): Promise<{ id: string; label: string }[]> {
+    if (!navigator.mediaDevices?.enumerateDevices) return [];
+    const all = await navigator.mediaDevices.enumerateDevices();
+    return all.filter((d) => d.kind === 'videoinput').map((d, i) => ({ id: d.deviceId, label: d.label || `Camera ${i + 1}` }));
+  }
+
+  /** Zoom range of the running camera, if the browser exposes one. */
+  zoomRange(): { min: number; max: number } | null {
+    const t = this.stream?.getVideoTracks()[0];
+    const caps = (t?.getCapabilities?.() ?? {}) as { zoom?: { min: number; max: number } };
+    return caps.zoom ? { min: caps.zoom.min, max: caps.zoom.max } : null;
+  }
+
+  private async applyWidest(): Promise<void> {
+    const t = this.stream?.getVideoTracks()[0];
+    const z = this.zoomRange();
+    if (!t || !z || z.min >= 1) return;
+    try {
+      await t.applyConstraints({ advanced: [{ zoom: z.min } as MediaTrackConstraintSet] });
+    } catch {
+      /* not supported on this camera */
+    }
+  }
 
   stop(): void {
     this.running = false;

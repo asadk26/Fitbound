@@ -33,6 +33,7 @@ const COMMAND_OF: Partial<Record<CtrlMsg['type'], CommandType>> = {
   BACK: 'back',
   PAUSE: 'pause',
   STEP: 'step',
+  READY: 'ready',
 };
 
 export class ControllerGate {
@@ -62,6 +63,8 @@ export class ControllerGate {
       case 'HEARTBEAT':
       case 'STATUS':
       case 'TELEMETRY':
+      // Display-only: matched to the set by id, never awards anything.
+      case 'EXERCISE_DIAG':
         return { ok: true, msg };
       case 'CALIBRATION':
         return ctx.mode === 'calibration' ? { ok: true, msg } : { ok: false, reason: 'mode' };
@@ -104,6 +107,8 @@ export function toCommand(msg: CtrlMsg): Command | null {
       return { type: 'pause' };
     case 'STEP':
       return { type: 'step' };
+    case 'READY':
+      return { type: 'ready' };
     default:
       return null;
   }

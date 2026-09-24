@@ -8,13 +8,22 @@ import { EDGE, GROUND_SCALE } from '../diorama/ground';
 import { getDioramaState } from '../game';
 import { BOARD, FENCE_X, GATE_GAP, scatter, SPOTS, START, type Placed } from '../diorama/layout';
 import { angleDelta, headingVector, resolveMove, turnHeading, type Obstacle } from '../diorama/steering';
+import { GOAL_NODE, nearestOnTrail, TrailWalker, type Fork } from '../diorama/trailGraph';
+import { travel } from '../diorama/travel';
 
 /**
- * The Motion Trial board, explored with the body: march in place to walk,
- * lean to turn. Steering is discrete — each lean turns the hero exactly one
- * step (45° by default, 90° optional) and the hero walks straight along that
- * heading — so the player always knows which way they'll go, can turn while
- * standing still, and never drifts from a posture wobble.
+ * The Motion Trial board. Three ways to get around, one world:
+ *
+ *  - Guided, active (default): marching walks the hero along the trail toward
+ *    the current objective, following every bend by itself. At a fork the
+ *    hero stops and one lean picks a route. No steering, no arrow to read.
+ *  - Guided, assisted: a gamepad stick or the keyboard moves the hero freely
+ *    around the same board (with collisions). Switching back to active walks
+ *    the hero to the nearest reachable bit of trail and carries on from there.
+ *  - Free roam (experimental): the older steering, where each lean turns the
+ *    hero one 45°/90° step and marching walks straight ahead.
+ *
+ * Encounters, interactions and progression are the same in every mode.
  */
 const SPEED = 190;
 const INTERACT_R = 150;
@@ -52,6 +61,13 @@ export class DioramaScene extends Phaser.Scene {
   private encounterLock = false;
   private offBus: (() => void)[] = [];
   private stepSfx = 0;
+  // Guided traversal
+  /** Where the hero is on the trail (null while roaming off it in Assisted mode). */
+  private walker = new TrailWalker();
+  private onTrail = true;
+  private choice: Fork | null = null;
+  private rejoin: { seg: string; s: number; x: number; y: number; since: number } | null = null;
+
 
   constructor() {
     super('Diorama');
@@ -67,6 +83,10 @@ export class DioramaScene extends Phaser.Scene {
     this.encounterLock = false;
     this.actors.clear();
     this.obstacles = [];
+    this.walker = new TrailWalker();
+    this.onTrail = true;
+    this.choice = null;
+    this.rejoin = null;
   }
 
   create(): void {
@@ -105,6 +125,10 @@ export class DioramaScene extends Phaser.Scene {
     this.addActor('banner', 'prop-banner', SPOTS.banner, 0.9, 0.95);
     this.addActor('signpost', 'prop-signpost', SPOTS.signpost, 0.85, 0.94);
     this.addActor('dummy', 'fig-dummy', SPOTS.dummy, HERO_UNITS / FIG_H, FIG_ORIGIN_Y);
+    // The Mossy Shrine (optional rest stop on the detour).
+    const shrineGlow = this.add.image(SPOTS.shrine.x, SPOTS.shrine.y - 30, 'glow').setScale(3).setTint(0x73eff7).setAlpha(0.35).setBlendMode(Phaser.BlendModes.ADD).setDepth(SPOTS.shrine.y - 2);
+    this.tweens.add({ targets: shrineGlow, alpha: 0.6, duration: 900, yoyo: true, repeat: -1 });
+    this.addActor('shrine', 'prop-crystal', SPOTS.shrine, 1, 0.92);
     for (const id of ['skeleton', 'golem', 'mage', 'warden'] as const) {
       const big = id === 'golem' || id === 'warden';
       const a = this.addActor(id, `fig-${id}`, SPOTS[id], (HERO_UNITS / FIG_H) * (big ? 1.35 : 1.1), FIG_ORIGIN_Y);
@@ -254,6 +278,10 @@ export class DioramaScene extends Phaser.Scene {
     this.heading = START.heading;
     this.shown = START.heading;
     this.speed = 0;
+    this.walker = new TrailWalker();
+    this.onTrail = true;
+    this.setChoice(null);
+    this.rejoin = null;
   }
 
   update(_t: number, dtMs: number): void {
@@ -270,21 +298,21 @@ export class DioramaScene extends Phaser.Scene {
       return;
     }
 
-    const turns = input.takeTurns();
-    if (turns !== 0) {
-      this.heading = turnHeading(this.heading, turns, getSave().settings.motion.turnStep);
-      audio.select();
+    const motion = getSave().settings.motion;
+    const x0 = this.hero.x;
+    const y0 = this.hero.y;
+    const freeRoam = motion.navigation === 'freeroam';
+    const assisted = !freeRoam && motion.traversal === 'assisted';
+    if (freeRoam) this.updateFreeRoam(dt);
+    else if (assisted) this.updateAssisted(dt);
+    else this.updateGuided(dt);
+    // Only marching counts as physical activity; keyboard and gamepad movement is tallied apart.
+    const moved = Math.hypot(this.hero.x - x0, this.hero.y - y0);
+    if (moved > 0) {
+      if (assisted || input.keyForward || this.rejoin) travel.assisted += moved;
+      else travel.active += moved;
     }
-    // The figure and indicator swing round quickly; movement uses the exact
-    // grid heading straight away.
-    this.shown += angleDelta(this.shown, this.heading) * Math.min(1, dt * 14);
-    const target = input.intent().forward * SPEED;
-    // Start briskly, stop even faster.
-    this.speed += (target - this.speed) * Math.min(1, dt * (target > this.speed ? 9 : 14));
-    if (target === 0 && this.speed < 4) this.speed = 0;
-
-    const v = headingVector(this.heading);
-    this.moveHero(v.x * this.speed * dt, v.y * this.speed * dt);
+    this.arrow.setVisible(freeRoam);
 
     // Marching bob and a little toy wobble.
     const moving = this.speed > 12;
@@ -313,6 +341,125 @@ export class DioramaScene extends Phaser.Scene {
 
     this.checkSpots(hx, hy);
     this.updatePointer(view);
+  }
+
+  /** Legacy steering: discrete lean turns, march straight ahead. */
+  private updateFreeRoam(dt: number): void {
+    this.onTrail = false;
+    this.setChoice(null);
+    const turns = input.takeTurns();
+    if (turns !== 0) {
+      this.heading = turnHeading(this.heading, turns, getSave().settings.motion.turnStep);
+      audio.select();
+    }
+    // The figure and indicator swing round quickly; movement uses the exact
+    // grid heading straight away.
+    this.shown += angleDelta(this.shown, this.heading) * Math.min(1, dt * 14);
+    this.accelerate(input.intent().forward * SPEED, dt);
+    const v = headingVector(this.heading);
+    this.moveHero(v.x * this.speed * dt, v.y * this.speed * dt);
+  }
+
+  /** Assisted Traversal: conventional free movement from a gamepad stick or keys. */
+  private updateAssisted(dt: number): void {
+    this.onTrail = false;
+    this.rejoin = null;
+    this.setChoice(null);
+    input.takeTurns();
+    const v = input.freeMove();
+    const mag = Math.min(1, Math.hypot(v.x, v.y));
+    this.accelerate(mag * SPEED, dt);
+    if (mag > 0.05) {
+      this.heading = Math.atan2(v.x, -v.y);
+      this.shown = this.heading;
+      this.moveHero((v.x / mag) * this.speed * dt, (v.y / mag) * this.speed * dt);
+    } else if (this.speed > 0) {
+      const h = headingVector(this.heading);
+      this.moveHero(h.x * this.speed * dt, h.y * this.speed * dt);
+    }
+  }
+
+  /** Guided Traversal: march to follow the trail; lean to choose at forks. */
+  private updateGuided(dt: number): void {
+    const now = this.time.now;
+    const gateOpen = this.state.gateOpen;
+    const goals = this.goals();
+
+    // Coming back from Assisted Traversal: walk (don't jump) to the trail.
+    if (!this.onTrail && !this.rejoin) {
+      const n = nearestOnTrail(this.hero, gateOpen);
+      if (n && n.d > 10) {
+        this.rejoin = { ...n, since: now };
+        bus.emit('trail:rejoin', { active: true });
+      } else if (n) {
+        this.walker.place(n.seg, n.s);
+        this.onTrail = true;
+      }
+    }
+    if (this.rejoin) {
+      input.takeTurns();
+      const r = this.rejoin;
+      const dx = r.x - this.hero.x;
+      const dy = r.y - this.hero.y;
+      const d = Math.hypot(dx, dy);
+      this.accelerate(SPEED * 0.8, dt);
+      const step = Math.min(d, this.speed * dt);
+      if (d > 0.5) {
+        this.heading = Math.atan2(dx, -dy);
+        // Collisions apply, but after a few seconds stuck, slip past (never teleport).
+        if (now - r.since < 4000) this.moveHero((dx / d) * step, (dy / d) * step);
+        else this.hero.setPosition(this.hero.x + (dx / d) * step, this.hero.y + (dy / d) * step);
+      }
+      if (Math.hypot(r.x - this.hero.x, r.y - this.hero.y) < 6) {
+        this.walker.place(r.seg, r.s);
+        this.onTrail = true;
+        this.rejoin = null;
+        this.speed = 0;
+        bus.emit('trail:rejoin', { active: false });
+      }
+      return;
+    }
+
+    const turns = input.takeTurns();
+    const w = this.walker;
+    if (w.choice) {
+      this.speed = 0;
+      if (turns !== 0) {
+        const opt = w.choose(turns < 0 ? -1 : 1);
+        if (opt) {
+          audio.gesture();
+          audio.say(opt.label);
+          bus.emit('trail:chosen', { label: opt.label });
+        }
+      }
+      this.setChoice(w.choice);
+      return;
+    }
+    this.accelerate(w.halted(goals, now) ? 0 : input.intent().forward * SPEED, dt);
+    const st = w.advance(this.speed * dt, goals, gateOpen, now);
+    if (st.halted) this.speed = 0;
+    this.setChoice(st.choice);
+    if (Math.hypot(st.dx, st.dy) > 0.5) this.heading = Math.atan2(st.dx, -st.dy);
+    this.hero.setPosition(st.x, st.y);
+  }
+
+  /** Trail nodes for the current objective(s). */
+  private goals(): string[] {
+    const s = this.state;
+    const ids = [s.target, ...(s.alt ?? [])].filter((x): x is string => !!x && !s.defeated.includes(x));
+    return [...new Set(ids.map((id) => GOAL_NODE[id]).filter(Boolean))];
+  }
+
+  private setChoice(f: Fork | null): void {
+    if (f === this.choice) return;
+    this.choice = f;
+    bus.emit('trail:choice', f ? { prompt: f.prompt, options: f.options.map(({ dir, label, detail, icon }) => ({ dir, label, detail, icon })) } : null);
+  }
+
+  /** Start briskly, stop even faster. */
+  private accelerate(target: number, dt: number): void {
+    this.speed += (target - this.speed) * Math.min(1, dt * (target > this.speed ? 9 : 14));
+    if (target === 0 && this.speed < 4) this.speed = 0;
   }
 
   private moveHero(dx: number, dy: number): void {

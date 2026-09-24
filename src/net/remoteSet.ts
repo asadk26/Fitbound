@@ -1,5 +1,6 @@
 import type { ExerciseDefinition } from '../exercise/registry';
 import type { SessionSnapshot, SessionStage } from '../exercise/session';
+import type { DiagSummary } from '../exercise/diagnostics';
 import type { DetectorUpdate, ExerciseEvent } from '../exercise/types';
 import type { CtrlMsg, GameMsg } from './protocol';
 
@@ -40,6 +41,8 @@ export class RemoteSet implements SetDriver {
   private manualMode = false;
   private done = false;
   private phone: Extract<CtrlMsg, { type: 'EXERCISE_STATUS' }> | null = null;
+  /** Why reps did or didn't count, as measured on the phone. */
+  diagnostics: DiagSummary | null = null;
 
   constructor(
     readonly setId: string,
@@ -62,6 +65,17 @@ export class RemoteSet implements SetDriver {
     if (msg.setId !== this.setId) return false;
     this.phone = msg;
     return true;
+  }
+
+  diag(msg: Extract<CtrlMsg, { type: 'EXERCISE_DIAG' }>): boolean {
+    if (msg.setId !== this.setId) return false;
+    this.diagnostics = msg.summary;
+    return true;
+  }
+
+  /** 0..1 progress of the phone's mid-set pause gesture (for the TV ring). */
+  get pauseProgress(): number {
+    return this.phone?.pauseProgress ?? 0;
   }
 
   rep(msg: Extract<CtrlMsg, { type: 'EXERCISE_REP' }>, now: number): RepVerdict {
@@ -151,7 +165,9 @@ export class RemoteSet implements SetDriver {
   snapshot(): SessionSnapshot {
     const p = this.phone;
     const stage: SessionStage = this.done ? 'complete' : this.manualMode ? 'active' : (p?.stage === 'complete' ? 'active' : (p?.stage ?? 'setup'));
-    const last: DetectorUpdate | null = p ? { phase: '', tracking: p.tracking, confidence: p.confidence, guidance: p.guidance, ready: p.ready, repCompleted: false, progress: 0 } : null;
+    const last: DetectorUpdate | null = p
+      ? { phase: '', tracking: p.tracking, confidence: p.confidence, guidance: p.guidance, ready: p.ready, repCompleted: false, progress: 0, diag: { blocker: p.blocker ?? null, waiting: null } }
+      : null;
     return {
       stage,
       count: this.count,

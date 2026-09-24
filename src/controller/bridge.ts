@@ -1,11 +1,14 @@
+import { SetDiagnostics } from '../exercise/diagnostics';
+import { levelFrame } from '../exercise/level';
 import { EXERCISES } from '../exercise/registry';
 import { ExerciseSessionController, type SessionStage } from '../exercise/session';
-import type { ExerciseEvent, GuidanceCode, PoseFrame, TrackingQuality } from '../exercise/types';
-import { CalibrationFlow, type CalState } from '../input/calibration';
+import type { DiagBlocker, ExerciseEvent, GuidanceCode, PoseFrame, TrackingQuality } from '../exercise/types';
+import { CalibrationFlow, type CalKind, type CalState } from '../input/calibration';
 import { InputHub, type InputEvent } from '../input/InputHub';
 import { detectorsFor, type InputMode } from '../input/modes';
 import { motionPreset, type MotionReading, type NeutralPose } from '../input/motion';
 import type { CameraState, CtrlPayload, GameMsg, ModelState } from '../net/protocol';
+import type { TiltWatch } from '../input/tilt';
 
 /**
  * The phone's brain in Connected Play. It runs the detectors the game asks
@@ -18,7 +21,9 @@ import type { CameraState, CtrlPayload, GameMsg, ModelState } from '../net/proto
  *   dialogue    lean → NAV, gestures
  *   calibration the setup checklist → CALIBRATION state
  *   exercise    only the requested exercise detector → EXERCISE_STATUS and
- *               one EXERCISE_REP per counted rep
+ *               one EXERCISE_REP per counted rep, that exercise's pause
+ *               gesture → PAUSE, and rep diagnostics → EXERCISE_DIAG
+ *   ready       standing tall, hands relaxed → READY
  *
  * Only these interpreted events leave the phone — never frames or landmarks.
  * No DOM here, so the whole pipeline can be tested with synthetic poses.
@@ -27,6 +32,7 @@ export const MOVE_REFRESH_MS = 400;
 export const TELEMETRY_MS = 100;
 export const STATUS_MS = 2000;
 export const EXERCISE_STATUS_MS = 150;
+export const DIAG_MS = 1000;
 
 interface ActiveSet {
   id: string;
@@ -34,6 +40,8 @@ interface ActiveSet {
   ctrl: ExerciseSessionController;
   lastStage: SessionStage | null;
   lastSentAt: number;
+  diag: SetDiagnostics;
+  diagAt: number;
 }
 
 export interface Progress {
@@ -62,6 +70,10 @@ export class ControllerBridge {
   modelSize: 'full' | 'lite' = 'full';
   exerciseGuidance: GuidanceCode | null = null;
   exerciseFallback = false;
+  exerciseBlocker: DiagBlocker | null = null;
+  /** Optional: reports whether the phone moved since calibration. */
+  tilt: TiltWatch | null = null;
+  private calKind: CalKind = 'full';
   /** Last command sent, for the dashboard ("Turn left", "Marching"...). */
   lastAction: { label: string; at: number } | null = null;
   reading: MotionReading | null = null;
@@ -90,6 +102,7 @@ export class ControllerBridge {
   handle(msg: GameMsg): void {
     switch (msg.type) {
       case 'MODE':
+        if (msg.calibration) this.calKind = msg.calibration;
         this.applyMode(msg.mode, msg.epoch);
         return;
       case 'SETTINGS':
@@ -104,7 +117,8 @@ export class ControllerBridge {
         const detector = ex.createDetector(msg.difficulty);
         // The PC decides when the set is complete; the phone just keeps counting.
         const ctrl = new ExerciseSessionController(ex, detector, 10_000, (e) => this.onExerciseEvent(msg.setId, e), { setupStuckMs: 20000, activeStuckMs: 20000 });
-        this.set = { id: msg.setId, exerciseId: ex.id, ctrl, lastStage: null, lastSentAt: -Infinity };
+        this.set = { id: msg.setId, exerciseId: ex.id, ctrl, lastStage: null, lastSentAt: -Infinity, diag: new SetDiagnostics(), diagAt: -Infinity };
+        this.hub.setExercise(ex.id);
         this.progress = { setId: msg.setId, exerciseName: ex.name, count: 0, target: 0, manualMode: false, paused: false };
         return;
       }
@@ -120,7 +134,11 @@ export class ControllerBridge {
         return;
       }
       case 'EXERCISE_END':
-        if (this.set?.id === msg.setId) this.set = null;
+        if (this.set?.id === msg.setId) {
+          this.sendDiag(this.set);
+          this.set = null;
+          this.hub.setExercise(null);
+        }
         if (this.progress?.setId === msg.setId) this.progress = null;
         return;
       case 'GAME':
@@ -145,7 +163,9 @@ export class ControllerBridge {
           this.hub.setNeutral(n);
           this.sendStatus(true);
         },
+        this.calKind,
       );
+      this.calKind = 'full';
       this.onCalibration(this.calib.state, true);
     } else this.calib = null;
     // An exercise set survives a pause (menu mode); only EXERCISE_END ends it.
@@ -163,10 +183,15 @@ export class ControllerBridge {
     if (d.exercise) {
       const s = this.set;
       if (!s) return;
-      const snap = s.ctrl.update(frame, now);
+      // The exercise's own pause gesture (standing variants only; see exercisePause.ts).
+      this.hub.feed(frame, now);
+      const snap = s.ctrl.update(levelFrame(frame, this.neutral?.rollDeg), now);
+      s.diag.feed(snap.last, snap.stage, now);
       this.tracking = snap.last?.tracking ?? (frame ? 'partial' : 'lost');
       this.exerciseGuidance = snap.last?.guidance ?? null;
       this.exerciseFallback = snap.fallbackAvailable;
+      this.exerciseBlocker = snap.last?.diag?.blocker ?? null;
+      if (now - s.diagAt >= DIAG_MS) this.sendDiag(s, now);
       if (snap.stage !== s.lastStage || now - s.lastSentAt >= EXERCISE_STATUS_MS) {
         s.lastStage = snap.stage;
         s.lastSentAt = now;
@@ -180,6 +205,8 @@ export class ControllerBridge {
           guidance: snap.last?.guidance ?? null,
           ready: !!snap.last?.ready,
           fallbackAvailable: snap.fallbackAvailable,
+          blocker: this.exerciseBlocker,
+          pauseProgress: this.hub.exercisePauseProgress,
         });
       }
     } else if (d.march || d.lean || d.gestures) {
@@ -205,6 +232,7 @@ export class ControllerBridge {
             turnArmed: r.turnArmed,
             hold: r.hold,
             armed: r.armed,
+            readyProgress: r.readyProgress,
           },
         });
       }
@@ -231,7 +259,16 @@ export class ControllerBridge {
   }
 
   sendStatus(force = false, now = this.clock()): void {
-    const s = { type: 'STATUS' as const, camera: this.camera, model: this.model, calibrated: !!this.neutral, tracking: this.tracking, ...(this.cameraError ? { error: this.cameraError.slice(0, 200) } : {}) };
+    const moved = !!this.tilt?.moved;
+    const s = {
+      type: 'STATUS' as const,
+      camera: this.camera,
+      model: this.model,
+      calibrated: !!this.neutral,
+      tracking: this.tracking,
+      ...(this.cameraError ? { error: this.cameraError.slice(0, 200) } : {}),
+      ...(moved ? { moved } : {}),
+    };
     const key = JSON.stringify(s);
     if (!force && key === this.statusKey && now - this.statusAt < STATUS_MS) return;
     this.statusKey = key;
@@ -240,7 +277,7 @@ export class ControllerBridge {
   }
 
   // ── Touch fallback ──────────────────────────────────────────────────────
-  touch(action: 'left' | 'right' | 'confirm' | 'back' | 'pause'): void {
+  touch(action: 'left' | 'right' | 'confirm' | 'back' | 'pause' | 'ready'): void {
     this.hub.press(action, 'touch');
   }
 
@@ -263,6 +300,11 @@ export class ControllerBridge {
 
   get exerciseActive(): boolean {
     return !!this.set;
+  }
+
+  private sendDiag(s: ActiveSet, now = this.clock()): void {
+    s.diagAt = now;
+    this.out({ type: 'EXERCISE_DIAG', setId: s.id, summary: s.diag.summary() });
   }
 
   // ── Internals ───────────────────────────────────────────────────────────
@@ -297,11 +339,17 @@ export class ControllerBridge {
       case 'step':
         this.out({ type: 'STEP', via });
         return;
+      case 'ready':
+        this.out({ type: 'READY', via });
+        this.note('✓ Ready');
+        return;
     }
   }
 
   private onCalibration(s: CalState, changed: boolean): void {
     this.calibration = s;
+    // The phone's position now is "where it belongs".
+    if (changed && s.step === 'done') this.tilt?.setReference();
     const now = this.clock();
     // Progress bars don't need every frame; step changes go at once.
     if (!changed && now - this.lastCalSentAt < 100) return;

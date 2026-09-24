@@ -1,4 +1,5 @@
 import { rng } from './paint';
+import { trailPaths } from './trailGraph';
 
 /**
  * The Motion Trial board: a small sanctuary meadow, a gate, and a winding
@@ -18,6 +19,8 @@ export const SPOTS = {
   golem: { x: 1890, y: 820 },
   mage: { x: 1560, y: 520 },
   warden: { x: 1880, y: 250 },
+  /** An optional place of interest on the detour (Guided Traversal). */
+  shrine: { x: 1135, y: 972 },
 } satisfies Record<string, Pt>;
 
 export const FENCE_X = 1300;
@@ -25,45 +28,9 @@ export const GATE_GAP = { y0: 835, y1: 965 };
 export const POND = { x: 800, y: 1120, rx: 150, ry: 90 };
 export const ARENA = { x: 1880, y: 260, r: 180 };
 
-const WAYPOINTS: Pt[] = [
-  START,
-  SPOTS.banner,
-  { x: 620, y: 740 },
-  SPOTS.dummy,
-  { x: 1040, y: 790 },
-  SPOTS.signpost,
-  SPOTS.gate,
-  { x: 1420, y: 1010 },
-  SPOTS.skeleton,
-  { x: 1760, y: 1010 },
-  SPOTS.golem,
-  { x: 1760, y: 640 },
-  SPOTS.mage,
-  { x: 1660, y: 380 },
-  SPOTS.warden,
-];
-
-/** Catmull-Rom sampled trail. */
+/** All trail curves, flattened (for keeping scenery off the paths). */
 export function trail(step = 12): Pt[] {
-  const p = WAYPOINTS;
-  const out: Pt[] = [];
-  for (let i = 0; i < p.length - 1; i++) {
-    const p0 = p[Math.max(0, i - 1)];
-    const p1 = p[i];
-    const p2 = p[i + 1];
-    const p3 = p[Math.min(p.length - 1, i + 2)];
-    const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-    const n = Math.max(2, Math.ceil(len / step));
-    for (let j = 0; j < n; j++) {
-      const t = j / n;
-      const t2 = t * t;
-      const t3 = t2 * t;
-      const f = (a: number, b: number, c: number, d: number) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3);
-      out.push({ x: f(p0.x, p1.x, p2.x, p3.x), y: f(p0.y, p1.y, p2.y, p3.y) });
-    }
-  }
-  out.push(p[p.length - 1]);
-  return out;
+  return trailPaths(step).flat();
 }
 
 export function distToTrail(pts: Pt[], x: number, y: number): number {

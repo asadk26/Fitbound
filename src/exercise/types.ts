@@ -72,6 +72,26 @@ export interface DetectorUpdate {
   partialRep?: boolean;
   /** Raw measurements behind the decision, for the Detector Lab and tuning. */
   metrics?: Record<string, number>;
+  /** Why reps aren't counting right now, for on-screen diagnostics (optional per detector). */
+  diag?: DetectorDiag;
+}
+
+/** Something stopping the detector from starting or continuing a rep. */
+export type DiagBlocker = 'NO_BODY' | 'BODY_HIDDEN' | 'ARMS_HIDDEN' | 'NOT_LEVEL' | 'NOT_SIDEWAYS' | 'HIPS_PIKED' | 'ARMS_NOT_STRAIGHT';
+
+/**
+ * One-off outcomes of a rep attempt that didn't count. The first three are
+ * *incomplete reps* (the camera saw them and they fell short); the last two
+ * are attempts the camera *could not assess*.
+ */
+export type DiagEvent = 'partial-depth' | 'no-return' | 'too-fast' | 'lost-mid-rep' | 'reset-mid-rep';
+
+export interface DetectorDiag {
+  /** Present while the detector is blocked (not in position / not started). */
+  blocker: DiagBlocker | null;
+  /** The transition the detector is waiting for. */
+  waiting: 'start' | 'lower' | 'bottom' | 'return' | null;
+  event?: DiagEvent;
 }
 
 export interface ExerciseDetector {

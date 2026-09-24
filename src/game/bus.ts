@@ -5,6 +5,8 @@ import type { MapId } from '../phaser/maps';
 export interface DioramaState {
   /** Where the objective beacon points, if anywhere. */
   target: string | null;
+  /** Other acceptable objective spots (e.g. either of two guardians). */
+  alt?: string[];
   /** Spots the hero can interact with right now. */
   interact: string[];
   /** Enemies that engage when approached. */
@@ -20,6 +22,11 @@ export interface BusEvents {
   'boot:ready': undefined;
   'diorama:near': { id: string | null };
   'diorama:reached': { id: string };
+  /** Guided Traversal: a fork where the player picks a route (null when resolved). */
+  'trail:choice': { prompt: string; options: { dir: -1 | 1; label: string; detail: string; icon: string }[] } | null;
+  'trail:chosen': { label: string };
+  /** The hero is walking back to the trail after Assisted Traversal. */
+  'trail:rejoin': { active: boolean };
   // React → Phaser (diorama)
   'diorama:state': DioramaState;
   'diorama:hit': { id: string };

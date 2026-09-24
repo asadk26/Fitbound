@@ -1,4 +1,5 @@
 import type { PoseFrame } from '../exercise/types';
+import { ExercisePauseGesture, pausePolicy } from './exercisePause';
 import { commandAllowed, isMenuMode, type CommandType, type InputMode } from './modes';
 import { MotionReader, type MotionConfig, type MotionReading, type NeutralPose } from './motion';
 
@@ -22,13 +23,19 @@ export type { InputMode } from './modes';
  * bumps `epoch`, so a command issued for the previous mode can be recognised
  * and dropped when it arrives late.
  */
-export type InputSource = 'motion' | 'keyboard' | 'touch' | 'remote';
+export type InputSource = 'motion' | 'keyboard' | 'touch' | 'remote' | 'gamepad';
 
 export type InputEvent =
-  | { type: 'confirm' | 'back' | 'pause' | 'step'; source: InputSource }
+  | { type: 'confirm' | 'back' | 'pause' | 'step' | 'ready'; source: InputSource }
   | { type: 'nav' | 'turn'; dir: -1 | 1; source: InputSource };
 
-export type Command = { type: 'move'; forward: number } | { type: 'turn' | 'nav'; dir: -1 | 1 } | { type: 'confirm' | 'back' | 'pause' | 'step' };
+export type Command = { type: 'move'; forward: number } | { type: 'turn' | 'nav'; dir: -1 | 1 } | { type: 'confirm' | 'back' | 'pause' | 'step' | 'ready' };
+
+/** A conventional (non-exercise) movement vector, screen-relative, length ≤ 1. */
+export interface FreeMove {
+  x: number;
+  y: number;
+}
 
 export interface MoveIntent {
   /** 0..1 forward speed. Turning is discrete: see takeTurns(). */
@@ -51,9 +58,14 @@ export class InputHub {
   private listeners = new Set<(e: InputEvent) => void>();
   private readingListeners = new Set<(r: MotionReading | null) => void>();
   private modeListeners = new Set<(m: InputMode, epoch: number) => void>();
-  private keys = { forward: false };
+  private keys = { forward: false, up: false, down: false, left: false, right: false };
+  private stick: FreeMove = { x: 0, y: 0 };
   private move = { forward: 0, at: -Infinity };
   private turns = 0;
+  /** The exercise whose pause gesture is active during a set. */
+  private exercisePause: ExercisePauseGesture | null = null;
+  /** Which calibration the next 'calibration' mode runs. */
+  calibrationKind: 'full' | 'quick' = 'full';
 
   constructor(cfg: Partial<MotionConfig> = {}) {
     this.reader = new MotionReader(cfg);
@@ -64,6 +76,7 @@ export class InputHub {
     this.mode = mode;
     this.epoch++;
     this.reader.reset();
+    this.exercisePause?.reset();
     this.stop();
     if (this.source === 'local') {
       this.latest = null;
@@ -78,6 +91,16 @@ export class InputHub {
     this.stop();
     this.latest = null;
     this.readingListeners.forEach((f) => f(null));
+  }
+
+  /** The exercise being performed (sets its pause gesture), or null. */
+  setExercise(exerciseId: string | null): void {
+    this.exercisePause = exerciseId ? new ExercisePauseGesture(pausePolicy(exerciseId)) : null;
+  }
+
+  /** 0..1 progress of the mid-set pause gesture, for the on-screen ring. */
+  get exercisePauseProgress(): number {
+    return this.mode === 'exercise' ? (this.exercisePause?.progress ?? 0) : 0;
   }
 
   setNeutral(n: NeutralPose | null): void {
@@ -112,6 +135,11 @@ export class InputHub {
     let type: CommandType = cmd.type;
     // In menus a turn (lean / arrow key) moves the highlight instead.
     if (type === 'turn' && isMenuMode(m)) type = 'nav';
+    // Between sets, a Continue press (not a raised hand) means "ready".
+    if (type === 'confirm' && m === 'ready' && source !== 'motion' && source !== 'remote') {
+      cmd = { type: 'ready' };
+      type = 'ready';
+    }
     if (!commandAllowed(m, type)) return false;
     switch (cmd.type) {
       case 'move':
@@ -128,10 +156,15 @@ export class InputHub {
     }
   }
 
-  /** Feed one local camera frame. Ignored in exercise / off modes and while a remote controller drives the game. */
+  /** Feed one local camera frame. Ignored in off mode and while a remote controller drives the game.
+   *  During an exercise only that exercise's pause gesture is read. */
   feed(frame: PoseFrame | null, now: number): MotionReading | null {
     const m = this.mode;
-    if (m === 'off' || m === 'exercise' || this.source !== 'local') return null;
+    if (m === 'off' || this.source !== 'local') return null;
+    if (m === 'exercise') {
+      if (this.exercisePause?.update(frame, now)) this.command({ type: 'pause' }, 'motion', now);
+      return null;
+    }
     const r = this.reader.update(frame, now);
     this.latest = r;
     this.command({ type: 'move', forward: r.marching ? r.intensity : 0 }, 'motion', now);
@@ -157,6 +190,34 @@ export class InputHub {
     return { forward: now - this.move.at <= MOVE_TIMEOUT_MS ? this.move.forward : 0 };
   }
 
+  /**
+   * Conventional movement (gamepad left stick or keyboard), for Assisted
+   * Traversal. The strongest single source wins — sources never add up, so
+   * holding a key and pushing the stick can't double the speed. Zero outside
+   * explore mode.
+   */
+  freeMove(): FreeMove {
+    if (this.mode !== 'explore') return { x: 0, y: 0 };
+    const k = this.keys;
+    const kx = (k.right ? 1 : 0) - (k.left ? 1 : 0);
+    const ky = (k.down ? 1 : 0) - (k.up ? 1 : 0);
+    const kl = Math.hypot(kx, ky);
+    const key = kl ? { x: kx / kl, y: ky / kl } : { x: 0, y: 0 };
+    const sl = Math.hypot(this.stick.x, this.stick.y);
+    const stick = sl > 1 ? { x: this.stick.x / sl, y: this.stick.y / sl } : this.stick;
+    return Math.hypot(stick.x, stick.y) > kl ? stick : key;
+  }
+
+  /** The gamepad's left stick (already dead-zoned). */
+  setStick(x: number, y: number): void {
+    this.stick = { x, y };
+  }
+
+  /** True while the forward key forces movement (not physical activity). */
+  get keyForward(): boolean {
+    return this.mode === 'explore' && this.keys.forward;
+  }
+
   /** Discrete turns requested since the last call (+1 per right, -1 per left). */
   takeTurns(): number {
     const t = this.turns;
@@ -171,18 +232,20 @@ export class InputHub {
   }
 
   /** Keyboard / touch equivalents, filtered by mode like motion input. */
-  press(action: 'confirm' | 'back' | 'pause' | 'left' | 'right', source: 'keyboard' | 'touch' = 'keyboard'): void {
+  press(action: 'confirm' | 'back' | 'pause' | 'left' | 'right' | 'ready', source: 'keyboard' | 'touch' | 'gamepad' = 'keyboard'): void {
     if (action === 'left' || action === 'right') this.command({ type: 'turn', dir: action === 'left' ? -1 : 1 }, source);
     else this.command({ type: action }, source);
   }
 
-  setKey(key: 'forward', down: boolean): void {
+  setKey(key: 'forward' | 'up' | 'down' | 'left' | 'right', down: boolean): void {
     this.keys[key] = down;
   }
 
   /** Arrow keys / WASD / Enter / Esc / P for desktop testing. */
   attachKeyboard(target: Window): () => void {
+    const dirs: Record<string, 'up' | 'down' | 'left' | 'right'> = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
     const down = (e: KeyboardEvent) => {
+      if (dirs[e.code]) this.setKey(dirs[e.code], true);
       if (e.code === 'ArrowUp' || e.code === 'KeyW') this.setKey('forward', true);
       if (e.repeat) return;
       // One press = one turn, like one lean.
@@ -193,6 +256,7 @@ export class InputHub {
       if (e.code === 'KeyP') this.press('pause');
     };
     const up = (e: KeyboardEvent) => {
+      if (dirs[e.code]) this.setKey(dirs[e.code], false);
       if (e.code === 'ArrowUp' || e.code === 'KeyW') this.setKey('forward', false);
     };
     target.addEventListener('keydown', down);

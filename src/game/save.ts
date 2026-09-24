@@ -28,6 +28,12 @@ export interface MotionSettings {
   turnStep: 45 | 90;
   lean: Sensitivity;
   march: Sensitivity;
+  /** 'guided': follow the trail, choose at forks. 'freeroam': older lean-to-turn steering (experimental). */
+  navigation: 'guided' | 'freeroam';
+  /** Guided only: march to move ('active') or use a gamepad/keyboard to roam ('assisted'). */
+  traversal: 'active' | 'assisted';
+  /** Show why reps weren't counted after each set. */
+  diagnostics: boolean;
 }
 
 export interface SaveData {
@@ -70,7 +76,7 @@ export function defaultSave(): SaveData {
       targetAdjust: {},
       trialTargets: { ...DEFAULT_TARGETS },
       cameraFacing: 'user',
-      motion: { turnStep: 45, lean: 'normal', march: 'normal' },
+      motion: { turnStep: 45, lean: 'normal', march: 'normal', navigation: 'guided', traversal: 'active', diagnostics: true },
     },
     totals: { cameraReps: 0, manualReps: 0, holdSeconds: 0, battlesWon: 0 },
   };
@@ -165,6 +171,9 @@ export function sanitize(input: unknown): SaveData {
   const sens = ['low', 'normal', 'high'];
   if (!sens.includes(mo.lean)) mo.lean = 'normal';
   if (!sens.includes(mo.march)) mo.march = 'normal';
+  if (mo.navigation !== 'freeroam') mo.navigation = 'guided';
+  if (mo.traversal !== 'assisted') mo.traversal = 'active';
+  if (typeof mo.diagnostics !== 'boolean') mo.diagnostics = true;
   for (const k of Object.keys(DEFAULT_TARGETS) as (keyof TrialTargets)[]) {
     const v = Number(out.settings.trialTargets[k]);
     out.settings.trialTargets[k] = Number.isFinite(v) && v >= 1 && v <= 50 ? Math.round(v) : DEFAULT_TARGETS[k];

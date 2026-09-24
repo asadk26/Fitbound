@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CAL_STEPS } from '../input/calibration';
+import { BLOCKER_TEXT } from '../exercise/diagnostics';
+import { startMotion, tilt } from '../input/tilt';
 import type { InputMode } from '../input/modes';
 import type { NeutralPose } from '../input/motion';
 import { tracker, TrackerError } from '../pose/PoseTracker';
@@ -24,7 +26,69 @@ const MODE_LABEL: Record<InputMode, string> = {
   dialogue: 'Talking',
   menu: 'Menu',
   exercise: 'Exercise',
+  ready: 'Stand tall to continue',
 };
+
+const CAMERA_KEY = 'fitbound.ctrl.camera';
+
+type CameraPref = { id: string | null; wide: boolean };
+
+function saveCameraPref(p: CameraPref): void {
+  try {
+    localStorage.setItem(CAMERA_KEY, JSON.stringify(p));
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Which camera to use. Browsers only reveal camera names after access has
+ * been allowed once, so this also lives on the dashboard, where changing it
+ * restarts the camera.
+ */
+function CameraPicker({ pref, onChange, onApply }: { pref: CameraPref; onChange: (p: CameraPref) => void; onApply?: () => void }) {
+  const [cams, setCams] = useState<{ id: string; label: string }[]>([]);
+  useEffect(() => {
+    void tracker.listCameras().then(setCams).catch(() => {});
+  }, []);
+  const zoom = tracker.zoomRange();
+  return (
+    <details className="small">
+      <summary>
+        Camera: {pref.id ? (cams.find((c) => c.id === pref.id)?.label ?? 'chosen camera') : bridge.facing === 'user' ? 'front (default)' : 'back (default)'}
+        {pref.wide ? ' · widest view' : ''}
+      </summary>
+      <p>If your phone lists an ultra-wide camera, it can see your whole body from closer. Wider lenses make you smaller in the picture, which can make tracking less reliable — try it and compare in a push-up set. The list fills in once the camera has been allowed. After switching, recalibrate from the pause menu.</p>
+      <select value={pref.id ?? ''} onChange={(e) => onChange({ ...pref, id: e.target.value || null })}>
+        <option value="">Default ({bridge.facing === 'user' ? 'front' : 'back'} camera)</option>
+        {cams.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.label}
+          </option>
+        ))}
+      </select>
+      <label className="check">
+        <input type="checkbox" checked={pref.wide} onChange={(e) => onChange({ ...pref, wide: e.target.checked })} /> Use the widest zoom if this camera offers it
+        {zoom ? ` (this one: ${zoom.min}×–${zoom.max}×)` : ''}
+      </label>
+      {onApply && (
+        <button className="ghost" onClick={onApply}>
+          Restart camera with this choice
+        </button>
+      )}
+    </details>
+  );
+}
+
+function loadCameraPref(): CameraPref {
+  try {
+    const v = JSON.parse(localStorage.getItem(CAMERA_KEY) ?? 'null');
+    if (v && (typeof v.id === 'string' || v.id === null) && typeof v.wide === 'boolean') return v;
+  } catch {
+    /* ignore */
+  }
+  return { id: null, wide: false };
+}
 
 function useLinkState(): CtrlLinkState {
   const [s, setS] = useState(link.state);
@@ -97,7 +161,12 @@ function PairScreen({ ls }: { ls: CtrlLinkState }) {
 function StartScreen({ ls, onStart }: { ls: CtrlLinkState; onStart: () => void }) {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pref, setPref] = useState(loadCameraPref);
   const secure = window.isSecureContext;
+  const savePref = (p: CameraPref) => {
+    setPref(p);
+    saveCameraPref(p);
+  };
   const start = async () => {
     setBusy(true);
     setErr(null);
@@ -105,6 +174,12 @@ function StartScreen({ ls, onStart }: { ls: CtrlLinkState; onStart: () => void }
     bridge.model = 'loading';
     bridge.sendStatus(true);
     tracker.facing = bridge.facing;
+    tracker.deviceId = pref.id;
+    tracker.wide = pref.wide;
+    // Motion-sensor permission must be asked from this tap (iOS); used only
+    // to notice if the phone gets knocked out of place.
+    bridge.tilt = tilt;
+    void startMotion(tilt);
     try {
       await tracker.start(bridge.modelSize);
       bridge.camera = 'running';
@@ -132,11 +207,12 @@ function StartScreen({ ls, onStart }: { ls: CtrlLinkState; onStart: () => void }
         <Pill ok={ls.hostOnline} label={ls.hostOnline ? 'Game online' : 'Game offline'} />
       </div>
       <h1>Paired!</h1>
-      <p>Put the phone in its spot — landscape, about knee height, 2.5–3 m from where you’ll stand — then start the camera. The TV will guide you from there.</p>
+      <p>Put the phone in its spot — landscape, low down (a low shelf, or leaning against a wall near the floor), 2.5–3 m from where you’ll stand — then start the camera. The TV will guide you from there.</p>
       {!secure && <p className="bad">This page isn’t a secure (HTTPS) page, so the browser won’t allow the camera. Open the https:// address shown on the PC.</p>}
       <button className="big" disabled={busy} onClick={start}>
         {busy ? 'Starting camera…' : 'Start camera'}
       </button>
+      <CameraPicker pref={pref} onChange={savePref} />
       {err && <p className="bad">{err}</p>}
       {err && (
         <button className="ghost" onClick={onStart}>
@@ -153,6 +229,7 @@ function Dashboard({ ls }: { ls: CtrlLinkState }) {
   const [preview, setPreview] = useState<boolean | null>(null);
   const [touch, setTouch] = useState(false);
   const [tick, setTick] = useState(false);
+  const [camPref, setCamPref] = useState(loadCameraPref);
   const lastAction = useRef<number>(0);
 
   // Frames → bridge; a steady tick keeps touch controls, heartbeats and
@@ -217,7 +294,14 @@ function Dashboard({ ls }: { ls: CtrlLinkState }) {
         <b>{MODE_LABEL[mode]}</b>
         {bridge.game?.title && <span>{bridge.game.title}</span>}
         {bridge.game?.notice && <span className="bad">{bridge.game.notice}</span>}
+        {tilt.moved && <span className="warn">The phone moved since calibration — put it back, or recalibrate from the pause menu.</span>}
       </section>
+
+      {mode === 'ready' && (
+        <button className="big" onClick={() => bridge.touch('ready')}>
+          Continue
+        </button>
+      )}
 
       {mode === 'calibration' && cal && (
         <section className="card">
@@ -238,7 +322,8 @@ function Dashboard({ ls }: { ls: CtrlLinkState }) {
           <Bar value={p.target ? p.count / p.target : 0} />
           {p.manualMode && <span className="warn">MANUAL COUNT · not camera-verified</span>}
           {p.paused && <span className="warn">Paused</span>}
-          {!p.manualMode && bridge.exerciseGuidance && <span>{GUIDANCE[bridge.exerciseGuidance] ?? ''}</span>}
+          {!p.manualMode && bridge.exerciseBlocker && <span className="warn">{BLOCKER_TEXT[bridge.exerciseBlocker]}</span>}
+          {!p.manualMode && !bridge.exerciseBlocker && bridge.exerciseGuidance && <span>{GUIDANCE[bridge.exerciseGuidance] ?? ''}</span>}
           {!p.manualMode && bridge.exerciseFallback && (
             <button className="warnbtn" onClick={() => bridge.manualMode()}>
               Camera struggling? Count manually
@@ -269,6 +354,30 @@ function Dashboard({ ls }: { ls: CtrlLinkState }) {
       </div>
 
       {touch && <TouchPad mode={mode} />}
+
+      <CameraPicker
+        pref={camPref}
+        onChange={(p) => {
+          setCamPref(p);
+          saveCameraPref(p);
+        }}
+        onApply={async () => {
+          tracker.stop();
+          tracker.deviceId = camPref.id;
+          tracker.wide = camPref.wide;
+          bridge.camera = 'starting';
+          bridge.sendStatus(true);
+          try {
+            await tracker.start(bridge.modelSize);
+            bridge.camera = 'running';
+            bridge.cameraError = undefined;
+          } catch (e) {
+            bridge.camera = 'error';
+            bridge.cameraError = e instanceof Error ? e.message : String(e);
+          }
+          bridge.sendStatus(true);
+        }}
+      />
 
       <label className="small check">
         <input type="checkbox" checked={tick} onChange={(e) => setTick(e.target.checked)} /> Click on this phone when a move is recognised (only while the PC’s sound is off)

@@ -59,7 +59,7 @@ export function HoldRing({ value, label, hand }: { value: number; label: string;
 }
 
 /** Feet that light on each step, a lean gauge, and the tracking state. */
-export function MotionMeter({ r }: { r: MotionReading | null }) {
+export function MotionMeter({ r, steering = true }: { r: MotionReading | null; /** Show the lean gauge (free-roam steering / setup). */ steering?: boolean }) {
   const [flash, setFlash] = useState<'left' | 'right' | null>(null);
   useInputEvents((e) => {
     if (e.type === 'step') {
@@ -77,14 +77,16 @@ export function MotionMeter({ r }: { r: MotionReading | null }) {
         <span className={`foot ${flash === 'right' ? 'on' : ''}`}>R</span>
         <b className={r?.marching ? 'go' : ''}>{lost ? 'Not tracking' : r?.marching ? 'Marching!' : 'March to move'}</b>
       </div>
-      <div className="meter-lean">
-        <span>◀ lean</span>
-        <div className="lean-track">
-          <i className="lean-dead" />
-          <i className="lean-dot" style={{ left: `${50 + lean * 45}%` }} />
+      {steering && (
+        <div className="meter-lean">
+          <span>◀ lean</span>
+          <div className="lean-track">
+            <i className="lean-dead" />
+            <i className="lean-dot" style={{ left: `${50 + lean * 45}%` }} />
+          </div>
+          <span>lean ▶</span>
         </div>
-        <span>lean ▶</span>
-      </div>
+      )}
     </div>
   );
 }
@@ -103,12 +105,30 @@ export interface MenuOption {
  * cursor left resting where the menu happens to open must not pick an option
  * the player then confirms with a gesture.
  */
-export function GestureMenu({ title, text, options, onChoose, onBack, initial = 0 }: { title: string; text?: string; options: MenuOption[]; onChoose: (id: string) => void; onBack?: () => void; initial?: number }) {
+export function GestureMenu({
+  title,
+  text,
+  options,
+  onChoose,
+  onBack,
+  initial = 0,
+  active = true,
+}: {
+  title: string;
+  text?: string;
+  options: MenuOption[];
+  onChoose: (id: string) => void;
+  onBack?: () => void;
+  initial?: number;
+  /** False while another menu (e.g. Pause) is on top: ignore all input. */
+  active?: boolean;
+}) {
   const [sel, setSel] = useState(initial);
   const r = useMotion();
   const selRef = useRef(sel);
   selRef.current = sel;
   useInputEvents((e) => {
+    if (!active) return;
     if (e.type === 'nav') {
       setSel((s) => Math.max(0, Math.min(options.length - 1, s + e.dir)));
       audio.select();

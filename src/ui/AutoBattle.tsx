@@ -2,21 +2,26 @@ import { useEffect, useRef, useState } from 'react';
 import { CombatEngine, type CombatEffect } from '../combat/CombatEngine';
 import type { EnemyDef } from '../combat/enemies';
 import { getExercise, type ExerciseDefinition } from '../exercise/registry';
+import { BLOCKER_TEXT, diagLines, SetDiagnostics } from '../exercise/diagnostics';
+import { levelFrame } from '../exercise/level';
 import { ExerciseSessionController, type SessionSnapshot } from '../exercise/session';
 import type { ExerciseEvent } from '../exercise/types';
 import { audio } from '../game/audio';
 import { bus } from '../game/bus';
 import type { PlayerStats } from '../game/progression';
 import { getSave } from '../game/store';
-import { input } from '../input/InputHub';
+import { input, type InputMode } from '../input/InputHub';
+import { tilt } from '../input/tilt';
 import { iconDataUrl } from '../phaser/art';
 import { endBattle, startBattle } from '../phaser/game';
 import { host } from '../net/host';
 import { RemoteSet, type SetDriver } from '../net/remoteSet';
 import { tracker } from '../pose/PoseTracker';
 import type { PlannedSet } from '../trial/config';
+import { Calibration } from './Calibration';
 import { CameraView } from './CameraView';
-import { ControllerStatus, useLink } from './Connected';
+import { ControllerStatus, RemoteCalibration, useLink } from './Connected';
+import { PausableTimers } from './pausableTimers';
 import { GUIDANCE } from './guidance';
 import { GestureMenu, HoldRing, useInputEvents, useMotion } from './motionUi';
 
@@ -26,6 +31,11 @@ import { GestureMenu, HoldRing, useInputEvents, useMotion } from './motionUi';
  * counts every rep. Between sets the game announces the next exercise and
  * gives a short rest that the player can cut short (right hand) or extend
  * (left hand) without touching the phone.
+ *
+ * After each set the enemy waits until the player is ready: standing tall
+ * with hands relaxed (or a Continue press). Pausing works in every phase and
+ * freezes everything — timers, the set and the enemy — and the pause menu
+ * can recalibrate without losing the fight's progress.
  */
 export interface BattleResult {
   victory: boolean;
@@ -42,7 +52,16 @@ export const FIXED_CAMERA_POSE: Record<string, string> = {
   plank: 'Turn sideways to the phone and get into a plank.',
 };
 
-type Stage = 'intro' | 'next' | 'set' | 'resolve' | 'victory';
+type Stage = 'intro' | 'next' | 'set' | 'ready' | 'resolve' | 'victory';
+
+const MODE_FOR: Record<Stage, InputMode> = { intro: 'menu', next: 'menu', set: 'exercise', ready: 'ready', resolve: 'menu', victory: 'menu' };
+
+/** How to pause mid-set for each exercise (see input/exercisePause.ts). */
+const PAUSE_HINT: Record<string, string> = {
+  pushup: 'Stand up, both hands high · pause',
+  squat: 'Both hands high, hold · pause',
+  jumping_jack: 'Feet together, both hands high, hold still · pause',
+};
 
 const REST_FIRST = 5;
 const REST_BETWEEN = 8;
@@ -72,17 +91,23 @@ export function AutoBattle({
   });
   const [stage, setStageState] = useState<Stage>('intro');
   const stageRef = useRef<Stage>('intro');
+  const pausedRef = useRef(false);
   const setStage = (s: Stage) => {
     stageRef.current = s;
     setStageState(s);
-    input.setMode(s === 'set' ? 'exercise' : 'menu');
+    if (!pausedRef.current) input.setMode(MODE_FOR[s]);
   };
   const [planIdx, setPlanIdx] = useState(0);
   const planIdxRef = useRef(0);
   const [rest, setRest] = useState(REST_FIRST);
   const [restHeld, setRestHeld] = useState(false);
   const [snap, setSnap] = useState<SessionSnapshot | null>(null);
-  const [paused, setPaused] = useState(false);
+  const [paused, setPausedState] = useState(false);
+  const [recal, setRecal] = useState(false);
+  const [diag, setDiag] = useState<string[]>([]);
+  const pendingCompleted = useRef(false);
+  const setupSince = useRef<number | null>(null);
+  const localDiag = useRef<SetDiagnostics | null>(null);
   const [hud, setHud] = useState({ p: engine.state.playerHp, max: engine.state.playerMaxHp, e: engine.state.enemyHp, emax: engine.state.enemyMaxHp });
   const [flash, setFlash] = useState(0);
   const [note, setNote] = useState<string | null>(null);
@@ -90,7 +115,7 @@ export function AutoBattle({
   const ctrl = useRef<SetDriver | null>(null);
   const link = useLink();
   const ctrlLost = connected && link.controller !== 'connected';
-  const timers = useRef<number[]>([]);
+  const timers = useRef(new PausableTimers());
   const stats$ = useRef<BattleResult>({ victory: false, hpLeft: hp, reps: {}, trackingLosses: 0 });
   const lastStage = useRef('');
   const lastCount = useRef(0);
@@ -98,7 +123,18 @@ export function AutoBattle({
   const lostCueAt = useRef(0);
   const r = useMotion();
 
-  const later = (fn: () => void, ms: number) => timers.current.push(window.setTimeout(fn, ms));
+  const later = (fn: () => void, ms: number) => timers.current.later(fn, ms);
+  const setPaused = (p: boolean) => {
+    pausedRef.current = p;
+    setPausedState(p);
+    if (p) {
+      timers.current.pause();
+      input.setMode('menu');
+    } else {
+      timers.current.resume();
+      input.setMode(MODE_FOR[stageRef.current]);
+    }
+  };
   const current = (): ExerciseDefinition => getExercise(plan[Math.min(planIdxRef.current, plan.length - 1)].exerciseId);
   const target = () => plan[Math.min(planIdxRef.current, plan.length - 1)].target;
 
@@ -129,7 +165,9 @@ export function AutoBattle({
     const off = tracker.subscribe((f) => {
       const c = ctrl.current;
       if (!(c instanceof ExerciseSessionController) || stageRef.current !== 'set') return;
-      const sn = c.update(f.frame, f.now);
+      // Detectors see the frame levelled by the calibrated camera roll.
+      const sn = c.update(levelFrame(f.frame, input.reader.neutral?.rollDeg), f.now);
+      localDiag.current?.feed(sn.last, sn.stage, f.now);
       cues(sn, f.now);
       setSnap(sn);
     });
@@ -144,11 +182,12 @@ export function AutoBattle({
     return () => {
       off();
       clearInterval(poll);
+      timers.current.clear();
+      input.setExercise(null);
       if (host.activeSet) {
         host.activeSet.end();
         host.activeSet = null;
       }
-      timers.current.forEach(clearTimeout);
       audio.duck(false);
       endBattle();
     };
@@ -157,7 +196,7 @@ export function AutoBattle({
 
   // Rest countdown between sets.
   useEffect(() => {
-    if (stage !== 'next' || restHeld || paused) return;
+    if (stage !== 'next' || restHeld || paused || recal) return;
     if (rest <= 0) {
       beginSet();
       return;
@@ -168,7 +207,7 @@ export function AutoBattle({
     }, 1000);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, rest, restHeld, paused]);
+  }, [stage, rest, restHeld, paused, recal]);
 
   function announceNext(restS: number) {
     const ex = current();
@@ -186,7 +225,11 @@ export function AutoBattle({
     lastStage.current = '';
     lastCount.current = 0;
     wasLost.current = false;
+    setupSince.current = null;
     setSnap(null);
+    setDiag([]);
+    input.setExercise(ex.id);
+    host.lastDiag = null;
     if (connected) {
       // Switch the phone to exercise mode first, then tell it which detector to run.
       setStage('set');
@@ -196,6 +239,7 @@ export function AutoBattle({
       ctrl.current = rs;
     } else {
       ctrl.current = new ExerciseSessionController(ex, ex.createDetector!(s.settings.difficulty), target(), onExerciseEvent, { setupStuckMs: 20000, activeStuckMs: 20000 });
+      localDiag.current = new SetDiagnostics();
       setStage('set');
     }
     emit(engine.beginSet(ex.id));
@@ -220,18 +264,31 @@ export function AutoBattle({
       }
       audio.duck(false);
       const completed = ev.type === 'setComplete';
-      later(() => resolve(completed), completed ? 1500 : 400);
+      later(() => afterSet(completed), completed ? 1500 : 400);
     }
   }
 
-  function resolve(completed: boolean) {
+  /** The set is over. Unless the enemy fell, wait for the player to be ready. */
+  function afterSet(completed: boolean) {
+    const rs = ctrl.current instanceof RemoteSet ? ctrl.current : null;
+    const summary = rs ? (rs.diagnostics ?? (host.lastDiag?.setId === rs.setId ? host.lastDiag.summary : null)) : (localDiag.current?.summary() ?? null);
+    setDiag(summary && getSave().settings.motion.diagnostics ? diagLines(summary) : []);
     ctrl.current = null;
+    localDiag.current = null;
     if (host.activeSet) host.activeSet = null;
-    setStage('resolve');
+    input.setExercise(null);
     if (engine.state.outcome === 'victory') {
+      setStage('resolve');
       later(win, 1800);
       return;
     }
+    pendingCompleted.current = completed;
+    setStage('ready');
+    audio.say('Stand tall, arms relaxed, when you are ready.');
+  }
+
+  function resolve(completed: boolean) {
+    setStage('resolve');
     later(() => {
       const fx = engine.enemyTurn();
       if (engine.state.outcome === 'defeat') {
@@ -257,6 +314,8 @@ export function AutoBattle({
   }
 
   function cues(sn: SessionSnapshot, now: number) {
+    if (sn.stage === 'setup') setupSince.current ??= now;
+    else setupSince.current = null;
     if (sn.stage !== lastStage.current) {
       if (sn.stage === 'countdown') audio.say('Ready');
       if (sn.stage === 'active' && lastStage.current === 'countdown') {
@@ -282,16 +341,21 @@ export function AutoBattle({
     wasLost.current = lost;
   }
 
-  // Gestures work between sets and while paused; never during a set.
+  // Pause works in every phase; during a set only via that exercise's safe
+  // gesture (or touch / keyboard / gamepad).
   useInputEvents((e) => {
-    if (e.type === 'pause' && stageRef.current === 'set' && !paused) {
-      ctrl.current?.pause();
+    if (e.type === 'pause' && !pausedRef.current && stageRef.current !== 'victory') {
+      if (stageRef.current === 'set') ctrl.current?.pause();
       setPaused(true);
-      input.setMode('menu');
       audio.gesture();
       return;
     }
-    if (paused) return; // the pause menu handles its own input
+    if (pausedRef.current) return; // the pause menu handles its own input
+    if (stageRef.current === 'ready' && e.type === 'ready') {
+      audio.gesture();
+      resolve(pendingCompleted.current);
+      return;
+    }
     if (stageRef.current === 'next') {
       if (e.type === 'confirm') {
         audio.gesture();
@@ -306,12 +370,9 @@ export function AutoBattle({
   // Connected Play: if the phone drops out mid-set, freeze the set (no reps
   // can count) and the rest timer; the encounter itself is kept as it is.
   useEffect(() => {
-    if (!ctrlLost) return;
-    if (stageRef.current === 'set' && !paused) {
-      ctrl.current?.pause();
-      setPaused(true);
-      input.setMode('menu');
-    } else if (stageRef.current === 'next') setPaused(true);
+    if (!ctrlLost || pausedRef.current) return;
+    if (stageRef.current === 'set') ctrl.current?.pause();
+    if (stageRef.current !== 'victory') setPaused(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctrlLost]);
 
@@ -322,10 +383,20 @@ export function AutoBattle({
       return;
     }
     setPaused(false);
-    if (stageRef.current === 'set') {
-      input.setMode('exercise');
-      ctrl.current?.resume(performance.now());
-    }
+    if (stageRef.current === 'set') ctrl.current?.resume(performance.now());
+  };
+
+  const startRecal = () => {
+    input.calibrationKind = 'quick';
+    input.setMode('calibration');
+    setRecal(true);
+  };
+  const endRecal = () => {
+    if (!connected) tilt.setReference();
+    setRecal(false);
+    input.setMode('menu');
+    setNote('Recalibrated. Resume when you are in position.');
+    audio.levelUp();
   };
 
   const ex = current();
@@ -334,6 +405,10 @@ export function AutoBattle({
   const guidance = sn?.last?.guidance ? GUIDANCE[sn.last.guidance] : null;
   const tracking = sn?.last?.tracking ?? 'lost';
   const isBoss = plan.length > 1;
+  const blocker = sn?.last?.diag?.blocker ?? null;
+  // Explain a set that won't start, once it has been stuck for a few seconds.
+  const stuck = sn?.stage === 'setup' && setupSince.current !== null && performance.now() - setupSince.current > 4000;
+  const pauseProgress = connected ? (host.activeSet?.pauseProgress ?? 0) : input.exercisePauseProgress;
 
   return (
     <div className="tvb" style={{ ['--ability' as string]: ex.ability.color }}>
@@ -388,21 +463,65 @@ export function AutoBattle({
             </div>
           )}
           <div className={`tvb-guide ${guidance ? '' : 'ok'}`}>
-            {sn?.stage === 'setup' ? (sn.last?.ready ? 'Hold still — starting…' : (guidance ?? FIXED_CAMERA_POSE[ex.id])) : sn?.stage === 'countdown' ? 'Get ready!' : sn?.stage === 'complete' ? 'Set complete!' : (guidance ?? 'Keep going!')}
+            {sn?.stage === 'setup'
+              ? sn.last?.ready
+                ? 'Hold still — starting…'
+                : stuck && blocker
+                  ? `Not starting: ${BLOCKER_TEXT[blocker]}`
+                  : (guidance ?? FIXED_CAMERA_POSE[ex.id])
+              : sn?.stage === 'countdown'
+                ? 'Get ready!'
+                : sn?.stage === 'complete'
+                  ? 'Set complete!'
+                  : (guidance ?? 'Keep going!')}
           </div>
           {sn?.manualMode && <div className="manual-badge">MANUAL COUNT · not camera-verified</div>}
+          {!paused && !sn?.manualMode && (
+            <div className="tvb-pausering">
+              <HoldRing value={pauseProgress} label={PAUSE_HINT[ex.id] ?? 'Stand, both hands high · pause'} hand="both" />
+            </div>
+          )}
         </>
       )}
 
-      {stage === 'resolve' && note && <div className="tvb-note">{note}</div>}
+      {stage === 'ready' && !paused && (
+        <div className="tvb-card tvb-ready">
+          <div className="tvb-card-head">
+            <img src={iconDataUrl('shield')} alt="" className="pix-icon" />
+            <div>
+              <small>The {enemy.name} readies its move</small>
+              <b>Stand tall, arms relaxed</b>
+              <span>Take your time. The enemy waits until you're ready.</span>
+            </div>
+          </div>
+          <div className="xpbar">
+            <div style={{ width: `${(r?.readyProgress ?? 0) * 100}%` }} />
+          </div>
+          {diag.length > 0 && (
+            <div className="tvb-diag">
+              <b>Camera notes for that set</b>
+              <ul>
+                {diag.map((d) => (
+                  <li key={d}>{d}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <button className="btn" onClick={() => input.press('ready', 'touch')}>
+            Continue
+          </button>
+        </div>
+      )}
+
+      {(stage === 'resolve' || (paused && !recal)) && note && <div className="tvb-note">{note}</div>}
       {stage === 'victory' && <div className="tvb-victory">VICTORY!</div>}
 
-      {(stage === 'set' || stage === 'next') && connected && (
+      {(stage === 'set' || stage === 'next' || stage === 'ready') && connected && (
         <div className="tvb-cam tv-pip-ctrl">
           <ControllerStatus />
         </div>
       )}
-      {(stage === 'set' || stage === 'next') && !connected && (
+      {(stage === 'set' || stage === 'next' || stage === 'ready') && !connected && (
         <CameraView className="tvb-cam" good={tracking === 'good'}>
           <span className={`cam-tag trk-${tracking}`}>{tracking === 'good' ? '● Tracking' : tracking === 'partial' ? '● Weak' : '● Not seen'}</span>
         </CameraView>
@@ -410,7 +529,7 @@ export function AutoBattle({
 
       {/* Touch controls for whoever set up the phone; never needed mid-set. */}
       <div className="tvb-touch">
-        {stage === 'set' && !paused && (
+        {stage !== 'victory' && !paused && (
           <button className="btn btn-sm btn-ghost" onClick={() => input.press('pause', 'touch')}>
             Pause
           </button>
@@ -427,17 +546,25 @@ export function AutoBattle({
         )}
       </div>
 
-      {paused && (
+      {paused && recal && (
+        <div className="tv-overlay tv-overlay-full">
+          {connected ? <RemoteCalibration kind="quick" onDone={endRecal} /> : <Calibration kind="quick" camera={{ state: 'running' }} onDone={endRecal} />}
+        </div>
+      )}
+
+      {paused && !recal && (
         <div className="tv-overlay">
           <GestureMenu
             title="Paused"
-            text={ctrlLost ? 'The phone controller disconnected. Your progress in this set is kept; resume once it reconnects and can see you.' : 'Take your time. Your progress in this set is kept.'}
+            text={ctrlLost ? 'The phone controller disconnected. Your progress is kept; resume once it reconnects and can see you.' : 'Take your time. The enemy, your HP and the reps in this set are kept.'}
             options={[
               { id: 'resume', label: canResume ? 'Resume' : 'Resume (waiting for the phone…)', icon: 'star' },
-              { id: 'end', label: 'End this set', detail: 'Reps so far still count', icon: 'lock' },
+              { id: 'recal', label: 'Recalibrate', detail: 'Quick; keeps the fight and your reps', icon: 'shield' },
+              ...(stage === 'set' ? [{ id: 'end', label: 'End this set', detail: 'Reps so far still count', icon: 'lock' }] : []),
             ]}
             onChoose={(id) => {
               if (id === 'resume') resume();
+              else if (id === 'recal') startRecal();
               else {
                 setPaused(false);
                 ctrl.current?.stop('stopped');

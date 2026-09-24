@@ -1,4 +1,5 @@
-import { ARENA, BOARD, FENCE_X, POND, trail } from './layout';
+import { ARENA, BOARD, FENCE_X, POND } from './layout';
+import { trailPaths } from './trailGraph';
 import { canvas, darken, lighten, rng, type Ctx } from './paint';
 
 /**
@@ -74,14 +75,15 @@ export function paintGround(): HTMLCanvasElement {
   ctx.stroke();
 
   // Trail: a darker bed, the path, then a lighter worn centre and pebbles.
-  const pts = trail(10);
+  const paths = trailPaths(10);
+  const pts = paths.flat();
   const stroke = (w: number, color: string) => {
     ctx.strokeStyle = color;
     ctx.lineWidth = w;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.beginPath();
-    pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    for (const path of paths) path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
     ctx.stroke();
   };
   stroke(118, 'rgba(70,90,50,0.35)');

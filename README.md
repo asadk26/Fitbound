@@ -89,18 +89,31 @@ Accepted reps become the same `ExerciseEvent`s that single-device play produces,
 - The pages' Content-Security-Policy allows network connections only to their own origin and relay socket. That also keeps blocking MediaPipe's built-in telemetry.
 - Nothing is uploaded or stored: no video, frames or landmarks leave the phone. There are no accounts, cloud services or API keys.
 
-### Discrete turning
+### Getting around: guided trail (default)
 
-Continuous "tank" steering was imprecise in the first playtest, so turning is now discrete:
+Physical playtesting showed that steering, even with clean 45° turns, was navigation work on top of a workout. Exploration now follows the trail:
 
-- **One lean = exactly one turn**, 45° by default (8 directions) or 90° (4 directions) under *Controls → Turn per lean*.
+- **Active traversal (default):** marching in place walks the hero along the trail toward the current objective. Every bend is followed automatically, so there's no steering and no arrow to read. Stop marching and the hero stops within a moment. Marching speed follows your cadence, but even a gentle march gets you there.
+- **Route choices:** at a fork the hero stops and two cards appear, one on each side of the screen. Lean toward the one you want. Marching alone never takes you past a fork, and a lean only counts after you've come back to upright. The meadow has two forks:
+  - after the dummy: the *Forest path*, or a detour to the *Mossy Shrine*, where raising your right hand restores your HP;
+  - after the Skeleton: the *Moonlit Tower* (the Mage first) or the *Stone Quarry* (the Golem first).
+- **Stops:** the trail pauses by itself at the dummy and the signpost for you to interact (raise your right hand), and briefly at the shrine. Encounters start as you walk up to each guardian.
+- **Assisted traversal (optional):** a gamepad's left stick or d-pad, or the keyboard arrows/WASD, moves the hero freely around the same meadow, with the same collisions, interactions and encounters.
+  - Connect the gamepad to the computer running the game (USB or Bluetooth), not to the phone, and press a button once so the browser notices it.
+  - To switch, press *Select* on the gamepad or *T* on the keyboard, or use the pause menu, whenever you like; the run and its rewards are unaffected.
+  - Switching back to Active walks the hero to the nearest reachable bit of trail, without teleporting, and carries on from there.
+  - Controller movement is never counted as exercise: the summary reports trail travelled by marching and by controller separately.
+  - Battles still use the camera.
+- **Free roam (experimental):** the previous lean-to-turn steering (below) is still available under *Controls → Getting around*, so the two can be compared.
+
+Where things are: the trail network, fork definitions and routing live in `src/phaser/diorama/trailGraph.ts` (pure, tested). The scene only draws where the walker says the hero is.
+
+### Free roam steering (experimental)
+
+- **One lean = exactly one turn**, 45° (8 directions) or 90° (4 directions) under *Controls → Turn per lean*.
 - **Holding a lean never repeats.** The torso must come back inside the neutral band (4°) for 0.12 s to re-arm.
-- A lean registers at 8° from your calibrated neutral. Low, Normal and High sensitivity use 11°, 8° and 6°.
-- Smoothing, a 0.35 s cooldown, and disarming on tracking loss mean marching sway, posture noise and wobbles don't turn you. Smoothing is time-based, so a phone that only manages a few pose frames a second turns just as reliably.
-- **You can turn while standing still.** The hero turns to face the new direction at once and walks straight along it, diagonals included.
-- **Collisions work on the grid:** you slide round trees and rocks, even walking straight at one. Pushing into the fence right next to the open gateway steers you into the gap.
-- The big rotating ground wheel is gone. A small chevron above the hero's head shows the facing direction.
-- Menus use the same rule: one lean moves the highlight one step. Keyboard ←/→ is one turn per press.
+- A lean registers at 8° from your calibrated neutral; Low, Normal and High sensitivity use 11°, 8° and 6°. A 0.35 s cooldown and time-based smoothing stop wobbles.
+- You can turn while standing still. You slide round trees and rocks, and pushing into the fence beside the open gateway steers you into the gap. A small chevron above the hero shows the facing direction.
 
 ### Marching
 
@@ -113,16 +126,102 @@ Continuous "tank" steering was imprecise in the first playtest, so turning is no
 - Speed follows your cadence between 55% and 100% of normal walking speed. It is capped, so marching faster never makes the game faster than a normal walk.
 - *Controls → March sensitivity* (Low, Normal, High) is on the Connected Play and trial setup screens.
 
+### Pausing and recalibrating
+
+You can pause from every phase without walking to the phone or laptop:
+
+| How | Works during |
+|---|---|
+| **Both hands up**, held 0.8 s | Exploration, dialogue, menus, rewards, between sets, the "stand tall" step |
+| **Squat sets:** both hands high, held 1 s | Squats (they never raise the hands that high) |
+| **Jumping-jack sets:** feet together, both hands high, held still 1.5 s | Jumping jacks (a jack's arms-up moment has the feet apart and lasts a fraction of a second) |
+| **Push-up sets:** stand up, then both hands high, held 1 s | Push-ups (can't happen on the floor; standing up alone doesn't pause) |
+| Touch **Pause** (phone or TV page), **P** on the keyboard, **Start** on a gamepad | Everything, including when tracking is lost |
+
+Each mid-set gesture is checked against its own exercise's movements in the tests, so ordinary reps don't trigger it. A pause freezes everything: the set, the rest timer, the enemy's turn and the timers between them. A gesture needs a body in view, so while tracking is lost use touch, keyboard or gamepad.
+
+**Recalibrate** is in the exploration pause menu and in the battle pause menu. It runs a quick version that takes a few seconds:
+
+1. stand in view;
+2. stand still (lean baseline and camera roll are re-measured);
+3. done.
+
+In a battle it keeps the enemy's HP, your HP, the reps already counted in the set and the fight's progress. The set resumes where it was: it isn't restarted and no reps are awarded.
+
+**Voice ("pause", "resume", "recalibrate") is researched but not built.** See *Voice commands* below.
+
+### Standing ready between sets
+
+After each set, the enemy waits until you signal you're ready:
+
+- Stand tall with your arms relaxed at your sides. It takes about half a second, and brief wobbles don't restart the hold. You don't have to freeze.
+- The TV shows a progress bar, plus a *Continue* button (or Enter, or gamepad A) as a fallback.
+- Standing up after push-ups can't trigger anything else: in this "ready" mode only *ready* and *pause* count.
+- The enemy never attacks before you're ready, and nothing advances while paused or while you're out of view.
+- The check only runs at this point in combat, never in story scenes or menus.
+
 ### Disconnects
 
 If the phone disconnects, or goes silent for 3 s (locked, backgrounded, Wi-Fi drop):
 
-- movement stops at once, and movement also stops by itself if no fresh `MOVE_START` arrives for 1.2 s;
-- exploration pauses, and a *Controller disconnected — reconnecting…* banner appears on the TV;
-- during a battle the current set pauses and reps can't count. The encounter, HP and set progress are kept, and the rest timer freezes;
+- movement stops at once, and also stops by itself if no fresh `MOVE_START` arrives for 1.2 s;
+- the game pauses and a *Controller disconnected — reconnecting…* banner appears on the TV;
+- in a battle the set pauses and reps can't count. The encounter, HP and set progress are kept, and every timer freezes;
 - the phone reconnects by itself (backoff from 0.5 s to 5 s) and resumes its session.
 
-**Resume** stays disabled until the phone is back with its camera running, still calibrated and able to see you. Then raise your right hand or click *Resume*. Touch pause works on the phone and the PC. Pause is an ordinary command, so a future voice "pause" only needs to call `input.command({ type: 'pause' }, …)`.
+**Resume** stays disabled until the phone is back with its camera running, still calibrated and able to see you.
+
+### Push-up reliability and rep diagnostics
+
+Every condition in the push-up state machine was reviewed. These could stop a rep from counting:
+
+| Condition | Before | Now |
+|---|---|---|
+| Arm and torso landmarks visible (confidence ≥ 0.5) | Required | Same, and reported as *elbow/wrist* or *shoulder/hip not visible* |
+| Body within 45° of horizontal (image-relative) | Required | Same, measured in a frame corrected for camera roll |
+| Side-on to the camera | Required | Same |
+| Hips not piked (shoulder–hip–knee ≥ 115°) | Required | Same |
+| **Any single frame failing the above, mid-rep** | Threw the rep away | Must fail for 0.3 s before the rep is discarded |
+| **Arms "extended" = elbow ≥ 150°** to start and to finish every rep | Fixed | If straight arms hold steady at a lower 2D angle (never below 135°), that becomes your top. The **required depth is unchanged** (the drop from top to bottom), so reps aren't easier. |
+| Depth (bottom ≤ 100–110° by difficulty), return to the top, minimum 0.45 s per rep | Required | Same |
+
+The two bold rows are the likely culprits for real, low-camera push-ups: 2D elbow angles from a floor-level phone often never read 150°, and MediaPipe's landmarks on a lying body are jittery. Neither was simply loosened. Thresholds are unchanged, a sustained problem still discards the rep, and the synthetic tests that check shallow reps, standing arm curls and hip hinges still fail to count.
+
+**Diagnostics** (numbers only, kept on the device running the detector, never uploaded):
+
+- While a set can't start, the TV explains why after a few seconds, e.g. *"Not starting: Starting pose not detected — arms not straight at the top"* or *"Elbow or wrist landmarks not visible"*. The phone dashboard shows the same line.
+- After each set, a *Camera notes* box separates two kinds of miss. **Incomplete reps** the camera saw: *lowering depth not reached*, *return to starting position not detected*, *too fast*. **Attempts it could not assess**: *tracking lost mid-rep*, *left the push-up position mid-rep*. It also names the main reason if the set struggled to begin.
+- To turn the notes off: *Controls → Rep diagnostics*.
+- The Detector Lab (`/lab.html`) also shows each check's numbers live, now including the learned top and bottom angles.
+- The labelled manual-count fallback is unchanged. Manual reps are never reported as camera-verified.
+
+### Camera placement, tilt and lens
+
+- **Placement:** landscape, low down (a low shelf, or leaning against a wall near the floor), 2.5–3 m away. Stand facing it for standing exercises; turn sideways and get down in the same spot for push-ups. You shouldn't need to move the phone during a workout.
+- **Tilt (roll):** detectors now see each frame rotated to undo the phone's sideways tilt. The tilt is measured from you during calibration (a standing torso is vertical), not from the phone's motion sensor. Turning sensor data into "down in this video frame" depends on how iOS rotates and mirrors camera frames and on sign conventions that differ between browsers; getting that wrong would *double* the tilt. Tilts over 25° aren't corrected.
+- **Pitch and perspective** (a phone leaning back against a wall) can't be undone from a single 2D view. The ±45° body check is tolerant of it, and the learned top angle absorbs its effect on elbow angles.
+- **"Phone moved" warning:** the phone's motion sensor (iOS asks permission when you tap *Start camera*) watches only the angle between gravity now and at calibration. That comparison is independent of axis conventions. It must be over 6° for 1.5 s, with heavy smoothing, so footsteps, thumps and sensor noise don't trigger it. If the phone moved, the TV and phone say so and suggest *Pause → Recalibrate*. Without sensor permission, this warning simply doesn't appear.
+- **Lens:** the phone's Start screen and dashboard list the cameras the browser exposes. The names appear once the camera has been allowed; on recent iPhones Safari may list an *Ultra Wide* camera. A *widest zoom* option applies the lowest zoom a camera reports (e.g. 0.5×) if it offers one. Neither is guaranteed across iPhone models or iOS versions; the default camera always works. Wider views make you smaller in the picture, which can reduce tracking reliability, so compare push-ups with each.
+
+### Voice commands (researched, deferred)
+
+A spoken "pause" that works on the floor is the right long-term answer. It isn't built, because a reliable, private version is a separate piece of work:
+
+- **Cloud recognition is ruled out as the default.** The browser's built-in speech recognition (Chrome, Edge; Safari's `webkitSpeechRecognition`) sends audio to Google, Microsoft or Apple for transcription. Newer Chrome versions have an on-device option, but it is experimental and not something to rely on yet.
+- **Recommended: a small offline keyword spotter running on the laptop:**
+  - either Vosk's WebAssembly build with a small English model (about 40 MB), restricted to the words *pause, resume, recalibrate*;
+  - or a tiny keyword-spotting model (TensorFlow.js *speech-commands* style) trained on those words.
+  - Why the laptop, not the phone:
+    - the phone already runs the camera and MediaPipe, and adding continuous audio inference there costs heat and battery;
+    - iOS Safari only reliably runs camera and microphone together while the page stays in the foreground, and suspends audio processing when it's backgrounded;
+    - on the laptop, Chrome's echo cancellation (`getUserMedia({ audio: { echoCancellation: true } })`) can remove the game's own sound, which comes from the same page, before recognition.
+- **Things that need testing in the room:**
+  - microphone distance (a laptop 3 m away beside the TV);
+  - TV speakers playing other audio, e.g. an AV receiver, which in-browser echo cancellation may not cover;
+  - a one-time microphone permission prompt;
+  - automatic restart after the browser suspends audio;
+  - false triggers from the game's spoken cues. A short confirm tone, plus ignoring recognition while the game is speaking, would help.
+- **Voice will never be the only way to pause.** It would plug into the existing command path as one more input source (`input.command({ type: 'pause' }, source)` with a new `'voice'` source), obeying the same mode rules.
 
 ### Networking and HTTPS
 
@@ -152,8 +251,8 @@ The same trial played on the phone alone: its camera, its screen, optionally mir
    - march in place, lean left, lean right;
    - **floor check**: get into push-up position sideways (left hand skips it);
    - stand back up.
-3. **Part 1, exploration** on a tabletop-diorama meadow: march to the banner, steer to the training dummy and strike it (right hand), then read the signpost and accept the trial.
-4. **Part 2, combat:** Skeleton (push-ups), Stone Golem (squats), Shadow Mage (jumping jacks), then the Dungeon Warden (push-ups → squats → jumping jacks). Pick a reward after each guardian.
+3. **Part 1, exploration** on a tabletop-diorama meadow: march along the trail to the banner and the training dummy (strike it with your right hand), choose a path at the fork, then read the signpost and accept the trial.
+4. **Part 2, combat:** the Skeleton (push-ups). Then the Stone Golem (squats) and the Shadow Mage (jumping jacks), in whichever order you choose at the fork. Last, the Dungeon Warden (push-ups → squats → jumping jacks). Pick a reward after each guardian.
 5. A summary lists camera-verified reps per exercise, marching steps, gestures used and tracking losses.
 
 Connected Play runs exactly the same trial.
@@ -163,28 +262,30 @@ Connected Play runs exactly the same trial.
 | Action | Where | How it's detected |
 |---|---|---|
 | **March in place → walk** | Exploration | Alternating difference in the height of the two knees and feet, normalised by thigh length. Both legs moving together cancels out. Two alternating steps start you; you stop 0.75 s after the last step. |
-| **Lean → one turn** | Exploration | Torso angle relative to your calibrated neutral. One lean past 8° gives one 45° (or 90°) turn. Hold it and nothing more happens; come back to neutral to re-arm. |
+| **Lean → choose a route** | Forks on the trail (and free-roam turning) | Torso angle relative to your calibrated neutral. One lean past 8° picks the route on that side. Holding it does nothing more; come back to upright to re-arm. |
+| **Stand tall, arms relaxed → ready** | Between sets | Upright, hands below mid-torso, feet together, not marching, held about 0.5 s (forgiving). |
 | **Raise RIGHT hand → confirm / interact** | Exploration, menus, dialogue | Wrist above your nose, held 0.45 s. Hands must come down before the next gesture. |
 | **Raise LEFT hand → back / more rest / skip** | Menus, dialogue, between sets | Same, left side. |
-| **Both hands up → pause** | Exploration, menus | Held 0.8 s. |
+| **Both hands up → pause** | Exploration, menus, between sets | Held 0.8 s. During sets, the per-exercise variants in *Pausing and recalibrating*. |
 | **Lean left/right → move selection** | Menus, dialogue | One lean = one step. |
 
-Left and right are your *anatomical* sides, so the controls are correct whether or not the camera mirrors. Keyboard equivalents: ↑/W walk (hold), ←/→ one turn per press, Enter confirm, Esc back, P pause.
+Left and right are your *anatomical* sides, so the controls are correct whether or not the camera mirrors. Keyboard: ↑/W walk (hold; counted as controller movement), ←/→ choose a route or one turn per press, Enter confirm/continue, Esc back, P pause, T switch Active/Assisted traversal. Gamepad: stick/d-pad move (Assisted), d-pad ◀ ▶ choose, A confirm, B back, Start pause, Select switch traversal.
 
 ### Input modes
 
 `src/input/modes.ts` is the single table of what each mode allows. `InputHub` applies it to every input source (local camera, phone controller, keyboard, touch):
 
 - **calibration:** the setup checklist reads motion; nothing moves.
-- **explore:** march moves, a lean turns, and confirm, back and pause gestures fire.
+- **explore:** march moves along the trail (or free roam), a lean chooses a route (or turns), and confirm, back and pause gestures fire.
 - **dialogue / menu:** a lean moves the highlight and gestures choose, go back or pause. Marching moves nothing.
-- **exercise:** *all motion input is off*, and only the active exercise detector sees frames, so a jumping jack can't pause the game and a squat can't walk the hero. Pause during a set is touch or keyboard only.
+- **exercise:** only the active exercise's detector and its own pause gesture read frames, so a jumping jack can't pause the game and a squat can't walk the hero.
+- **ready:** between a set and the enemy's turn, only *ready* (standing tall) and pause count.
 
 Every mode change resets motion history, disarms gestures and turns, and bumps the epoch. In Connected Play the PC sends each mode change to the phone, which switches detectors to match.
 
 ### Battles in the trial
 
-Hands-free. Each guardian has a plan of sets. For each set: a **Next exercise** card (with spoken cue) tells you how to face the phone and gives a 5–8 s rest (right hand = start now, left hand = more rest). The camera then waits until you're in the start position, counts down 3-2-1, and counts reps. When the set completes, the enemy responds and the next phase starts automatically. The trial never ends in a knockout.
+Hands-free. Each guardian has a plan of sets. For each set: a **Next exercise** card (with spoken cue) tells you how to face the phone and gives a 5–8 s rest (right hand = start now, left hand = more rest). The camera then waits until you're in the start position, counts down 3-2-1, and counts reps. When the set completes, you stand tall to signal you're ready, the enemy responds, and the next phase starts. The trial never ends in a knockout.
 
 Rep targets default to **5 push-ups, 10 squats, 10 jumping jacks, and a 3/6/8 boss**. Change them in *Trial settings* on the setup screen, or with a URL parameter such as `?reps=pushup:3,squat:5,jumping_jack:5,bossPushup:2,bossSquat:3,bossJack:4`.
 
@@ -192,7 +293,7 @@ Audio cues: exercise start chord, a rep blip that climbs in pitch, set-complete 
 
 ### Phone placement (one position for everything)
 
-- **Landscape**, on something steady at about **knee height** (low shelf, chair, stack of books), **2.5–3 m** from where you stand, on a clear floor.
+- **Landscape**, low down: on something steady at about **knee height**, or leaning against a wall near the floor. Place it **2.5–3 m** from where you stand, on a clear floor.
 - Standing exploration, squats and jumping jacks: **face** the phone.
 - Push-ups: stay where you are, **turn sideways** to the phone and get down. Your body then lies across the frame in profile, which is what the push-up detector needs.
 - Knee height is a compromise: high enough to see you standing head-to-feet with hands raised, low enough that a body on the floor isn't hidden or foreshortened. The calibration floor check tests exactly this.
@@ -220,7 +321,7 @@ npm run play         # Connected Play: build + relay (PC http://localhost:8080, 
 npm run relay        # the relay alone, using the existing build
 npm run dev          # http://localhost:5173 (single-device play; the camera works on localhost)
 npm run dev:https    # the same, over HTTPS on the LAN, for a phone
-npm test             # 153 automated tests
+npm test             # 195 automated tests
 npm run build        # type-check + production build into dist/ (game, controller, detector lab)
 ```
 
@@ -309,23 +410,99 @@ server/           Connected Play relay: static HTTPS/HTTP server + WebSocket rel
 controller.html   phone controller entry (no Phaser)
 src/controller/   phone controller: ControllerBridge (detectors → messages), CtrlLink (pairing, resume, resend), dashboard UI
 src/net/          protocol + validation, ControllerGate (session/sequence/mode checks), RemoteSet (authoritative reps), HostLink (PC side)
-src/input/        MotionReader (march / discrete turns / gestures), CalibrationFlow, modes table, InputHub (one command path for all sources)
+src/input/        MotionReader (march / turns / gestures / ready), exercise-safe pause gestures, CalibrationFlow (full + quick),
+                  modes table, InputHub (one command path for all sources), gamepad, tilt watcher
 src/trial/        Motion Trial config: rep targets, encounter plans, rewards
 src/testing/      synthetic pose generators shared by tests and the ?debug browser hooks
-src/exercise/     detectors (pure TS), registry, session controller (setup → countdown → active → complete)
+src/exercise/     detectors (pure TS), rep diagnostics, roll levelling, registry, session controller (setup → countdown → active → complete)
 src/pose/         camera + MediaPipe PoseLandmarker (GPU with CPU fallback), frame conversion
 src/combat/       CombatEngine (pure rules → CombatEffects), enemies & boss phases
 src/game/         progression, save (localStorage, validated), store, audio (WebAudio synth + speech), event bus
-src/phaser/       diorama/ figurines, props, board, steering & collisions; pixel art & tiles for classic; Boot / Diorama / World / Battle scenes
+src/phaser/       diorama/ figurines, props, board, trail graph & walker, steering & collisions; pixel art & tiles for classic; scenes
 src/ui/           React UI: TrialRun, Calibration, AutoBattle, Connected (pairing, remote calibration, controller status), gesture menus; classic UI
 src/lab/          Detector Lab
 ```
 
 Saved automatically: level/XP, gold, upgrades, abilities, defeated enemies, dungeon clears, location, settings (including turn step and sensitivities) and lifetime totals.
 
+## Toward the combat overhaul (architecture notes)
+
+The planned direction:
+
+- turn-based exercise attacks, with no interruptions mid-set;
+- selectable abilities, and several abilities per detector;
+- recharge, weaknesses and roguelite upgrades;
+- high/low enemy attacks dodged with a squat or a hop.
+
+These parts of today's code would make that unusually hard:
+
+1. **Ability = exercise.** `CombatEngine.handle` looks up `getExercise(id).ability.effect` and switches on it, so each exercise has exactly one ability. Selectable and shared abilities need an `AbilityDef` of its own (effect, damage profile, recharge), and a set that starts with an ability id, not an exercise id.
+2. **Enemies prescribe exercises.** `trial/config.encounterPlan` fixes which exercise each set uses, and boss phases gate damage on `phase.required`. Choosing your own abilities needs plans that describe what's *allowed or favoured*. Weaknesses become multipliers on ability tags, not hard requirements.
+3. **No per-ability or run state.** Recharge counters and temporary upgrades have nowhere to live: `BattleState` only holds HP and phase, and trial boons are ad-hoc bonuses in `TrialRun`. A small `RunState` (upgrades, recharge) passed into the engine would fix this.
+4. **Enemy attacks resolve instantly.** `enemyTurn()` applies damage at once, with no attack type (high/low), wind-up or response window. Dodges need a telegraph → response-window → resolve step, plus short "reaction" detectors (crouch, hop). Those differ from rep counters and would use their own input mode.
+5. **Battle pacing lives in React timeouts.** This build moved them onto pausable timers and added an explicit "ready" step. The next step is a small battle phase machine (player turn → ready → enemy telegraph → dodge window → resolve) that owns the timing, which `AutoBattle` then renders.
+
+Already in place and reusable:
+
+- `SetDriver`: local or remote sets feeding one engine.
+- The PC-authoritative rep validation.
+- The mode table, which can take new *reaction* and *ready* modes.
+- The mid-set pause policies, keyed by exercise.
+- Pausable timers.
+- The "ready" neutral-pose recognition.
+
 ## Testing done
 
-- **Automated (`npm test`, 153 passing):**
+- **Playtest-2 build (this round):**
+  - **Automated:** `npm test`, 195 passing, of which 42 are new:
+    - **Guided trail:**
+      - every segment is connected and smooth, and only the gate crosses the fence;
+      - marching alone reaches the banner and stops;
+      - with no movement input the hero stays put, and bends are followed without choices;
+      - the hero stops at a fork, waits even while marching, and one choice takes that route (the shrine detour lingers, then continues);
+      - the direct route skips the shrine, and the closed gate stops the trail until it opens;
+      - after the Skeleton, either order reaches the other guardian, then the Warden;
+      - a fork is only offered when both options still lead somewhere;
+      - rejoining picks trail on the same side of a closed gate.
+    - **Pause gestures:**
+      - jumping jacks, squats and push-ups never trigger their own pause gesture;
+      - each exercise's pause pose does;
+      - hands already raised don't count;
+      - the hub fires pause only in exercise mode.
+    - **Ready:**
+      - fires once after standing up from push-ups, and a brief wobble doesn't restart it;
+      - never fires while marching, with hands raised, or out of view;
+      - in ready mode a raised hand can't confirm, while keyboard, touch and gamepad *Continue* can;
+      - the phone sends READY only in ready mode, and the gate only accepts it there.
+    - **Push-ups:**
+      - one noisy frame no longer loses a rep, but a sustained break still does (and is reported);
+      - a learned top counts real reps whose straight arms read 142°, while shallow reps still don't count;
+      - bent arms never become the top, and standing arm movements never count;
+      - diagnostics report no-return, lost-mid-rep, hidden landmarks, a set that couldn't begin, and incomplete reps.
+    - **Camera and tilt:**
+      - calibration measures camera roll, and levelling restores a tilted frame;
+      - push-ups count from a 25°-tilted phone;
+      - the tilt watcher ignores noise and thumps, flags a 12° move and clears when the phone is put back.
+    - **Other:**
+      - gamepad buttons fire once per press and follow mode rules, and the stick dead zone works;
+      - stick and keys never add up;
+      - pausable timers hold the enemy's turn;
+      - the new protocol fields are validated;
+      - quick recalibration is body → neutral → done.
+  - **Browser, end to end:** Connected Play with a guided trail, PC and phone pages through the real relay, driven by a synthetic body:
+    - Marching only, with no lean, reached the banner. After marching stopped, the hero drifted 19 px while decelerating.
+    - Keyboard Assisted traversal moved the hero, and switching back walked it onto the trail to the dummy.
+    - Marching at a fork moved the hero 0 px, and one lean chose the shrine; there, a right hand restored HP.
+    - At the second fork, one lean chose the Mage first.
+    - Mid jumping-jack set, the feet-together pause pose paused the game at 1/3. A quick recalibration ran from the battle pause menu, and after resuming the count was still 1/3.
+    - All four battles were won, and the Warden fight used the "stand tall" ready step, whose *Camera notes* box also showed.
+    - No page errors.
+  - **Regressions:**
+    - the phone-only Motion Trial on the guided trail: all four fights;
+    - the legacy free-roam steering through Connected Play, including disconnect and reconnect;
+    - the classic touch adventure (four fights, save and reload).
+    - All pass.
+- **Automated, previous round (`npm test`, 153 passing then):**
   - **Discrete turning:**
     - one lean gives exactly one turn in the right direction;
     - holding a lean for 10 s never repeats;
@@ -378,7 +555,26 @@ Saved automatically: level/XP, gold, upgrades, abilities, defeated enemies, dung
 
 ## Needs physical testing (not verified)
 
-Nothing in Connected Play has been run on real devices. It has only been exercised with synthetic bodies in headless Chromium on one machine. Specifically unverified:
+**Nothing in this round has been tried by a real person on a real device.** The playtest scenarios to try next:
+
+1. March through the meadow without steering.
+2. Stop marching and check the hero stops promptly.
+3. Choose a route with one deliberate lean.
+4. Complete all four battles without moving the phone.
+5. Pause and recalibrate mid-battle without losing progress.
+6. Stand tall after a set without triggering anything else.
+7. Recover from brief tracking loss.
+
+Specifically unverified:
+
+- Whether a real body's push-ups count from the wall/floor placement. If they don't, the *Camera notes* now say which check failed. Please note what they say.
+- The mid-set pause gestures with a real body, especially the feet-together hold after jacks. Also whether standing up and raising both hands feels natural mid push-ups.
+- The ready step: whether about 0.5 s of standing tall feels responsive, and whether it ever misfires.
+- The iPhone motion-sensor permission prompt, and whether the *phone moved* warning is quiet in normal play.
+- Which cameras Safari lists on your iPhone (Ultra Wide?), whether the widest-zoom option does anything, and how push-up tracking compares.
+- A Bluetooth/USB gamepad on the laptop's browser (Chrome/Edge should support standard pads).
+
+Earlier items, still unverified:
 
 - An iPhone (Safari) pairing with a real PC over Wi-Fi: the self-signed certificate warning flow, camera permission, the MediaPipe frame rate and battery/heat over a session, and wake-lock keeping the screen on.
 - The mkcert trust flow, the Windows/macOS firewall prompts, networks that isolate clients, and the tunnel fallback.
@@ -395,7 +591,9 @@ Nothing in Connected Play has been run on real devices. It has only been exercis
 - The first connection to a self-signed certificate shows a browser warning. Use mkcert to avoid it.
 - Hold exercises (plank) are only in the classic mode and aren't supported by the remote exercise protocol yet.
 - **Single camera placement** is plausible but unproven for push-ups. The floor check and manual fallback exist for this reason.
-- Pause during an exercise set is touch or keyboard only (both-hands-up is part of a jumping jack).
+- Mid-set pause gestures need a body in view. Lying on the floor you must stand first, or use touch, keyboard or gamepad (voice is deferred).
+- Guided traversal uses one hand-built trail for the meadow. New areas need their own trail graphs.
+- Roll correction only undoes sideways tilt. Pitch and perspective from a phone leaning against a wall are not corrected.
 - The camera runs continuously; expect battery drain and warmth. Keep the phone on a charger.
 - **iOS Safari:** the camera needs HTTPS. Screen wake-lock needs iOS 16.4+. Keep the page in the foreground. Older iPhones may need the *Fast* tracking model.
 - Reverse lunges and mountain climbers have no detectors yet. The game does not judge exercise form and makes no medical claims.

@@ -14,6 +14,7 @@ import { useSave } from './ui/useSave';
 import { TrialRun } from './ui/TrialRun';
 import { TrialSetup } from './ui/TrialSetup';
 import { ConnectedSetup } from './ui/Connected';
+import { startMotion, tilt } from './input/tilt';
 import type { Difficulty } from './exercise/types';
 
 type Screen = 'title' | 'newgame' | 'world' | 'battle' | 'trialsetup' | 'trial' | 'connectsetup' | 'connected';
@@ -147,6 +148,9 @@ export default function App() {
           onBack={() => setScreen('title')}
           onStart={() => {
             audio.unlock();
+            // Motion-sensor permission must be requested from this tap (iOS);
+            // it is only used to notice if the phone gets knocked out of place.
+            void startMotion(tilt);
             setScreen('trial');
           }}
         />

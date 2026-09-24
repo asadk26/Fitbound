@@ -33,6 +33,8 @@ export interface PhoneStatus {
   calibrated: boolean;
   tracking: 'good' | 'partial' | 'lost';
   error?: string;
+  /** The phone's motion sensor says it moved since calibration. */
+  moved?: boolean;
 }
 
 export interface LinkState {
@@ -58,6 +60,8 @@ export class HostLink {
   private offs: (() => void)[] = [];
   /** The exercise set currently receiving reps, if any. */
   activeSet: RemoteSet | null = null;
+  /** The latest rep-diagnostics summary from the phone (arrives just after a set ends). */
+  lastDiag: Extract<CtrlMsg, { type: 'EXERCISE_DIAG' }> | null = null;
   /** Rejected messages, by reason (shown in the debug hook and logged). */
   readonly rejected: Record<string, number> = {};
 
@@ -118,7 +122,7 @@ export class HostLink {
       this.offs.push(
         this.hub.onMode((mode, epoch) => {
           if (mode === 'calibration') this.set({ calibration: null });
-          this.send({ type: 'MODE', mode, epoch });
+          this.send({ type: 'MODE', mode, epoch, ...(mode === 'calibration' ? { calibration: this.hub.calibrationKind } : {}) });
         }),
         subscribeSave(() => this.sendSettings()),
       );
@@ -205,7 +209,7 @@ export class HostLink {
   private welcome(): void {
     this.lastHeard = performance.now();
     this.set({ controller: 'connected', pairing: null, error: null });
-    this.send({ type: 'MODE', mode: this.hub.mode, epoch: this.hub.epoch });
+    this.send({ type: 'MODE', mode: this.hub.mode, epoch: this.hub.epoch, ...(this.hub.mode === 'calibration' ? { calibration: this.hub.calibrationKind } : {}) });
     this.sendSettings();
   }
 
@@ -231,8 +235,8 @@ export class HostLink {
       case 'HEARTBEAT':
         return;
       case 'STATUS': {
-        const { camera, model, calibrated, tracking, error } = msg;
-        this.set({ status: { camera, model, calibrated, tracking, error } });
+        const { camera, model, calibrated, tracking, error, moved } = msg;
+        this.set({ status: { camera, model, calibrated, tracking, error, moved } });
         return;
       }
       case 'TELEMETRY':
@@ -245,6 +249,10 @@ export class HostLink {
       }
       case 'EXERCISE_STATUS':
         this.activeSet?.status(msg);
+        return;
+      case 'EXERCISE_DIAG':
+        this.activeSet?.diag(msg);
+        this.lastDiag = msg.setId === this.activeSet?.setId || !this.activeSet ? msg : this.lastDiag;
         return;
       case 'EXERCISE_REP': {
         const verdict = this.activeSet ? this.activeSet.rep(msg, now) : 'wrong-set';

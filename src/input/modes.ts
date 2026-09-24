@@ -8,16 +8,20 @@
  *  - explore:     march moves, a lean turns, gestures act.
  *  - dialogue:    a lean moves the highlighted answer, gestures choose/back.
  *  - menu:        like dialogue (pause, rewards, between sets).
- *  - exercise:    only the active exercise detector counts; the only other
- *                 command is pause, so a jumping jack can't be read as
- *                 "pause" and a squat can't be read as a step.
+ *  - exercise:    only the active exercise detector counts, plus a pause
+ *                 gesture chosen per exercise so ordinary reps can't trigger
+ *                 it (see exercisePause.ts); nothing else.
+ *  - ready:       between a finished set and the enemy's turn: the game
+ *                 waits for the player to stand tall with hands relaxed
+ *                 (or a Continue press). Only "ready" and pause count, so
+ *                 standing up after push-ups can't be read as anything else.
  *  - off:         nothing.
  */
-export type InputMode = 'off' | 'calibration' | 'explore' | 'dialogue' | 'menu' | 'exercise';
+export type InputMode = 'off' | 'calibration' | 'explore' | 'dialogue' | 'menu' | 'exercise' | 'ready';
 
-export const INPUT_MODES: readonly InputMode[] = ['off', 'calibration', 'explore', 'dialogue', 'menu', 'exercise'];
+export const INPUT_MODES: readonly InputMode[] = ['off', 'calibration', 'explore', 'dialogue', 'menu', 'exercise', 'ready'];
 
-export type CommandType = 'move' | 'turn' | 'nav' | 'confirm' | 'back' | 'pause' | 'step';
+export type CommandType = 'move' | 'turn' | 'nav' | 'confirm' | 'back' | 'pause' | 'step' | 'ready';
 
 const ALLOWED: Record<InputMode, readonly CommandType[]> = {
   off: [],
@@ -26,6 +30,7 @@ const ALLOWED: Record<InputMode, readonly CommandType[]> = {
   dialogue: ['nav', 'confirm', 'back', 'pause'],
   menu: ['nav', 'confirm', 'back', 'pause'],
   exercise: ['pause'],
+  ready: ['ready', 'pause'],
 };
 
 export function commandAllowed(mode: InputMode, type: CommandType): boolean {
@@ -44,14 +49,17 @@ export interface DetectorSet {
   gestures: boolean;
   exercise: boolean;
   calibration: boolean;
+  /** The standing-neutral "ready" check. */
+  neutral: boolean;
 }
 
 export function detectorsFor(mode: InputMode): DetectorSet {
   return {
     march: mode === 'explore' || mode === 'calibration',
     lean: mode === 'explore' || isMenuMode(mode) || mode === 'calibration',
-    gestures: mode === 'explore' || isMenuMode(mode) || mode === 'calibration',
+    gestures: mode === 'explore' || isMenuMode(mode) || mode === 'calibration' || mode === 'ready',
     exercise: mode === 'exercise',
     calibration: mode === 'calibration',
+    neutral: mode === 'ready',
   };
 }
