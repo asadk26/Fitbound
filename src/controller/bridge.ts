@@ -1,7 +1,7 @@
 import { SetDiagnostics } from '../exercise/diagnostics';
 import { levelFrame } from '../exercise/level';
 import { EXERCISES } from '../exercise/registry';
-import { ExerciseSessionController, type SessionStage } from '../exercise/session';
+import { ExerciseSessionController, trialSessionOptions, type SessionStage } from '../exercise/session';
 import type { DiagBlocker, ExerciseEvent, GuidanceCode, PoseFrame, TrackingQuality } from '../exercise/types';
 import { CalibrationFlow, type CalKind, type CalState } from '../input/calibration';
 import { InputHub, type InputEvent } from '../input/InputHub';
@@ -9,6 +9,7 @@ import { detectorsFor, type InputMode } from '../input/modes';
 import { motionPreset, type MotionReading, type NeutralPose } from '../input/motion';
 import type { CameraState, CtrlPayload, GameMsg, ModelState } from '../net/protocol';
 import type { TiltWatch } from '../input/tilt';
+import { viewSummary } from '../net/view';
 
 /**
  * The phone's brain in Connected Play. It runs the detectors the game asks
@@ -25,7 +26,9 @@ import type { TiltWatch } from '../input/tilt';
  *               gesture → PAUSE, and rep diagnostics → EXERCISE_DIAG
  *   ready       standing tall, hands relaxed → READY
  *
- * Only these interpreted events leave the phone — never frames or landmarks.
+ * Only these interpreted events leave the phone — never landmarks. While
+ * tracking is poor it also sends a words-only VIEW (which body parts are
+ * visible) and, only if the player switched it on, a tiny PEEK preview.
  * No DOM here, so the whole pipeline can be tested with synthetic poses.
  */
 export const MOVE_REFRESH_MS = 400;
@@ -33,6 +36,12 @@ export const TELEMETRY_MS = 100;
 export const STATUS_MS = 2000;
 export const EXERCISE_STATUS_MS = 150;
 export const DIAG_MS = 1000;
+/** "What the camera sees" while tracking is poor: parts list, and opt-in preview. */
+export const VIEW_MS = 500;
+export const PEEK_MS = 1000;
+/** Poor for this long before the TV shows it; good for this long before it hides. */
+export const VIEW_SHOW_MS = 500;
+export const VIEW_HIDE_MS = 1000;
 
 interface ActiveSet {
   id: string;
@@ -74,6 +83,17 @@ export class ControllerBridge {
   /** Optional: reports whether the phone moved since calibration. */
   tilt: TiltWatch | null = null;
   private calKind: CalKind = 'full';
+  /** Which camera is in use, shown on the TV so the player knows. */
+  cameraLabel: string | undefined;
+  /** Opt-in (off by default): grabs a tiny low-res still for the TV while tracking is lost. */
+  peek: (() => string | null) | null = null;
+  peekEnabled = false;
+  private poorSince: number | null = null;
+  private goodSince: number | null = null;
+  private viewShown = false;
+  private viewAt = -Infinity;
+  private peekShown = false;
+  private peekAt = -Infinity;
   /** Last command sent, for the dashboard ("Turn left", "Marching"...). */
   lastAction: { label: string; at: number } | null = null;
   reading: MotionReading | null = null;
@@ -116,7 +136,7 @@ export class ControllerBridge {
         if (!ex?.createDetector || ex.kind !== 'reps') return;
         const detector = ex.createDetector(msg.difficulty);
         // The PC decides when the set is complete; the phone just keeps counting.
-        const ctrl = new ExerciseSessionController(ex, detector, 10_000, (e) => this.onExerciseEvent(msg.setId, e), { setupStuckMs: 20000, activeStuckMs: 20000 });
+        const ctrl = new ExerciseSessionController(ex, detector, 10_000, (e) => this.onExerciseEvent(msg.setId, e), trialSessionOptions(ex.id));
         this.set = { id: msg.setId, exerciseId: ex.id, ctrl, lastStage: null, lastSentAt: -Infinity, diag: new SetDiagnostics(), diagAt: -Infinity };
         this.hub.setExercise(ex.id);
         this.progress = { setId: msg.setId, exerciseName: ex.name, count: 0, target: 0, manualMode: false, paused: false };
@@ -237,6 +257,7 @@ export class ControllerBridge {
         });
       }
     } else this.tracking = frame ? 'good' : 'lost';
+    this.updateView(frame, now);
     this.tick(now);
   }
 
@@ -258,6 +279,46 @@ export class ControllerBridge {
     this.sendStatus(false, now);
   }
 
+  /** Tell the TV what the camera can see while tracking is poor; clear it once good again. */
+  private updateView(frame: PoseFrame | null, now: number): void {
+    if (this.tracking === 'good') {
+      this.poorSince = null;
+      this.goodSince ??= now;
+      if (now - this.goodSince >= VIEW_HIDE_MS) this.clearView();
+      return;
+    }
+    this.goodSince = null;
+    this.poorSince ??= now;
+    if (now - this.poorSince < VIEW_SHOW_MS) return;
+    if (now - this.viewAt >= VIEW_MS) {
+      this.viewAt = now;
+      this.viewShown = true;
+      this.out({ type: 'VIEW', view: viewSummary(frame) });
+    }
+    if (this.peekEnabled && this.peek && now - this.peekAt >= PEEK_MS) {
+      this.peekAt = now;
+      const image = this.peek();
+      if (image) {
+        this.peekShown = true;
+        this.out({ type: 'PEEK', image });
+      }
+    } else if (!this.peekEnabled) this.clearPeek();
+  }
+
+  private clearView(): void {
+    if (this.viewShown) this.out({ type: 'VIEW', view: null });
+    this.viewShown = false;
+    this.viewAt = -Infinity;
+    this.clearPeek();
+  }
+
+  /** Stop any preview on the TV now (e.g. the player switched it off). */
+  clearPeek(): void {
+    if (this.peekShown) this.out({ type: 'PEEK', image: null });
+    this.peekShown = false;
+    this.peekAt = -Infinity;
+  }
+
   sendStatus(force = false, now = this.clock()): void {
     const moved = !!this.tilt?.moved;
     const s = {
@@ -268,6 +329,7 @@ export class ControllerBridge {
       tracking: this.tracking,
       ...(this.cameraError ? { error: this.cameraError.slice(0, 200) } : {}),
       ...(moved ? { moved } : {}),
+      ...(this.cameraLabel ? { cameraLabel: this.cameraLabel.slice(0, 80) } : {}),
     };
     const key = JSON.stringify(s);
     if (!force && key === this.statusKey && now - this.statusAt < STATUS_MS) return;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import qrcode from 'qrcode-generator';
 import { updateSave } from '../game/store';
 import { host, type LinkState } from '../net/host';
+import { missingParts } from '../net/view';
 import type { CalKind, CalState } from '../input/calibration';
 import { CalibrationPanel, useCalibrationCues, type CalibrationResult } from './Calibration';
 import { useMotion } from './motionUi';
@@ -67,6 +68,74 @@ export function MotionSettings() {
       {seg('Rep diagnostics', m.diagnostics ? 'on' : 'off', [['on', 'Show after sets'], ['off', 'Hide']], (v) => updateSave((s) => void (s.settings.motion.diagnostics = v === 'on')))}
       <p className="muted small">Assisted traversal lets you explore with a gamepad (paired with this computer) or the arrow keys when you want a break from marching. Controller movement isn't counted as exercise; battles still use the camera. Switch any time with Select on the gamepad, T on the keyboard, or from Pause.</p>
     </>
+  );
+}
+
+/**
+ * How the player gets around between encounters, chosen up front: marching in
+ * place, or a gamepad / the keyboard (the battles still use the camera).
+ */
+export function TraversalPicker() {
+  const save = useSave();
+  const m = save.settings.motion;
+  const assisted = m.navigation === 'guided' && m.traversal === 'assisted';
+  const pick = (a: boolean) =>
+    updateSave((s) => {
+      s.settings.motion.traversal = a ? 'assisted' : 'active';
+      if (a) s.settings.motion.navigation = 'guided';
+    });
+  return (
+    <div className="trav-pick">
+      <b>How will you explore?</b>
+      <div className="trav-cards">
+        <button className={`trav-card ${!assisted ? 'on' : ''}`} onClick={() => pick(false)} aria-pressed={!assisted}>
+          <span className="trav-icon">🚶</span>
+          <b>March in place</b>
+          <small>Your steps move the hero along the trail. Extra exercise between battles.</small>
+        </button>
+        <button className={`trav-card ${assisted ? 'on' : ''}`} onClick={() => pick(true)} aria-pressed={assisted}>
+          <span className="trav-icon">🎮</span>
+          <b>Gamepad or keyboard</b>
+          <small>Stick or arrow keys between battles, for a breather. Not counted as exercise; battles still use the camera.</small>
+        </button>
+      </div>
+      <p className="muted small">Switch any time: Select on the gamepad, T on the keyboard, or from Pause.</p>
+    </div>
+  );
+}
+
+/**
+ * "What the camera sees" while tracking is poor, from the phone: which body
+ * parts are hidden and where you are in the frame. Normally words only; a
+ * tiny preview appears only if the player switched it on on the phone.
+ */
+export function CameraSees({ compact = false }: { compact?: boolean }) {
+  const s = useLink();
+  const v = s.view;
+  if (!v) return null;
+  const { missing, partial } = missingParts(v);
+  const nobody = !v.box;
+  const b = v.box;
+  const edge = b && (b[0] < 0.03 || b[2] > 0.97 || b[1] < 0.03 || b[3] > 0.97);
+  let advice: string;
+  if (nobody) advice = 'The camera can’t find you. Something may be in front of it, or you’re out of view.';
+  else if (missing.length) advice = `Can’t see your ${missing.join(', ')}${edge ? ' — you may be at the edge of the picture' : ' — something may be blocking them'}.`;
+  else if (partial.length) advice = `Only one side of your ${partial.join(', ')} is clear${edge ? ' — move toward the middle' : ''}.`;
+  else advice = edge ? 'You’re at the edge of the picture — move toward the middle.' : 'Hold still a moment…';
+  const cam = s.status?.cameraLabel;
+  return (
+    <div className={`cam-sees ${compact ? 'compact' : ''}`}>
+      <div className="cam-sees-frame" aria-hidden="true">
+        {s.peek && <img src={s.peek} alt="" />}
+        {b && <i style={{ left: `${Math.max(0, b[0]) * 100}%`, top: `${Math.max(0, b[1]) * 100}%`, right: `${Math.max(0, 1 - b[2]) * 100}%`, bottom: `${Math.max(0, 1 - b[3]) * 100}%` }} />}
+        {nobody && !s.peek && <span>?</span>}
+      </div>
+      <div className="cam-sees-text">
+        <b>What the camera sees</b>
+        <span>{advice}</span>
+        {cam && <small className="muted">{cam}</small>}
+      </div>
+    </div>
   );
 }
 
@@ -163,6 +232,14 @@ export function ConnectedSetup({ onStart, onBack }: { onStart: () => void; onBac
             </Check>
           </ol>
         )}
+        {camOk && (
+          <p className="muted small">
+            Using: <b>{st?.cameraLabel ?? 'phone camera'}</b> — to switch between front and back, use the Camera card on the phone.
+          </p>
+        )}
+        {modelOk && !seen && <CameraSees />}
+
+        <TraversalPicker />
 
         <details className="setup-settings">
           <summary>Controls</summary>
@@ -219,7 +296,8 @@ export function ControllerStatus({ big = false }: { big?: boolean }) {
     <div className={`ctrl-status ${big ? 'big' : ''} ${conn ? '' : 'lost'}`}>
       <span className={`dot ${conn ? 'ok' : 'bad'}`}>📱 {conn ? 'Phone connected' : 'Phone disconnected'}</span>
       {conn && <span className={`dot ${trk === 'good' ? 'ok' : trk === 'partial' ? 'warn' : 'bad'}`}>{trk === 'good' ? 'Tracking you' : trk === 'partial' ? 'Weak tracking' : 'Not seeing you'}</span>}
-      {big && conn && <span className="muted small">The camera picture stays on the phone — nothing is sent to this computer but your movements.</span>}
+      {conn && <CameraSees compact={!big} />}
+      {big && conn && !s.peek && <span className="muted small">The camera picture stays on the phone — nothing is sent to this computer but your movements.</span>}
     </div>
   );
 }

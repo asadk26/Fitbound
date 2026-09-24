@@ -262,3 +262,14 @@ select {
   width: 100%;
   margin: 8px 0;
 }
+/* Camera choice: front/back up front, the full list folded below. */
+.campick .row button {
+  min-height: 52px;
+  font-size: 1.05rem;
+}
+.campick .row button.big {
+  outline: 3px solid var(--accent);
+}
+.campick > .small {
+  color: var(--muted);
+}

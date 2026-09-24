@@ -3,7 +3,7 @@ import type { CalState } from '../input/calibration';
 import { input as defaultHub, type InputHub } from '../input/InputHub';
 import type { MotionReading } from '../input/motion';
 import { ControllerGate, toCommand } from './gate';
-import type { CtrlMsg, GameMsg, Telemetry } from './protocol';
+import type { CtrlMsg, GameMsg, Telemetry, ViewSummary } from './protocol';
 import type { RemoteSet } from './remoteSet';
 
 /**
@@ -35,6 +35,8 @@ export interface PhoneStatus {
   error?: string;
   /** The phone's motion sensor says it moved since calibration. */
   moved?: boolean;
+  /** Which camera the phone is using (as the browser names it). */
+  cameraLabel?: string;
 }
 
 export interface LinkState {
@@ -45,12 +47,16 @@ export interface LinkState {
   status: PhoneStatus | null;
   calibration: CalState | null;
   error: string | null;
+  /** What the camera can see while tracking is poor (no image). */
+  view: ViewSummary | null;
+  /** Opt-in tiny preview while tracking is lost; never stored. */
+  peek: string | null;
 }
 
 type Listener = (s: LinkState) => void;
 
 export class HostLink {
-  state: LinkState = { relay: 'idle', pairing: null, controller: 'none', status: null, calibration: null, error: null };
+  state: LinkState = { relay: 'idle', pairing: null, controller: 'none', status: null, calibration: null, error: null, view: null, peek: null };
   readonly gate = new ControllerGate();
   private ws: WebSocket | null = null;
   private listeners = new Set<Listener>();
@@ -141,7 +147,7 @@ export class HostLink {
     this.gate.unbind();
     this.hub.stop();
     this.hub.useRemote(false);
-    this.state = { relay: 'idle', pairing: null, controller: 'none', status: null, calibration: null, error: null };
+    this.state = { relay: 'idle', pairing: null, controller: 'none', status: null, calibration: null, error: null, view: null, peek: null };
     this.listeners.forEach((f) => f(this.state));
   }
 
@@ -235,8 +241,8 @@ export class HostLink {
       case 'HEARTBEAT':
         return;
       case 'STATUS': {
-        const { camera, model, calibrated, tracking, error, moved } = msg;
-        this.set({ status: { camera, model, calibrated, tracking, error, moved } });
+        const { camera, model, calibrated, tracking, error, moved, cameraLabel } = msg;
+        this.set({ status: { camera, model, calibrated, tracking, error, moved, cameraLabel } });
         return;
       }
       case 'TELEMETRY':
@@ -249,6 +255,12 @@ export class HostLink {
       }
       case 'EXERCISE_STATUS':
         this.activeSet?.status(msg);
+        return;
+      case 'VIEW':
+        this.set({ view: msg.view });
+        return;
+      case 'PEEK':
+        this.set({ peek: msg.image });
         return;
       case 'EXERCISE_DIAG':
         this.activeSet?.diag(msg);
@@ -281,6 +293,7 @@ export class HostLink {
   private lost(): void {
     this.hub.stop();
     this.hub.setRemoteReading(null);
+    if (this.state.peek || this.state.view) this.set({ peek: null, view: null });
     if (this.state.controller === 'connected') this.set({ controller: 'lost' });
   }
 }

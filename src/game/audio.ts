@@ -222,7 +222,7 @@ class Audio {
     if (!this.voiceOn || typeof speechSynthesis === 'undefined') return;
     try {
       if (interrupt) speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
+      const u = new SpeechSynthesisUtterance(speakable(text));
       u.rate = 1.05;
       u.pitch = 1;
       speechSynthesis.speak(u);
@@ -230,6 +230,14 @@ class Audio {
       /* speech unavailable */
     }
   }
+}
+
+/**
+ * Some voices read "Push-ups" as "push U-P-S" (the shipping company). Speak
+ * exercise names in a form every voice pronounces as words.
+ */
+export function speakable(text: string): string {
+  return text.replace(/\bpush-ups\b/gi, 'push ups').replace(/\bpush-up\b/gi, 'push up');
 }
 
 export const audio = new Audio();

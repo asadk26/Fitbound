@@ -65,6 +65,8 @@ export class ControllerGate {
       case 'TELEMETRY':
       // Display-only: matched to the set by id, never awards anything.
       case 'EXERCISE_DIAG':
+      case 'VIEW':
+      case 'PEEK':
         return { ok: true, msg };
       case 'CALIBRATION':
         return ctx.mode === 'calibration' ? { ok: true, msg } : { ok: false, reason: 'mode' };

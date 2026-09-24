@@ -35,11 +35,13 @@ All three share one input system, one combat engine, one progression system and 
    npm run play            # builds, then starts the relay
    ```
    It prints two addresses: `http://localhost:8080` for the PC and `https://<PC-LAN-IP>:8443/controller.html` for the phone.
+
+   **Windows shortcut:** double-click **`Play FITBOUND.bat`** in the repo folder. It installs anything new, builds, starts the relay and opens `http://localhost:8080` in your browser. Keep its window open while you play and close it to stop. With GitHub Desktop, click *Fetch origin* → *Pull* first to get the latest version.
 2. **TV:** connect the PC to the TV with HDMI and open **http://localhost:8080** in Chrome, Edge or Firefox on the PC. Press F11 for full screen. Turn the PC's sound on; the PC is the audio source.
 3. Choose **Connected Play · PC + phone**. A QR code, the phone address and a 6-digit code appear.
 4. **Phone** (same Wi-Fi as the PC): scan the QR code with the camera app and open it in Safari or Chrome. Alternatively, open the phone address and type the code.
    - The first time, the browser warns that the connection isn't private, because the PC uses its own certificate. On iPhone choose *Show Details → visit this website → Visit Website*. On Chrome choose *Advanced → Proceed*. See *Networking and HTTPS* to remove the warning.
-5. Place the phone (see *Phone placement*), tap **Start camera** and allow camera access. The TV ticks off *Phone connected → Camera allowed → Pose tracking ready → The phone can see you*, then starts calibration by itself after 5 s (or click **Start calibration**).
+5. Place the phone (see *Phone placement*), pick **Front** or **Back** on the phone's Camera card, tap **Start … camera** and allow camera access. The TV shows which camera is in use. The TV ticks off *Phone connected → Camera allowed → Pose tracking ready → The phone can see you*, then starts calibration by itself after 5 s (or click **Start calibration**).
 6. From here it's hands-free. Calibration, exploration, dialogue, rewards and battles all run from your body, with instructions, voice and sound on the TV.
 
 The phone shows a high-contrast status dashboard: connection, camera, tracking, the game's current mode, the current exercise and rep progress, and the last recognised move. The camera preview is shown only while setting up or when you're out of view, and repaints at 10 fps to save battery. **Touch controls** (turn, walk, interact, back, choose) and a **Pause** button are always available as a fallback.
@@ -58,6 +60,7 @@ The phone shows a high-contrast status dashboard: connection, camera, tracking, 
 
 `src/net/protocol.ts` defines every message and validates it field by field.
 
+- **Phone → PC (while tracking is poor):** `VIEW {parts, box}`, words-only "what the camera sees" (which body parts are visible, 0/1/2 sides, and the body's box in the frame), about twice a second; and `PEEK {image}`, the opt-in tiny preview (see *What the camera sees*). Both are display-only; the gate accepts them in any mode and they never affect gameplay.
 - **Phone → PC:** `MOVE_START {intensity}` (refreshed every 0.4 s while marching) and `MOVE_STOP`; `TURN_LEFT`, `TURN_RIGHT`, `NAV {dir}`, `INTERACT`, `BACK`, `PAUSE`, `STEP`; `CALIBRATION {step, progress, hint}`; `EXERCISE_STATUS {setId, stage, tracking, guidance…}`; `EXERCISE_REP {setId, exerciseId, index, source}`; `MANUAL_MODE`; `STATUS {camera, model, calibrated, tracking}`; `TELEMETRY` (display-only meters, 10 Hz); `HEARTBEAT` (1 Hz).
 - **PC → phone:** `MODE {mode, epoch}`, `SETTINGS`, `EXERCISE_BEGIN/PROGRESS/CONTROL/END`, `GAME` (objective text for the dashboard), `ACK`.
 - **Sequence numbers and epochs:** every phone message carries a sequence number that only increases, plus the *epoch* of the input mode it was produced in.
@@ -87,7 +90,15 @@ Accepted reps become the same `ExerciseEvent`s that single-device play produces,
 - **One controller per session.** A paired phone gets a session id and a secret resume key (kept in that browser tab) so it can reconnect after a Wi-Fi blip. *Pair a different phone* revokes it.
 - WebSocket upgrades whose `Origin` isn't the relay's own page are refused, so other websites can't connect. Messages are capped at 16 KB, and floods are dropped.
 - The pages' Content-Security-Policy allows network connections only to their own origin and relay socket. That also keeps blocking MediaPipe's built-in telemetry.
-- Nothing is uploaded or stored: no video, frames or landmarks leave the phone. There are no accounts, cloud services or API keys.
+- Nothing is uploaded or stored. By default no video, frames or landmarks leave the phone. The one exception is the **opt-in** tiny preview below, which goes only to your PC over the paired link and is never saved. There are no accounts, cloud services or API keys.
+
+### What the camera sees (when tracking is lost)
+
+If the phone stops seeing you — say the back camera is blocked by a chair leg while you're on the floor — the TV now shows a **What the camera sees** panel in place of the phone status, until tracking has been good again for a second:
+
+- **Always on, no images:** a small frame with a dashed box where your body is, and plain words: *"Can't see your hands, feet — something may be blocking them"*, *"You're at the edge of the picture"*, or *"The camera can't find you"*. The phone sends only which body parts it can see and where (a few numbers), twice a second, and only while tracking is poor. It also appears on the Connected Play setup screen, next to the name of the camera in use.
+- **Opt-in tiny preview:** a checkbox on the phone, *Show a tiny camera preview on the TV when it can't see you*, **off by default** and remembered on that phone. When on, the phone also sends a 128-pixel-wide, low-quality JPEG (about 1–5 KB) **once a second, only while tracking is lost**. It goes over the same paired, origin-checked link to your PC only. The PC shows it and keeps only the latest one in memory; it is cleared when tracking recovers, the phone disconnects, or you switch it off. Nothing is written to disk and nothing goes to the internet.
+- **Privacy tradeoff:** the original Connected Play rule was "no camera images leave the phone". The preview relaxes that, only when you choose to. It's a real picture of your room, even at 128 px, so anyone who can see the TV or the PC's memory could see it. The PC validates every preview: it must be a `data:image/jpeg;base64` string of at most 14,000 characters, anything else is dropped. Leave it off and you still get the words-only panel. This isn't video streaming: tracking still runs on the phone, and one tiny still a second adds no lag. It's only there to help you spot what's blocking the view.
 
 ### Getting around: guided trail (default)
 
@@ -173,6 +184,8 @@ If the phone disconnects, or goes silent for 3 s (locked, backgrounded, Wi-Fi dr
 
 ### Push-up reliability and rep diagnostics
 
+**No countdown for push-ups:** counting starts as soon as the camera sees you in push-up position (a quarter-second check, down from a 0.7 s hold plus a 3 s countdown), so you don't hold a plank waiting. Squats and jumping jacks keep their *3-2-1*.
+
 Every condition in the push-up state machine was reviewed. These could stop a rep from counting:
 
 | Condition | Before | Now |
@@ -201,7 +214,8 @@ The two bold rows are the likely culprits for real, low-camera push-ups: 2D elbo
 - **Tilt (roll):** detectors now see each frame rotated to undo the phone's sideways tilt. The tilt is measured from you during calibration (a standing torso is vertical), not from the phone's motion sensor. Turning sensor data into "down in this video frame" depends on how iOS rotates and mirrors camera frames and on sign conventions that differ between browsers; getting that wrong would *double* the tilt. Tilts over 25° aren't corrected.
 - **Pitch and perspective** (a phone leaning back against a wall) can't be undone from a single 2D view. The ±45° body check is tolerant of it, and the learned top angle absorbs its effect on elbow angles.
 - **"Phone moved" warning:** the phone's motion sensor (iOS asks permission when you tap *Start camera*) watches only the angle between gravity now and at calibration. That comparison is independent of axis conventions. It must be over 6° for 1.5 s, with heavy smoothing, so footsteps, thumps and sensor noise don't trigger it. If the phone moved, the TV and phone say so and suggest *Pause → Recalibrate*. Without sensor permission, this warning simply doesn't appear.
-- **Lens:** the phone's Start screen and dashboard list the cameras the browser exposes. The names appear once the camera has been allowed; on recent iPhones Safari may list an *Ultra Wide* camera. A *widest zoom* option applies the lowest zoom a camera reports (e.g. 0.5×) if it offers one. Neither is guaranteed across iPhone models or iOS versions; the default camera always works. Wider views make you smaller in the picture, which can reduce tracking reliability, so compare push-ups with each.
+- **Choosing a camera:** the phone's Start screen has a **Camera** card with big *Front (selfie)* / *Back (sharper)* buttons. The start button says which one will start, and the choice is remembered on the phone. The dashboard has the same card, with *Restart camera with this choice*. The PC setup screen shows the name of the camera in use.
+- **Lens:** the phone's Camera card (*More cameras and zoom*) lists the cameras the browser exposes. The names appear once the camera has been allowed; on recent iPhones Safari may list an *Ultra Wide* camera. A *widest zoom* option applies the lowest zoom a camera reports (e.g. 0.5×) if it offers one. Neither is guaranteed across iPhone models or iOS versions; the default camera always works. Wider views make you smaller in the picture, which can reduce tracking reliability, so compare push-ups with each.
 
 ### Voice commands (researched, deferred)
 
@@ -452,6 +466,33 @@ Already in place and reusable:
 - The "ready" neutral-pose recognition.
 
 ## Testing done
+
+- **Playtest-3 fixes (this round):**
+  - **What was fixed or added:**
+    - the narrator now says "push ups" (it was spelling out "U-P-S");
+    - push-ups have no countdown;
+    - *How will you explore?* (March in place / Gamepad or keyboard) is on the setup screens;
+    - camera choice is up front on the phone;
+    - the "What the camera sees" panel and the opt-in preview;
+    - the `Play FITBOUND.bat` launcher.
+  - **Automated:** `npm test`, 202 passing, 7 new:
+    - pronunciation;
+    - push-ups go straight from position to counting, and other exercises keep the countdown;
+    - the view summary names hidden parts;
+    - VIEW, PEEK and camera-label validation (rejects non-JPEG or oversized images, `javascript:` URLs, bad part values, out-of-range boxes);
+    - the gate accepts them in any mode;
+    - the phone sends VIEW about twice a second only while lost, and clears it after;
+    - no preview unless opted in; about once a second when opted in; cleared on recovery.
+  - **Headless Chromium, PC + phone through the real relay:**
+    - the traversal cards switch the setting;
+    - the phone's Front/Back buttons change the start button;
+    - the PC shows the camera label;
+    - losing tracking shows the panel on setup and in calibration;
+    - turning the preview on sends a ~1.3 KB JPEG that the PC displays;
+    - the panel and preview clear once tracking is back;
+    - after switching the preview off, none are sent;
+    - no console errors.
+  - **Not verified:** the `.bat` launcher on a real Windows PC (it was written for `cmd.exe` but couldn't be run here), and the preview and camera labels on a real iPhone.
 
 - **Playtest-2 build (this round):**
   - **Automated:** `npm test`, 195 passing, of which 42 are new:

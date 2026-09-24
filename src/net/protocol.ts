@@ -39,10 +39,27 @@ export interface Telemetry {
   readyProgress: number;
 }
 
+/** Body parts, each 0 = not seen, 1 = one side seen, 2 = both sides seen. */
+export const VIEW_PARTS = ['head', 'shoulders', 'elbows', 'wrists', 'hips', 'knees', 'ankles'] as const;
+export type ViewPart = (typeof VIEW_PARTS)[number];
+
+/**
+ * What the camera can see, without any image: which body parts are visible
+ * and where the body sits in the frame (0..1 box). Sent while tracking is
+ * poor so the TV can say e.g. "can't see your wrists or ankles".
+ */
+export interface ViewSummary {
+  parts: Record<ViewPart, 0 | 1 | 2>;
+  box: [number, number, number, number] | null;
+}
+
+/** Longest preview image accepted (a ~128×72 JPEG is 3–6 KB). */
+export const MAX_PEEK_CHARS = 14_000;
+
 export type CtrlPayload =
   | { type: 'HELLO'; version: number; facing: 'user' | 'environment' }
   | { type: 'HEARTBEAT' }
-  | { type: 'STATUS'; camera: CameraState; model: ModelState; calibrated: boolean; tracking: TrackingQuality; error?: string; moved?: boolean }
+  | { type: 'STATUS'; camera: CameraState; model: ModelState; calibrated: boolean; tracking: TrackingQuality; error?: string; moved?: boolean; cameraLabel?: string }
   | { type: 'TELEMETRY'; r: Telemetry }
   | { type: 'MOVE_START'; intensity: number }
   | { type: 'MOVE_STOP' }
@@ -66,7 +83,10 @@ export type CtrlPayload =
     }
   | { type: 'EXERCISE_DIAG'; setId: string; summary: DiagSummary }
   | { type: 'EXERCISE_REP'; setId: string; exerciseId: string; index: number; source: RepSource }
-  | { type: 'MANUAL_MODE'; setId: string };
+  | { type: 'MANUAL_MODE'; setId: string }
+  | { type: 'VIEW'; view: ViewSummary | null }
+  /** Opt-in only: a tiny, low-resolution preview while tracking is lost (null clears it). */
+  | { type: 'PEEK'; image: string | null };
 
 export type CtrlMsg = CtrlPayload & { seq: number; epoch: number };
 
@@ -190,7 +210,18 @@ export function parseCtrlMsg(v: unknown): CtrlMsg | null {
       if (!oneOf(v.camera, ['off', 'starting', 'running', 'error'] as const) || !oneOf(v.model, ['loading', 'ready', 'error'] as const) || typeof v.calibrated !== 'boolean' || !oneOf(v.tracking, TRACKING)) return null;
       if (v.error !== undefined && !text(v.error, 200)) return null;
       if (v.moved !== undefined && typeof v.moved !== 'boolean') return null;
-      return { ...base, type: 'STATUS', camera: v.camera, model: v.model, calibrated: v.calibrated, tracking: v.tracking, ...(v.error ? { error: v.error as string } : {}), ...(v.moved ? { moved: true } : {}) };
+      if (v.cameraLabel !== undefined && !text(v.cameraLabel, 80)) return null;
+      return {
+        ...base,
+        type: 'STATUS',
+        camera: v.camera,
+        model: v.model,
+        calibrated: v.calibrated,
+        tracking: v.tracking,
+        ...(v.error ? { error: v.error as string } : {}),
+        ...(v.moved ? { moved: true } : {}),
+        ...(v.cameraLabel ? { cameraLabel: v.cameraLabel as string } : {}),
+      };
     case 'TELEMETRY': {
       const r = telemetry(v.r);
       return r ? { ...base, type: 'TELEMETRY', r } : null;
@@ -239,6 +270,22 @@ export function parseCtrlMsg(v: unknown): CtrlMsg | null {
         : null;
     case 'MANUAL_MODE':
       return str(v.setId, 40) ? { ...base, type: 'MANUAL_MODE', setId: v.setId } : null;
+    case 'VIEW': {
+      if (v.view === null) return { ...base, type: 'VIEW', view: null };
+      if (!isObj(v.view) || !isObj(v.view.parts)) return null;
+      const parts = {} as Record<ViewPart, 0 | 1 | 2>;
+      for (const k of VIEW_PARTS) {
+        const n = v.view.parts[k];
+        if (!oneOf(n, [0, 1, 2] as const)) return null;
+        parts[k] = n;
+      }
+      const b = v.view.box;
+      if (b !== null && !(Array.isArray(b) && b.length === 4 && b.every((x) => num(x, -0.5, 1.5)))) return null;
+      return { ...base, type: 'VIEW', view: { parts, box: b as ViewSummary['box'] } };
+    }
+    case 'PEEK':
+      if (v.image === null) return { ...base, type: 'PEEK', image: null };
+      return typeof v.image === 'string' && v.image.length <= MAX_PEEK_CHARS && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(v.image) ? { ...base, type: 'PEEK', image: v.image } : null;
     default:
       return null;
   }

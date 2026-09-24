@@ -2,7 +2,7 @@ import type { TrialTargets } from '../trial/config';
 import { DEFAULT_TARGETS } from '../trial/config';
 import { updateSave } from '../game/store';
 import { useSave } from './useSave';
-import { MotionSettings } from './Connected';
+import { MotionSettings, TraversalPicker } from './Connected';
 
 /**
  * One screen of setup before the Motion Trial: where to put the phone, how
@@ -45,8 +45,7 @@ export function TrialSetup({ onStart, onBack }: { onStart: () => void; onBack: (
           </ol>
         </div>
 
-        <details className="setup-settings">
-          <summary>Trial settings</summary>
+        <div className="setup-upfront">
           <div className="toggle-row">
             <span>Camera</span>
             <div className="seg">
@@ -59,6 +58,11 @@ export function TrialSetup({ onStart, onBack }: { onStart: () => void; onBack: (
             </div>
           </div>
           <p className="muted small">Using the back camera? Point the back of the phone at yourself — the TV shows the game.</p>
+        </div>
+        <TraversalPicker />
+
+        <details className="setup-settings">
+          <summary>Trial settings</summary>
           {TARGET_ROWS.map(([k, label]) => (
             <div className="adj-row" key={k}>
               <span>{label}</span>

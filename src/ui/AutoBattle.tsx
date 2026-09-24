@@ -4,7 +4,7 @@ import type { EnemyDef } from '../combat/enemies';
 import { getExercise, type ExerciseDefinition } from '../exercise/registry';
 import { BLOCKER_TEXT, diagLines, SetDiagnostics } from '../exercise/diagnostics';
 import { levelFrame } from '../exercise/level';
-import { ExerciseSessionController, type SessionSnapshot } from '../exercise/session';
+import { ExerciseSessionController, trialSessionOptions, type SessionSnapshot } from '../exercise/session';
 import type { ExerciseEvent } from '../exercise/types';
 import { audio } from '../game/audio';
 import { bus } from '../game/bus';
@@ -46,7 +46,7 @@ export interface BattleResult {
 
 /** How to stand for each exercise with the phone fixed in front of you. */
 export const FIXED_CAMERA_POSE: Record<string, string> = {
-  pushup: 'Turn SIDEWAYS to the phone, then get down into push-up position. Arms straight to start.',
+  pushup: 'Turn SIDEWAYS to the phone, then get down into push-up position. Arms straight — counting starts the moment the camera sees you in position.',
   squat: 'Stand FACING the phone, feet shoulder-width apart, whole body in view.',
   jumping_jack: 'Stand FACING the phone, arms by your sides, feet together.',
   plank: 'Turn sideways to the phone and get into a plank.',
@@ -238,7 +238,7 @@ export function AutoBattle({
       host.activeSet = rs;
       ctrl.current = rs;
     } else {
-      ctrl.current = new ExerciseSessionController(ex, ex.createDetector!(s.settings.difficulty), target(), onExerciseEvent, { setupStuckMs: 20000, activeStuckMs: 20000 });
+      ctrl.current = new ExerciseSessionController(ex, ex.createDetector!(s.settings.difficulty), target(), onExerciseEvent, trialSessionOptions(ex.id));
       localDiag.current = new SetDiagnostics();
       setStage('set');
     }
@@ -317,7 +317,7 @@ export function AutoBattle({
     if (sn.stage === 'setup') setupSince.current ??= now;
     else setupSince.current = null;
     if (sn.stage !== lastStage.current) {
-      if (sn.stage === 'countdown') audio.say('Ready');
+      if (sn.stage === 'countdown' && sn.countdownLeftMs > 500) audio.say('Ready');
       if (sn.stage === 'active' && lastStage.current === 'countdown') {
         audio.exerciseStart();
         audio.say('Go!');

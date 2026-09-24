@@ -30,8 +30,84 @@ const MODE_LABEL: Record<InputMode, string> = {
 };
 
 const CAMERA_KEY = 'fitbound.ctrl.camera';
+const PEEK_KEY = 'fitbound.ctrl.peek';
 
-type CameraPref = { id: string | null; wide: boolean };
+/** facing overrides the PC's front/back setting; id (a specific camera) overrides both. */
+type CameraPref = { id: string | null; wide: boolean; facing?: 'user' | 'environment' };
+
+function applyCameraPref(p: CameraPref): void {
+  tracker.facing = p.facing ?? bridge.facing;
+  tracker.deviceId = p.id;
+  tracker.wide = p.wide;
+}
+
+function cameraName(p: CameraPref, cams: { id: string; label: string }[]): string {
+  if (p.id) return cams.find((c) => c.id === p.id)?.label ?? 'chosen camera';
+  return (p.facing ?? bridge.facing) === 'user' ? 'Front camera' : 'Back camera';
+}
+
+function loadPeek(): boolean {
+  try {
+    return localStorage.getItem(PEEK_KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
+
+let peekCanvas: HTMLCanvasElement | null = null;
+/**
+ * A tiny, low-quality still (128 px wide) of what the camera sees, for the TV
+ * while tracking is lost. Only used when the player switched it on; it is sent
+ * straight to the PC over the paired link, shown, and never saved.
+ */
+function grabPeek(): string | null {
+  const v = tracker.video;
+  if (v.readyState < 2 || !v.videoWidth) return null;
+  const w = 128;
+  const h = Math.max(1, Math.round((w * v.videoHeight) / v.videoWidth));
+  peekCanvas ??= document.createElement('canvas');
+  peekCanvas.width = w;
+  peekCanvas.height = h;
+  const g = peekCanvas.getContext('2d');
+  if (!g) return null;
+  g.save();
+  // Front camera: show it like a mirror, as the phone's own preview does.
+  if (tracker.facing === 'user' && !tracker.deviceId) {
+    g.translate(w, 0);
+    g.scale(-1, 1);
+  }
+  g.drawImage(v, 0, 0, w, h);
+  g.restore();
+  const url = peekCanvas.toDataURL('image/jpeg', 0.5);
+  return url.startsWith('data:image/jpeg') ? url : null;
+}
+bridge.peek = grabPeek;
+bridge.peekEnabled = loadPeek();
+
+/** Opt-in: let the TV show a tiny preview while it can't see you. Off by default. */
+function PeekToggle() {
+  const [on, setOn] = useState(bridge.peekEnabled);
+  return (
+    <label className="small check">
+      <input
+        type="checkbox"
+        checked={on}
+        onChange={(e) => {
+          const v = e.target.checked;
+          setOn(v);
+          bridge.peekEnabled = v;
+          if (!v) bridge.clearPeek();
+          try {
+            localStorage.setItem(PEEK_KEY, v ? 'on' : 'off');
+          } catch {
+            /* ignore */
+          }
+        }}
+      />{' '}
+      Show a tiny camera preview on the TV when it can’t see you (low-res, about one still a second, only while tracking is lost; sent only to your PC and never saved). Off: the TV lists which body parts are hidden instead.
+    </label>
+  );
+}
 
 function saveCameraPref(p: CameraPref): void {
   try {
@@ -46,21 +122,39 @@ function saveCameraPref(p: CameraPref): void {
  * been allowed once, so this also lives on the dashboard, where changing it
  * restarts the camera.
  */
-function CameraPicker({ pref, onChange, onApply }: { pref: CameraPref; onChange: (p: CameraPref) => void; onApply?: () => void }) {
+function CameraPicker({ pref, onChange, onApply, open }: { pref: CameraPref; onChange: (p: CameraPref) => void; onApply?: () => void; open?: boolean }) {
   const [cams, setCams] = useState<{ id: string; label: string }[]>([]);
   useEffect(() => {
     void tracker.listCameras().then(setCams).catch(() => {});
   }, []);
   const zoom = tracker.zoomRange();
+  const facing = pref.id ? null : (pref.facing ?? bridge.facing);
   return (
-    <details className="small">
-      <summary>
-        Camera: {pref.id ? (cams.find((c) => c.id === pref.id)?.label ?? 'chosen camera') : bridge.facing === 'user' ? 'front (default)' : 'back (default)'}
+    <section className="card campick">
+      <small>Camera</small>
+      <b>
+        {cameraName(pref, cams)}
         {pref.wide ? ' · widest view' : ''}
-      </summary>
+      </b>
+      <div className="row">
+        <button className={facing === 'user' ? 'big' : 'ghost'} onClick={() => onChange({ ...pref, id: null, facing: 'user' })}>
+          Front (selfie)
+        </button>
+        <button className={facing === 'environment' ? 'big' : 'ghost'} onClick={() => onChange({ ...pref, id: null, facing: 'environment' })}>
+          Back (sharper)
+        </button>
+      </div>
+      <span className="small">Front: you can glance at the phone to check the view. Back: usually a better camera, but make sure nothing blocks it when you’re on the floor.</span>
+      {onApply && (
+        <button className="ghost" onClick={onApply}>
+          Restart camera with this choice
+        </button>
+      )}
+      <details className="small" open={open}>
+      <summary>More cameras and zoom</summary>
       <p>If your phone lists an ultra-wide camera, it can see your whole body from closer. Wider lenses make you smaller in the picture, which can make tracking less reliable — try it and compare in a push-up set. The list fills in once the camera has been allowed. After switching, recalibrate from the pause menu.</p>
       <select value={pref.id ?? ''} onChange={(e) => onChange({ ...pref, id: e.target.value || null })}>
-        <option value="">Default ({bridge.facing === 'user' ? 'front' : 'back'} camera)</option>
+        <option value="">{(pref.facing ?? bridge.facing) === 'user' ? 'Front' : 'Back'} camera (choose above)</option>
         {cams.map((c) => (
           <option key={c.id} value={c.id}>
             {c.label}
@@ -71,19 +165,15 @@ function CameraPicker({ pref, onChange, onApply }: { pref: CameraPref; onChange:
         <input type="checkbox" checked={pref.wide} onChange={(e) => onChange({ ...pref, wide: e.target.checked })} /> Use the widest zoom if this camera offers it
         {zoom ? ` (this one: ${zoom.min}×–${zoom.max}×)` : ''}
       </label>
-      {onApply && (
-        <button className="ghost" onClick={onApply}>
-          Restart camera with this choice
-        </button>
-      )}
-    </details>
+      </details>
+    </section>
   );
 }
 
 function loadCameraPref(): CameraPref {
   try {
     const v = JSON.parse(localStorage.getItem(CAMERA_KEY) ?? 'null');
-    if (v && (typeof v.id === 'string' || v.id === null) && typeof v.wide === 'boolean') return v;
+    if (v && (typeof v.id === 'string' || v.id === null) && typeof v.wide === 'boolean') return { id: v.id, wide: v.wide, ...(v.facing === 'user' || v.facing === 'environment' ? { facing: v.facing } : {}) };
   } catch {
     /* ignore */
   }
@@ -153,7 +243,7 @@ function PairScreen({ ls }: { ls: CtrlLinkState }) {
         </button>
       </form>
       {ls.error && <p className="bad">{ls.error}</p>}
-      <p className="small">This page must be opened over HTTPS from the PC running FITBOUND. Your camera stays on this phone: only movements and rep counts are sent.</p>
+      <p className="small">This page must be opened over HTTPS from the PC running FITBOUND. Your camera stays on this phone: only movements and rep counts are sent (plus, only if you switch it on, a tiny preview while the camera can’t see you).</p>
     </main>
   );
 }
@@ -173,9 +263,7 @@ function StartScreen({ ls, onStart }: { ls: CtrlLinkState; onStart: () => void }
     bridge.camera = 'starting';
     bridge.model = 'loading';
     bridge.sendStatus(true);
-    tracker.facing = bridge.facing;
-    tracker.deviceId = pref.id;
-    tracker.wide = pref.wide;
+    applyCameraPref(pref);
     // Motion-sensor permission must be asked from this tap (iOS); used only
     // to notice if the phone gets knocked out of place.
     bridge.tilt = tilt;
@@ -185,6 +273,7 @@ function StartScreen({ ls, onStart }: { ls: CtrlLinkState; onStart: () => void }
       bridge.camera = 'running';
       bridge.model = 'ready';
       bridge.cameraError = undefined;
+      bridge.cameraLabel = tracker.activeLabel || cameraName(pref, []);
       onStart();
     } catch (e) {
       const code = e instanceof TrackerError ? e.code : 'unknown';
@@ -209,17 +298,18 @@ function StartScreen({ ls, onStart }: { ls: CtrlLinkState; onStart: () => void }
       <h1>Paired!</h1>
       <p>Put the phone in its spot — landscape, low down (a low shelf, or leaning against a wall near the floor), 2.5–3 m from where you’ll stand — then start the camera. The TV will guide you from there.</p>
       {!secure && <p className="bad">This page isn’t a secure (HTTPS) page, so the browser won’t allow the camera. Open the https:// address shown on the PC.</p>}
-      <button className="big" disabled={busy} onClick={start}>
-        {busy ? 'Starting camera…' : 'Start camera'}
-      </button>
       <CameraPicker pref={pref} onChange={savePref} />
+      <button className="big" disabled={busy} onClick={start}>
+        {busy ? 'Starting camera…' : `Start ${cameraName(pref, []).toLowerCase()}`}
+      </button>
+      <PeekToggle />
       {err && <p className="bad">{err}</p>}
       {err && (
         <button className="ghost" onClick={onStart}>
           Continue with touch controls only
         </button>
       )}
-      <p className="small">Video is processed on this phone and never sent or saved. Keep this page open and the phone unlocked while you play.</p>
+      <p className="small">Video is processed on this phone and never saved. Unless you switch on the preview above, no images leave the phone. Keep this page open and the phone unlocked while you play.</p>
     </main>
   );
 }
@@ -363,14 +453,14 @@ function Dashboard({ ls }: { ls: CtrlLinkState }) {
         }}
         onApply={async () => {
           tracker.stop();
-          tracker.deviceId = camPref.id;
-          tracker.wide = camPref.wide;
+          applyCameraPref(camPref);
           bridge.camera = 'starting';
           bridge.sendStatus(true);
           try {
             await tracker.start(bridge.modelSize);
             bridge.camera = 'running';
             bridge.cameraError = undefined;
+            bridge.cameraLabel = tracker.activeLabel || cameraName(camPref, []);
           } catch (e) {
             bridge.camera = 'error';
             bridge.cameraError = e instanceof Error ? e.message : String(e);
@@ -378,6 +468,8 @@ function Dashboard({ ls }: { ls: CtrlLinkState }) {
           bridge.sendStatus(true);
         }}
       />
+
+      <PeekToggle />
 
       <label className="small check">
         <input type="checkbox" checked={tick} onChange={(e) => setTick(e.target.checked)} /> Click on this phone when a move is recognised (only while the PC’s sound is off)

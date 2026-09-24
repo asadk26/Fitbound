@@ -234,6 +234,11 @@ export class PoseTracker {
     this.listeners.forEach((l) => l(f));
   };
 
+  /** The camera in use right now, by its device label (empty before permission). */
+  get activeLabel(): string {
+    return this.stream?.getVideoTracks()[0]?.label ?? '';
+  }
+
   /** Video cameras this browser exposes (labels appear once permission is granted). */
   async listCameras(): Promise<{ id: string; label: string }[]> {
     if (!navigator.mediaDevices?.enumerateDevices) return [];
