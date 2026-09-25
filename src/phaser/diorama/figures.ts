@@ -316,16 +316,283 @@ function dummy(ctx: Ctx): void {
   ctx.stroke();
 }
 
-export const FIGURES: Record<string, (ctx: Ctx) => void> = { hero, skeleton, golem, mage, warden, dummy };
+/** Eyes closed, for blinking (Elara only for now). */
+let blinking = false;
 
-/** A figure, on its round base or (for battles) standing free. */
-export function paintFigure(name: string, onBase = true): HTMLCanvasElement {
+const SILVER = '#c4c7d4';
+const IVORY = '#efe7d6';
+const TEAL = '#1f5c61';
+/** The Heart's colour: a warm amber. */
+export const HEART = '#ffb45a';
+
+/** Long wavy hair, from a top point down one side and across the ends. */
+function wavyHair(ctx: Ctx, pts: [number, number][]): void {
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length - 1; i += 2) ctx.quadraticCurveTo(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+  ctx.closePath();
+}
+
+/**
+ * Elara: a young, doll-like woman — porcelain skin, large calm eyes, long
+ * wavy silver-grey hair, ivory robes under deep teal, and one thin thread of
+ * the Heart's warm light running through them. Glossy like the other
+ * figures; soft blush and a small smile keep her approachable.
+ */
+function elara(ctx: Ctx): void {
+  base(ctx, '#7f9a86', '#3d4a4a');
+  // Hair behind: falls in waves to below the waist.
+  const backHair = () =>
+    wavyHair(ctx, [
+      [80, 30],
+      [124, 30],
+      [118, 70],
+      [128, 88],
+      [120, 106],
+      [130, 126],
+      [118, 144],
+      [124, 158],
+      [104, 160],
+      [92, 166],
+      [80, 158],
+      [68, 166],
+      [56, 160],
+      [36, 158],
+      [42, 144],
+      [30, 126],
+      [40, 106],
+      [32, 88],
+      [42, 70],
+      [36, 30],
+      [80, 30],
+    ]);
+  backHair();
+  shade(ctx, SILVER, { x: 30, y: 30, w: 100, h: 136 }, 3, 0.5);
+  ctx.save();
+  backHair();
+  ctx.clip();
+  hairStrands(ctx, 56, 160);
+  ctx.restore();
+  // Ivory gown, a soft bell to the floor.
+  ctx.beginPath();
+  ctx.moveTo(64, 98);
+  ctx.quadraticCurveTo(50, 140, 44, 172);
+  ctx.quadraticCurveTo(80, 180, 116, 172);
+  ctx.quadraticCurveTo(110, 140, 96, 98);
+  ctx.closePath();
+  shade(ctx, IVORY, { x: 44, y: 98, w: 72, h: 80 }, 3, 0.3);
+  // Deep-teal over-robe, open at the front.
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(80 + s * 16, 98);
+    ctx.quadraticCurveTo(80 + s * 34, 136, 80 + s * 37, 172);
+    ctx.quadraticCurveTo(80 + s * 28, 176, 80 + s * 20, 174);
+    ctx.quadraticCurveTo(80 + s * 16, 136, 80 + s * 8, 104);
+    ctx.closePath();
+    shade(ctx, TEAL, { x: s < 0 ? 42 : 86, y: 98, w: 32, h: 78 }, 2.5, 0.35);
+  }
+  // A soft teal shawl collar.
+  ctx.beginPath();
+  ctx.moveTo(58, 96);
+  ctx.quadraticCurveTo(80, 116, 102, 96);
+  ctx.quadraticCurveTo(80, 104, 58, 96);
+  ctx.closePath();
+  shade(ctx, TEAL, { x: 58, y: 94, w: 44, h: 18 }, 2.5, 0.45);
+  // The thread of the Heart's light, from the collar down through the gown.
+  ctx.save();
+  ctx.shadowColor = HEART;
+  ctx.shadowBlur = 8;
+  ctx.strokeStyle = '#ffd08a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(72, 104);
+  ctx.bezierCurveTo(88, 118, 70, 132, 82, 144);
+  ctx.bezierCurveTo(92, 154, 86, 164, 96, 172);
+  ctx.stroke();
+  ctx.restore();
+  ctx.save();
+  ctx.shadowColor = HEART;
+  ctx.shadowBlur = 10;
+  ellipse(ctx, 72, 104, 3.2, 3.2, HEART, 1.5, 0.7);
+  ctx.restore();
+  // Wide ivory sleeves, hands folded in front.
+  ellipse(ctx, 58, 126, 10, 19, IVORY, 2.5, 0.3);
+  ellipse(ctx, 102, 126, 10, 19, IVORY, 2.5, 0.3);
+  ellipse(ctx, 75, 138, 7, 6, '#f7e8de', 2, 0.4);
+  ellipse(ctx, 85, 139, 7, 6, '#f7e8de', 2, 0.4);
+  // Porcelain face.
+  ellipse(ctx, 80, 64, 30, 29, '#f7e8de', 3, 0.45);
+  // Eyes: large, calm, grey-teal; lids a touch lowered, never sleepy.
+  for (const sx of [-1, 1]) {
+    const ex = 80 + sx * 11;
+    const ey = 70;
+    if (blinking) {
+      ctx.strokeStyle = '#4a3a44';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(ex, ey - 3, 6, 0.25 * Math.PI, 0.75 * Math.PI);
+      ctx.stroke();
+      continue;
+    }
+    ctx.beginPath();
+    ctx.ellipse(ex, ey, 5.6, 7, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(ex, ey + 0.8, 4.6, 6, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#4d7c84';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(ex, ey + 1.2, 2.3, 3.2, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#1d2a33';
+    ctx.fill();
+    glint(ctx, ex - 1.6, ey - 2.2, 1.5, 1.5, 0.95);
+    glint(ctx, ex + 1.8, ey + 3, 0.8, 0.8, 0.6);
+    // Upper lid and lashes.
+    ctx.strokeStyle = '#3e3140';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.ellipse(ex, ey + 0.5, 6.2, 6.6, 0, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.stroke();
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(ex + sx * 5.6, ey - 3.5);
+    ctx.lineTo(ex + sx * 8, ey - 5);
+    ctx.stroke();
+  }
+  // Brows, soft and light.
+  ctx.strokeStyle = '#a3a6b6';
+  ctx.lineWidth = 1.8;
+  for (const sx of [-1, 1]) {
+    ctx.beginPath();
+    ctx.arc(80 + sx * 11, 62, 6, 1.2 * Math.PI, 1.8 * Math.PI);
+    ctx.stroke();
+  }
+  // Blush and a small smile.
+  ctx.fillStyle = 'rgba(236,140,150,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(62, 80, 5.5, 3, 0, 0, Math.PI * 2);
+  ctx.ellipse(98, 80, 5.5, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#a0525a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(80, 80, 3.6, 0.25 * Math.PI, 0.75 * Math.PI);
+  ctx.stroke();
+  // Hair in front: a side-swept fringe and two long wavy locks framing the face.
+  wavyHair(ctx, [
+    [49, 66],
+    [46, 30],
+    [82, 31],
+    [116, 30],
+    [111, 68],
+    [106, 50],
+    [96, 50],
+    [86, 42],
+    [74, 50],
+    [60, 48],
+    [49, 66],
+  ]);
+  shade(ctx, SILVER, { x: 46, y: 30, w: 70, h: 38 }, 3, 0.55);
+  ctx.strokeStyle = 'rgba(140,144,166,0.7)';
+  ctx.lineWidth = 1.4;
+  for (const [x0, x1] of [
+    [62, 70],
+    [76, 88],
+    [96, 104],
+  ]) {
+    ctx.beginPath();
+    ctx.moveTo(x0, 36);
+    ctx.quadraticCurveTo((x0 + x1) / 2 - 4, 42, x1, 50);
+    ctx.stroke();
+  }
+  for (const sx of [-1, 1]) lock(ctx, 80 + sx * 27, 54, 118, sx);
+  // A small teal clasp with a bead of Heart-light.
+  ellipse(ctx, 106, 46, 5, 4, TEAL, 2, 0.5);
+  ellipse(ctx, 106, 46, 2, 2, HEART, 1, 0.8);
+}
+
+/** A long wavy lock framing the face: a ribbon that tapers as it waves down. */
+function lock(ctx: Ctx, x: number, y0: number, y1: number, sx: number): void {
+  const left: [number, number][] = [];
+  const right: [number, number][] = [];
+  for (let y = y0; y <= y1; y += 3) {
+    const t = (y - y0) / (y1 - y0);
+    const cx = x + sx * (2 + 3.2 * Math.sin((y - y0) / 8));
+    const hw = 5.2 * (1 - t) + 1.4;
+    left.push([cx - hw, y]);
+    right.push([cx + hw, y]);
+  }
+  ctx.beginPath();
+  ctx.moveTo(left[0][0], left[0][1]);
+  for (const [px, py] of left) ctx.lineTo(px, py);
+  for (const [px, py] of right.reverse()) ctx.lineTo(px, py);
+  ctx.closePath();
+  shade(ctx, SILVER, { x: x - 9, y: y0, w: 18, h: y1 - y0 }, 2.2, 0.55);
+}
+
+/** Fine strands over the long hair, following its waves. */
+function hairStrands(ctx: Ctx, y0: number, y1: number): void {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(140,144,166,0.6)';
+  ctx.lineWidth = 1.4;
+  for (const sx of [-1, 1]) {
+    for (const k of [0, 1, 2]) {
+      const x = 80 + sx * (30 + k * 7);
+      ctx.beginPath();
+      for (let y = y0; y <= y1 - k * 8; y += 3) {
+        const px = x + sx * 3.5 * Math.sin((y - y0) / 9 + k);
+        if (y === y0) ctx.moveTo(px, y);
+        else ctx.lineTo(px, y);
+      }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+export const FIGURES: Record<string, (ctx: Ctx) => void> = {
+  hero,
+  skeleton,
+  golem,
+  mage,
+  warden,
+  dummy,
+  elara,
+};
+
+/** A figure, on its round base or (for battles and scenes) standing free. */
+export function paintFigure(name: string, onBase = true, blink = false): HTMLCanvasElement {
   const [c, ctx] = canvas(FIG_W, FIG_H);
   withBase = onBase;
+  blinking = blink;
   try {
     (FIGURES[name] ?? hero)(ctx);
   } finally {
     withBase = true;
+    blinking = false;
+  }
+  return c;
+}
+
+/**
+ * A dialogue portrait: the same painting as the figure, larger and cropped
+ * to head and shoulders, so a character looks the same in the scene and in
+ * conversation.
+ */
+export function paintPortrait(name: string, blink = false): HTMLCanvasElement {
+  const size = 256;
+  const k = 2.5;
+  const [c, ctx] = canvas(size, size);
+  withBase = false;
+  blinking = blink;
+  try {
+    ctx.translate(size / 2 - 80 * k, size * 0.47 - 72 * k);
+    ctx.scale(k, k);
+    (FIGURES[name] ?? hero)(ctx);
+  } finally {
+    withBase = true;
+    blinking = false;
   }
   return c;
 }

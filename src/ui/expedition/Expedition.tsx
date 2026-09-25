@@ -7,7 +7,7 @@ import { input } from '../../input/InputHub';
 import { motionPreset } from '../../input/motion';
 import { tilt } from '../../input/tilt';
 import { host } from '../../net/host';
-import { showScene } from '../../phaser/game';
+import { showSanctuary, showScene } from '../../phaser/game';
 import { tracker, TrackerError } from '../../pose/PoseTracker';
 import { atPhaseBoundary, clearExpedition, currentNode, HERO_HP, loadExpedition, newExpedition, ROUTES, saveExpedition, type ExNode, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
 import { generateLoadout, setTarget } from '../../rpg/loadout';
@@ -17,6 +17,9 @@ import { Calibration } from '../Calibration';
 import { ControllerLost, RemoteCalibration, useLink } from '../Connected';
 import { useInputEvents } from '../motionUi';
 import { toggleTraversal } from '../TrialRun';
+import { CinemaPlayer } from '../Cinema';
+import type { Script } from '../../story/cinema';
+import { OPENING, ritualReason, ritualScript, type RitualReason } from '../../story/scripts';
 import { BlessingPick, Fallen, Haven, Mirror, PathView, Summary } from './Events';
 import { MovementLab } from './MovementLab';
 import { RpgBattle } from './RpgBattle';
@@ -32,7 +35,7 @@ import type { SetResult } from './setRunner';
  * choices and the Haven work from the couch with a gamepad, and the camera
  * check happens right before the first fight rather than at the start.
  */
-type View = 'sanctuary' | 'lab' | 'calibrate' | 'path' | 'travel' | 'node' | 'fallen' | 'summary';
+type View = 'cinema' | 'sanctuary' | 'lab' | 'calibrate' | 'path' | 'travel' | 'node' | 'fallen' | 'summary';
 
 export function Expedition({ connected, resume, onExit }: { connected: boolean; resume: boolean; onExit: () => void }) {
   const [x, setXState] = useState<ExpeditionState | null>(() => {
@@ -42,7 +45,9 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
   /** The real run, set aside while the Lab plays a scratch encounter. */
   const realRun = useRef<ExpeditionState | null>(null);
   const xRef = useRef(x);
-  const [view, setView] = useState<View>(() => (resume && x ? 'path' : 'sanctuary'));
+  // Arriving at the Sanctuary: the opening the first time, the short reconstruction ritual after that.
+  const [cine, setCine] = useState<{ script: Script; restored: boolean; then: () => void } | null>(() => (resume && x ? null : arrival(() => setView('sanctuary'))));
+  const [view, setView] = useState<View>(() => (resume && x ? 'path' : 'cinema'));
   const viewRef = useRef(view);
   viewRef.current = view;
   const [debug, setDebug] = useState<ExNode | null>(null);
@@ -66,7 +71,8 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
 
   // Camera + inputs for the whole expedition.
   useEffect(() => {
-    showScene('Diorama', { attract: true });
+    // (An arriving cinematic has already taken the stage.)
+    if (viewRef.current !== 'cinema') showScene('Diorama', { attract: true });
     input.reader.configure(motionPreset(getSave().settings.motion));
     let offFeed = () => {};
     if (connected) host.start();
@@ -116,7 +122,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
   useEffect(() => {
     if (!connected) return;
     const n = x ? currentNode(x) : null;
-    host.send({ type: 'GAME', title: view === 'sanctuary' ? 'The Sanctuary' : view === 'node' && n ? n.title : 'Heart of Haze', hint: '', exercise: null, paused: false, notice: null });
+    host.send({ type: 'GAME', title: view === 'sanctuary' || view === 'cinema' ? 'The Sanctuary' : view === 'node' && n ? n.title : 'Heart of Haze', hint: '', exercise: null, paused: false, notice: null });
   }, [connected, view, x, link.controller]);
 
   /** Quick camera check before the first physical node this session. */
@@ -135,10 +141,25 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     afterCal.current();
   };
 
-  // The Sanctuary floats over the drifting board; marches restart it for real.
+  // The Sanctuary screen sits in the garden (in the rain, until the first restoration).
   useEffect(() => {
-    if (view === 'sanctuary') showScene('Diorama', { attract: true });
+    if (view === 'sanctuary') showSanctuary(getSave().story.restored);
   }, [view]);
+
+  /** Play the reconstruction ritual for this reason, then show the Sanctuary. */
+  const ritual = (reason: RitualReason) => {
+    const s = getSave();
+    const then = () => {
+      updateSave((d) => {
+        d.story.rituals++;
+        d.story.lastVisit = Date.now();
+      });
+      setView('sanctuary');
+    };
+    setCine({ script: ritualScript(reason, s.story.rituals), restored: s.story.restored, then });
+    setView('cinema');
+  };
+  const firstRestoration = useRef(false);
 
   useInputEvents((e) => {
     if (e.type === 'recalibrate' && (view === 'path' || view === 'sanctuary')) {
@@ -158,7 +179,6 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     if (old && old.id !== xRef.current?.id) recordHistory({ ...old, workout: { ...old.workout, outcome: 'ended' } });
     const next = newExpedition(route, prefs, loadout, targets);
     commit(next);
-    audio.say(STORY.departure);
     routeNext();
   };
 
@@ -223,7 +243,12 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     const done = xRef.current!;
     recordHistory(done);
     clearExpedition();
-    if (outcome === 'victory') audio.victory();
+    if (outcome === 'victory') {
+      audio.victory();
+      // The first time the Spark is reached, part of the kingdom is restored — and the Sanctuary's rain stops.
+      firstRestoration.current = !getSave().story.restored;
+      updateSave((s) => void (s.story.restored = true));
+    }
     setView('summary');
   };
 
@@ -265,6 +290,18 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
 
   return (
     <div className="expedition">
+      {view === 'cinema' && cine && (
+        <CinemaPlayer
+          key={cine.script.id + cine.restored}
+          script={cine.script}
+          restored={cine.restored}
+          onDone={() => {
+            const then = cine.then;
+            setCine(null);
+            then();
+          }}
+        />
+      )}
       {view === 'sanctuary' && (
         <Sanctuary
           connected={connected}
@@ -428,20 +465,61 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
             })
           }
           onAgain={() => {
+            const done = xRef.current!;
             setXState(null);
             xRef.current = null;
-            setView('sanctuary');
+            const outcome = done.workout.outcome;
+            ritual(
+              ritualReason({
+                outcome: outcome === 'victory' || outcome === 'defeat' || outcome === 'ended' || outcome === 'suspended' ? outcome : undefined,
+                firstRestoration: firstRestoration.current,
+                fell: done.fallen,
+              }),
+            );
+            firstRestoration.current = false;
           }}
           onExit={onExit}
         />
       )}
 
-      {ctrlLost && view !== 'summary' && view !== 'sanctuary' && view !== 'lab' && <ControllerLost />}
+      {ctrlLost && view !== 'summary' && view !== 'sanctuary' && view !== 'cinema' && view !== 'lab' && <ControllerLost />}
       {x && view === 'path' && <div className="exp-route">{ROUTES[x.route].name}</div>}
     </div>
   );
 }
 
+/**
+ * What plays on arriving at the Sanctuary from the title screen: the opening
+ * once (marked seen even if skipped, so it never repeats by itself), then the
+ * short ritual, with Elara's line depending on how long you've been away.
+ */
+function arrival(arrived: () => void): { script: Script; restored: boolean; then: () => void } {
+  const s = getSave();
+  const now = Date.now();
+  const visited = () => updateSave((d) => void (d.story.lastVisit = now));
+  if (!s.story.openingSeen)
+    return {
+      script: OPENING,
+      restored: false,
+      then: () => {
+        updateSave((d) => {
+          d.story.openingSeen = true;
+          d.story.lastVisit = now;
+        });
+        arrived();
+      },
+    };
+  const daysAway = s.story.lastVisit ? (now - s.story.lastVisit) / 86_400_000 : 0;
+  return {
+    script: ritualScript(ritualReason({ daysAway }), s.story.rituals),
+    restored: s.story.restored,
+    then: () => {
+      visited();
+      updateSave((d) => void d.story.rituals++);
+      arrived();
+    },
+  };
+}
 /** Add a finished session to the save's history (for varying future loadouts). */
 function recordHistory(x: ExpeditionState): void {
   if (!x.workout.sets.length && !x.workout.recoveryMs) return;

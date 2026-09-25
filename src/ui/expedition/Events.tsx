@@ -219,7 +219,8 @@ export function Haven({ onDone }: { onDone: (recoveryMs: number) => void }) {
     }
     audio.calm(false);
     setPhase('memory');
-    window.setTimeout(() => audio.say(`${STORY.havenMemory} ${STORY.havenElara}`), 1200);
+    // The narrator reads the memory; Elara's part is only ever read, never synthesised.
+    window.setTimeout(() => audio.say(STORY.havenMemory), 1200);
   }
 
   useInputEvents((e) => {
@@ -329,7 +330,7 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
   const won = w.outcome === 'victory';
   useEffect(() => {
     input.setMode('menu');
-    audio.say(won ? `${STORY.victory} ${STORY.victoryElara}` : x.status === 'suspended' ? STORY.suspended : STORY.fallenEnd);
+    audio.say(won ? STORY.victory : x.status === 'suspended' ? STORY.suspended : STORY.fallenEnd);
   }, [won, x.status]);
   const mins = (ms: number) => Math.max(0, Math.round(ms / 60000));
   return (

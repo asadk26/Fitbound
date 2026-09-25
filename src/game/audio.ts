@@ -51,7 +51,11 @@ class Audio {
 
   setSound(on: boolean): void {
     this.soundOn = on;
-    if (!on) this.stopMusic();
+    if (!on) {
+      this.stopMusic();
+      this.rain(0);
+      this.score(null);
+    }
   }
 
   private tone(freq: number, dur: number, wave: Wave = 'square', vol = 0.5, when = 0, slideTo?: number, dest?: AudioNode): void {
@@ -279,6 +283,183 @@ class Audio {
     };
     play();
     this.calmTimer = window.setInterval(play, 8000);
+  }
+
+  // ── Cinematic soundscape ────────────────────────────────────────────────
+  private rainNodes: { gain: GainNode; lp: BiquadFilterNode; srcs: AudioBufferSourceNode[] } | null = null;
+
+  /**
+   * Soft, steady rain: a looped bed of filtered noise plus a sparse patter of
+   * drops. Muffled, it's rain heard through stone (a low cutoff). Kept well
+   * under dialogue and music.
+   */
+  rain(level: number, muffled = false): void {
+    if (!this.ctx || !this.master) return;
+    const ctx = this.ctx;
+    const on = this.soundOn && level > 0;
+    if (!this.rainNodes && on) {
+      const len = ctx.sampleRate * 4;
+      const bed = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = bed.getChannelData(0);
+      // Brown-ish noise for the steady hush.
+      let last = 0;
+      for (let i = 0; i < len; i++) {
+        last = (last + 0.035 * (Math.random() * 2 - 1)) / 1.035;
+        d[i] = last * 3.2;
+      }
+      const drops = ctx.createBuffer(1, len, ctx.sampleRate);
+      const p = drops.getChannelData(0);
+      for (let n = 0; n < 900; n++) {
+        const at = Math.floor(Math.random() * (len - 400));
+        const amp = 0.15 + Math.random() * 0.35;
+        for (let k = 0; k < 300; k++) p[at + k] += (Math.random() * 2 - 1) * amp * Math.exp(-k / 40);
+      }
+      const gain = ctx.createGain();
+      gain.gain.value = 0.0001;
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 3200;
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 180;
+      const srcs = [bed, drops].map((buf, i) => {
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+        const g = ctx.createGain();
+        g.gain.value = i === 0 ? 0.55 : 0.28;
+        const bp = ctx.createBiquadFilter();
+        bp.type = i === 0 ? 'lowpass' : 'bandpass';
+        bp.frequency.value = i === 0 ? 1400 : 2600;
+        src.connect(bp);
+        bp.connect(g);
+        g.connect(hp);
+        src.start();
+        return src;
+      });
+      hp.connect(lp);
+      lp.connect(gain);
+      gain.connect(this.master);
+      this.rainNodes = { gain, lp, srcs };
+    }
+    const r = this.rainNodes;
+    if (!r) return;
+    const t = ctx.currentTime;
+    r.gain.gain.setTargetAtTime(on ? Math.max(0.0001, level * 0.5) : 0.0001, t, on ? 0.6 : 0.5);
+    r.lp.frequency.setTargetAtTime(muffled ? 360 : 3200, t, 0.5);
+    if (!on) {
+      const nodes = r;
+      this.rainNodes = null;
+      window.setTimeout(() => {
+        nodes.srcs.forEach((x) => x.stop());
+        nodes.gain.disconnect();
+      }, 3000);
+    }
+  }
+
+  /** One heartbeat: a low lub-dub, felt more than heard. */
+  thump(vol = 0.6): void {
+    if (!this.soundOn || !this.ctx || !this.master) return;
+    const ctx = this.ctx;
+    const beat = (when: number, f0: number, v: number) => {
+      const t = ctx.currentTime + when;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(f0, t);
+      o.frequency.exponentialRampToValueAtTime(34, t + 0.18);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(v, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.24);
+      o.connect(g);
+      g.connect(this.master!);
+      o.start(t);
+      o.stop(t + 0.3);
+    };
+    beat(0, 68, vol);
+    beat(0.26, 58, vol * 0.7);
+  }
+
+  /** A soft glassy chime: light gathering into a shape. */
+  form(): void {
+    [784, 988, 1175, 1568].forEach((f, i) => this.tone(f, 1.4, 'sine', 0.07, i * 0.12));
+  }
+
+  /** A barely-there tick as a line of dialogue appears. */
+  lineTick(): void {
+    this.tone(1320, 0.05, 'sine', 0.035);
+  }
+
+  private scoreTimer: number | null = null;
+  private scoreGain: GainNode | null = null;
+  private scoreTrack: string | null = null;
+
+  /**
+   * The cinematic score: slow minor pads with a sparse, music-box melody.
+   * "opening" is the fuller cue; "sanctuary" is quieter, for the garden.
+   */
+  score(track: 'opening' | 'sanctuary' | null): void {
+    if (track === this.scoreTrack) return;
+    this.scoreTrack = track;
+    if (this.scoreTimer !== null) window.clearInterval(this.scoreTimer);
+    this.scoreTimer = null;
+    if (this.scoreGain && this.ctx) {
+      const g = this.scoreGain;
+      g.gain.setTargetAtTime(0.0001, this.ctx.currentTime, 1);
+      window.setTimeout(() => g.disconnect(), 5000);
+    }
+    this.scoreGain = null;
+    if (!track || !this.soundOn || !this.ctx || !this.master) return;
+    const ctx = this.ctx;
+    const out = ctx.createGain();
+    out.gain.value = 0.0001;
+    out.gain.setTargetAtTime(track === 'opening' ? 0.55 : 0.32, ctx.currentTime, 1.5);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1100;
+    out.connect(lp);
+    lp.connect(this.master);
+    this.scoreGain = out;
+    // A minor – F – C – E minor: hopeful and a little sad.
+    const chords = [
+      [45, 52, 60, 64],
+      [41, 48, 57, 64],
+      [48, 55, 64, 67],
+      [40, 47, 59, 64],
+    ];
+    const melody = [76, 0, 72, 74, 0, 71, 0, 0, 72, 0, 69, 71, 0, 67, 0, 0];
+    const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
+    let i = 0;
+    const bar = 6;
+    const play = () => {
+      if (!this.soundOn || !this.ctx) return;
+      const t = ctx.currentTime;
+      for (const n of chords[i % chords.length]) {
+        for (const detune of [-5, 5]) {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine';
+          o.frequency.value = midi(n);
+          o.detune.value = detune;
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(0.045, t + 2.2);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + bar + 1.5);
+          o.connect(g);
+          g.connect(out);
+          o.start(t);
+          o.stop(t + bar + 1.6);
+        }
+      }
+      if (track === 'opening' || i % 2 === 1) {
+        for (let k = 0; k < 4; k++) {
+          const n = melody[(i * 4 + k) % melody.length];
+          if (n) this.tone(midi(n + 12), 2.2, 'triangle', 0.05, k * (bar / 4), undefined, out);
+        }
+      }
+      i++;
+    };
+    play();
+    this.scoreTimer = window.setInterval(play, bar * 1000);
   }
 
   /** Duck the music while the player exercises so cues are audible. */

@@ -43,7 +43,6 @@ export function Sanctuary({ connected, onBegin, onLab, onBack }: { connected: bo
 
   useEffect(() => {
     input.setMode('menu');
-    audio.say(STORY.sanctuaryGreeting);
   }, []);
 
   const actions = useMemo(
@@ -91,7 +90,7 @@ export function Sanctuary({ connected, onBegin, onLab, onBack }: { connected: bo
   );
 
   return (
-    <div className="title-screen">
+    <div className="title-screen in-garden">
       <div className="title-card setup-card sanctuary">
         <h2>The Sanctuary</h2>
         <p className="elara">

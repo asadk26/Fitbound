@@ -66,7 +66,22 @@ export interface SaveData {
   calibrations: Calibrations;
   /** Recent sessions, for varying the workout. */
   workouts: WorkoutRecord[];
+  /** Story progress that outlives any one run. */
+  story: StoryState;
 }
+
+export interface StoryState {
+  /** The opening has been seen (or skipped): it never plays again by itself. */
+  openingSeen: boolean;
+  /** The Spark has been reached once and part of the kingdom restored (the Sanctuary's rain stops). */
+  restored: boolean;
+  /** Reconstruction rituals so far (varies Elara's line). */
+  rituals: number;
+  /** When the player last arrived at the Sanctuary. */
+  lastVisit: number;
+}
+
+export const DEFAULT_STORY: StoryState = { openingSeen: false, restored: false, rituals: 0, lastVisit: 0 };
 
 export function defaultSave(): SaveData {
   return {
@@ -99,6 +114,7 @@ export function defaultSave(): SaveData {
     exerciseTargets: {},
     calibrations: {},
     workouts: [],
+    story: { ...DEFAULT_STORY },
   };
 }
 
@@ -186,6 +202,12 @@ export function sanitize(input: unknown): SaveData {
     exerciseTargets: Object.fromEntries(Object.entries(o.exerciseTargets ?? {}).filter(([k, v]) => known.has(k) && typeof v === 'number' && Number.isFinite(v) && v >= 1 && v <= 600).map(([k, v]) => [k, Math.round(v as number)])),
     calibrations: Object.fromEntries(Object.entries(o.calibrations ?? {}).filter(([k, v]) => known.has(k) && v && typeof v.at === 'number' && typeof v.reps === 'number')),
     workouts: Array.isArray(o.workouts) ? o.workouts.filter((w) => w && typeof w.id === 'string' && typeof w.at === 'number' && w.volume && typeof w.volume === 'object').slice(-20) : [],
+    story: {
+      openingSeen: !!o.story?.openingSeen,
+      restored: !!o.story?.restored,
+      rituals: Number.isInteger(o.story?.rituals) && o.story!.rituals >= 0 ? o.story!.rituals : 0,
+      lastVisit: typeof o.story?.lastVisit === 'number' && Number.isFinite(o.story.lastVisit) ? o.story.lastVisit : 0,
+    },
   };
   if (typeof out.settings.voiceCommands !== 'boolean') out.settings.voiceCommands = false;
   if (out.settings.attackCues !== 'obvious') out.settings.attackCues = 'adaptive';

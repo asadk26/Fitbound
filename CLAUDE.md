@@ -22,7 +22,8 @@ A personal fitness-powered fantasy roguelite. Real exercises, counted by a phone
 - Story text must follow the canon, and speculative lore must never be presented as settled:
   - the Heart is benevolent;
   - the Echo truth is not revealed early;
-  - Elara is sympathetic, never a simple traitor.
+  - Elara is sympathetic, never a simple traitor. Her lines are never spoken by the browser's synthetic voice.
+  - The Sanctuary rains until the first restoration. Never explain why.
 
 ## Honesty about testing
 
@@ -69,5 +70,7 @@ Headless end-to-end checks drive a PC page and a phone page through the real rel
 - `src/rpg/`: combat engine, abilities, enemies, blessings, dodge reading, expedition routes, loadouts, workout records, and story text (`story.ts`).
 - `src/ui/expedition/`: Sanctuary, travel, battle, events (Mirror, Haven, blessings, summary), and the Movement Lab.
 - `src/phaser/`: scenes and procedurally painted diorama art. `RpgScene` stages expedition battles; `DioramaScene` is the trail board.
+- `src/story/`: cinematics. `cinema.ts` holds the script format and runner, plus the voice-line hook. `scripts.ts` holds the opening and the ritual.
+- `src/phaser/scenes/CinemaScene.ts` and `src/phaser/diorama/cinemaArt.ts`: the cinematic stage and its art (the Sanctuary, the Heart, the memories). `src/ui/Cinema.tsx`: the dialogue overlay.
 - `src/trial/`: the tutorial Motion Trial.
 - `tests/`: unit tests.

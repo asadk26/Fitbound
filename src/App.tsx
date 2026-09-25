@@ -16,11 +16,13 @@ import { TrialSetup } from './ui/TrialSetup';
 import { ConnectedSetup } from './ui/Connected';
 import { Expedition } from './ui/expedition/Expedition';
 import { VoiceChip } from './ui/VoiceUi';
+import { CinemaPlayer } from './ui/Cinema';
+import { OPENING } from './story/scripts';
 import { currentNode, loadExpedition } from './rpg/expedition';
 import { startMotion, tilt } from './input/tilt';
 import type { Difficulty } from './exercise/types';
 
-type Screen = 'title' | 'newgame' | 'world' | 'battle' | 'trialsetup' | 'trial' | 'connectsetup' | 'connected' | 'expconnect' | 'expedition';
+type Screen = 'title' | 'opening' | 'newgame' | 'world' | 'battle' | 'trialsetup' | 'trial' | 'connectsetup' | 'connected' | 'expconnect' | 'expedition';
 type Overlay = { kind: 'npc'; id: string } | { kind: 'message'; text: string } | { kind: 'abilities' } | { kind: 'menu' } | null;
 
 export default function App() {
@@ -144,6 +146,12 @@ export default function App() {
             setScreen(connected ? 'expconnect' : 'expedition');
           }}
           canContinue={save.created}
+          canReplay={save.story.openingSeen}
+          onReplay={() => {
+            audio.unlock();
+            audio.select();
+            setScreen('opening');
+          }}
           onTrial={() => {
             audio.unlock();
             audio.select();
@@ -177,6 +185,7 @@ export default function App() {
       )}
 
       {screen === 'trial' && <TrialRun onExit={() => setScreen('title')} />}
+      {screen === 'opening' && <CinemaPlayer script={OPENING} ownInput onDone={() => setScreen('title')} />}
 
       {screen === 'connectsetup' && <ConnectedSetup onBack={() => setScreen('title')} onStart={startConnected} />}
       {screen === 'expconnect' && <ConnectedSetup purpose="expedition" onBack={() => setScreen('title')} onStart={() => setScreen('expedition')} />}
@@ -261,6 +270,8 @@ export default function App() {
 
 function TitleScreen({
   canContinue,
+  canReplay,
+  onReplay,
   onExpedition,
   onTrial,
   onConnected,
@@ -268,6 +279,8 @@ function TitleScreen({
   onNew,
 }: {
   canContinue: boolean;
+  canReplay: boolean;
+  onReplay: () => void;
   onExpedition: (connected: boolean, resume: boolean) => void;
   onTrial: () => void;
   onConnected: () => void;
@@ -313,6 +326,11 @@ function TitleScreen({
             <button className="btn btn-sm btn-ghost" onClick={onTrial}>
               Tutorial trial · phone only
             </button>
+            {canReplay && (
+              <button className="btn btn-sm btn-ghost" onClick={onReplay}>
+                Replay the opening
+              </button>
+            )}
           </div>
           <div className="title-classic">
             {canContinue && (

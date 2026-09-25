@@ -3,6 +3,7 @@ import { bus, type BusEvents, type DioramaState } from '../game/bus';
 import { BattleScene } from './scenes/BattleScene';
 import { RpgScene } from './scenes/RpgScene';
 import { BootScene } from './scenes/BootScene';
+import { CinemaScene, type CinemaData } from './scenes/CinemaScene';
 import { DioramaScene } from './scenes/DioramaScene';
 import { WorldScene } from './scenes/WorldScene';
 
@@ -33,7 +34,7 @@ export function createGame(parent: HTMLElement): Phaser.Game {
     scale: { mode: Phaser.Scale.RESIZE, width: parent.clientWidth || 390, height: parent.clientHeight || 700 },
     input: { activePointers: 2 },
     audio: { noAudio: true },
-    scene: [BootScene, WorldScene, DioramaScene, BattleScene, RpgScene],
+    scene: [BootScene, WorldScene, DioramaScene, BattleScene, RpgScene, CinemaScene],
   });
   return game;
 }
@@ -59,13 +60,30 @@ function whenBooted(fn: () => void): void {
 }
 
 /** Show one exploration scene (stopping the others). */
-export function showScene(key: 'World' | 'Diorama', data: object = {}): void {
+export function showScene(key: 'World' | 'Diorama' | 'Cinema', data: object = {}): void {
   whenBooted(() => {
     const sm = game!.scene;
-    for (const k of ['World', 'Diorama', 'Battle', 'Rpg']) if (k !== key && (sm.isActive(k) || sm.isSleeping(k))) sm.stop(k);
+    for (const k of ['World', 'Diorama', 'Battle', 'Rpg', 'Cinema']) if (k !== key && (sm.isActive(k) || sm.isSleeping(k))) sm.stop(k);
     paused = null;
     if (sm.isActive(key) || sm.isSleeping(key)) sm.stop(key);
     sm.run(key, data);
+  });
+}
+
+/** Play a cinematic from its first beat (the scene says `cine:ready` when it can take beats). */
+export function showCinema(data: CinemaData): void {
+  showScene('Cinema', data);
+}
+
+/**
+ * The quiet Sanctuary garden behind the setup screen. If a cinematic just
+ * ended there, it simply settles (no restart, no break in the rain).
+ */
+export function showSanctuary(restored: boolean): void {
+  whenBooted(() => {
+    const sm = game!.scene;
+    if (sm.isActive('Cinema')) bus.emit('cine:idle', { restored });
+    else showScene('Cinema', { mode: 'idle', restored } satisfies CinemaData);
   });
 }
 

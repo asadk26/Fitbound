@@ -1373,9 +1373,18 @@ Since then, the following have also been implemented (not yet physically playtes
   - An optional post-run check-in on effort, fun and pacing, saved with the history. This is the first "player feedback" from §17.
   - A copyable plain-text playtest report per run.
 
+- **The opening cinematic and the reconstruction ritual (first version).** These run on a reusable in-engine cinematic system; the scripts are data.
+  - **Elara's first visual identity:** a young, doll-like woman; long wavy silver-grey hair; ivory and deep-teal robes; a thin thread of the Heart's warm amber light. Her figure and dialogue portrait share one painter.
+  - **The opening:** darkness and rain, then the heartbeat; illustrated memory fragments of the kingdom; the Heart's cavern, where the rain is muffled; the rainy Sanctuary, where the hero forms on the stone and Elara waits by the well; and the distant Spark.
+  - **Presentation:** player-paced dialogue; no synthetic voice for Elara anywhere in the game; line ids ready for recorded voice.
+  - **Playback:** the opening plays once, can be skipped, and can be replayed from the title screen.
+  - **The ritual:** about 10 s, skippable, with a context-sensitive line from Elara.
+  - **Rain motif:** the Sanctuary rains until the first restoration, then is dry and sunlit. This is not explained on screen.
+
 Validation to date:
 
-- **Automated:** 283 passing unit tests.
+- **Automated:** 296 passing unit tests. These include the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
+- **Headless browser:** the full opening (every line in order), the ritual on the next launch (the opening does not repeat), skip, the Sanctuary screen over the garden, and the dry garden after restoration. Screenshots were reviewed; the visuals are a first version for the creator to evaluate.
 - **Headless browser runs through the local relay with a scripted synthetic body:**
   - a full standard expedition (19 sets, all march legs, the shrine detour, and victory);
   - a short expedition;
@@ -1486,7 +1495,7 @@ They should be resolved through implementation and playtesting.
 
 ### Presentation
 
-- Elara’s finalized visual identity.
+- Elara’s finalized visual identity. A first version exists (§32); it is open to refinement.
 - The protagonist’s final character design.
 - Character voice casting and production.
 - Exact cutscene scripts.
@@ -1554,3 +1563,4 @@ That is the experience every major design decision should serve.
   - **§32:** status brought up to date (marching legs, visual battle staging, visual-only cues, free-standing battle figures, 280 tests).
   - **§34:** navigation added to the open questions.
 - **2026-09-25 (later):** §32 updated with the playtest aids.
+- **2026-09-25 (later):** §32 updated with the opening cinematic, the ritual, Elara's first visual identity, and the Sanctuary rain motif. §34 notes that Elara's look has a first version.

@@ -1,6 +1,7 @@
 import type { CombatEffect } from '../combat/CombatEngine';
 import type { RpgFx } from '../rpg/engine';
 import type { MapId } from '../phaser/maps';
+import type { SetId, Soundscape } from '../story/cinema';
 
 /** What the Motion Trial wants the diorama to show. */
 export interface DioramaState {
@@ -77,6 +78,12 @@ export interface BusEvents {
   'rpg:strike': { uid: number; height: 'high' | 'low'; phase: 'telegraph' | 'approach' | 'swing' | 'clear'; cues?: 'obvious' | 'clear' | 'subtle'; /** approach: time until impact. */ ms?: number };
   /** Per-foe status for the in-world HUD (HP, ward, armour, intent). */
   'rpg:foes': { foes: RpgFoeStatus[] };
+  /** Cinematics: the scene is up; a beat starts (stage, staging cues, soundscape); jump to the quiet Sanctuary. */
+  'cine:ready': undefined;
+  /** The scene's clock: scripts advance on it, so staging and dialogue stay in step even on a slow machine. */
+  'cine:tick': { dt: number };
+  'cine:beat': { set?: SetId; cues: string[]; sound: Soundscape };
+  'cine:idle': { restored: boolean };
   /** Hero pose while dodging (from the body reading), for feedback. */
   'rpg:pose': { duck: number; airborne: boolean };
   'rpg:end': undefined;

@@ -24,7 +24,9 @@ All modes share one input system, one exercise library, one progression system a
 1. Double-click **`Play FITBOUND.bat`** on the laptop (or run `npm run play`). The browser opens the game.
 2. Choose **Expedition · PC + phone**. Pair the phone as before (QR code, then *Start … camera* on the phone).
 3. **Continue to the Sanctuary.** You don't need to be in view yet. Menus, choices, the path and the Haven all work from the couch with a gamepad, keyboard or mouse.
-4. In **the Sanctuary** (setup, about 20 seconds):
+   - **The first time**, the opening plays (see *The opening and the ritual* below). It plays once. It is marked as seen even if you skip it, and it never repeats by itself. *Replay the opening* is on the title screen.
+   - **After that**, a short reconstruction ritual (about 10 seconds, skippable) plays whenever you arrive at the Sanctuary. That covers arriving from the title screen and coming back from an expedition.
+4. In **the Sanctuary** (setup, about 20 seconds; the screen sits in the rainy garden):
    - say whether you have **dumbbells** today, and a **chair or bench** for rows;
    - say **how you feel** (Take it easy, Normal or Strong). This scales your own targets and nothing else;
    - pick a **route**: Full (about 20–25 min, 6 fights) or Short (about 12–15 min, 4 fights);
@@ -33,6 +35,45 @@ All modes share one input system, one exercise library, one progression system a
 5. **Begin.** The camera checks you just before the first fight (a quick "stand tall"), not before.
 
 A saved run shows **Resume expedition · Phase N** on the title screen.
+
+### The opening and the ritual
+
+Cinematics are staged in the engine, in the same painted diorama style as the rest of the game. They are not videos.
+
+**The opening** has four stages:
+
+1. **Darkness.** Soft rain, then a heartbeat rising beneath it.
+2. **The kingdom, in fragments.** Three illustrated memories fade in and out: a festival square with nobody in it, towers coming apart stone by stone, and a wheat field greying from the edges. Elara, not yet seen, speaks over them.
+3. **The Heart.** A crystal heart in a cavern of roots, with brass rings turning around it. The rain is muffled here, as if heard through stone. Light pulls a sword, a cape and a hand out of the dark.
+4. **The Sanctuary.** A walled garden on a floating island above a sea of haze, in the rain. The hero forms on a stone slab and rises. Elara waits beside a well that glows with the Heart's warm light, and the light shows in the wet stone and the puddles. Later she walks to the garden's edge, and the camera finds the Spark on a far rise.
+
+It ends on "Come. Let's see what the Heart has remembered of you." and goes straight into the Sanctuary setup screen.
+
+**How it plays:**
+
+- **Lines wait for you.** Press A, Enter or Space, click, or raise your right hand. The first press finishes the text; the next moves on.
+- **Skipping:** press B or Esc twice, or use the **Skip** button.
+- **No camera needed.** You can watch from the couch.
+- **Sound:** music, rain and the heartbeat, with no synthetic voice. The browser's robotic voice is never used for Elara, anywhere in the game.
+- **Recorded voice later:** every line has an id (e.g. `opening.elara.05`). A recorded file can be added per line in `VOICE_LINES` (`src/story/cinema.ts`).
+
+**The reconstruction ritual** is about 10 seconds and skippable. There's a heartbeat, light gathers, the hero forms, and Elara says one line that fits the moment:
+
+- after a victory;
+- after a fall;
+- after ending or saving early;
+- after a few days away;
+- or simply "There you are."
+
+**The rain.** The Sanctuary has been raining for a long time. After the first expedition that reaches the Spark, the rain stops, and the garden is dry and sunlit from then on. Nothing explains why.
+
+**For development:**
+
+- Scripts are data in `src/story/scripts.ts`: stages, staging cues, the soundscape, and lines.
+- The stage is `src/phaser/scenes/CinemaScene.ts`.
+- Its art is `src/phaser/diorama/cinemaArt.ts`. It's painted the first time it's needed, not at boot.
+- Elara's figure and her dialogue portrait come from one painter in `src/phaser/diorama/figures.ts`, so they always match.
+- Script time comes from the scene's clock, so staging and dialogue stay in step even on a slow machine.
 
 ### A run
 
@@ -907,6 +948,14 @@ Already in place and reusable:
 - **Regressions:** the phone-only Motion Trial and the classic touch adventure (all four fights, level-ups, save and reload) were re-run end to end in the browser and still work.
 
 ## Physical playtest checklist (Heart of Haze)
+
+**The opening (new).** Watch it on the TV from the couch:
+- Are the lines readable at your distance?
+- Does the pacing feel right when you press on at your own speed?
+- Is the rain audible but never covering the music or the heartbeat?
+- Does Elara feel approachable?
+
+Then note how the ritual feels on your second and third visits.
 
 **Nothing in the expedition has been tried by a real person yet.** Suggested order for one or two sessions. After each expedition, open **Playtest report** on the summary and copy it into your notes.
 

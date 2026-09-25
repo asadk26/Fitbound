@@ -16,7 +16,7 @@
  * Haven memories come after the stretches end.
  */
 export const STORY = {
-  sanctuaryGreeting: 'You’re awake. Good. The Heart gathered you again — the pieces it could find. Tell me what you have to work with today, and we’ll see what your hands and feet remember.',
+  sanctuaryGreeting: 'Tell me what you have to work with today.',
   loadoutNote: 'Each expedition the Heart rebuilds you a little differently. Four kinds of strength; the forms they take will change.',
   departure: 'The path to the Spark is open for now. I’ll be here when you come back. …Try to come back.',
   blessingIntro: 'A fragment surfaces — a technique from some other version of you. The Heart offers it. Take one.',
