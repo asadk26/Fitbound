@@ -1,0 +1,165 @@
+import { describe, expect, it } from 'vitest';
+import { SidePlankDetector, sidePlankConfig, WallSitDetector, wallSitConfig } from '../src/exercise/detectors/holds';
+import { getExercise, targetLabel } from '../src/exercise/registry';
+import { ExerciseSessionController, trialSessionOptions } from '../src/exercise/session';
+import { parseGameMsg } from '../src/net/protocol';
+import type { DetectorUpdate, ExerciseDetector, ExerciseEvent, PoseFrame } from '../src/exercise/types';
+import { FRAME_MS, sidePlankPose, wallSitPose } from '../src/testing/poses';
+
+type F = (t: number) => PoseFrame | null;
+
+function run(d: ExerciseDetector, frames: F[], start = 0) {
+  let t = start;
+  let u: DetectorUpdate | null = null;
+  for (const f of frames) {
+    t += FRAME_MS;
+    u = d.update(f(t), t);
+  }
+  return { u: u!, t };
+}
+const n = (count: number, f: F) => Array.from({ length: count }, () => f);
+const secs = (s: number) => Math.round((s * 1000) / FRAME_MS);
+
+describe('wall sit', () => {
+  it('times a seated hold and nothing while standing', () => {
+    const d = new WallSitDetector();
+    const stand = run(
+      d,
+      n(60, (t) => wallSitPose(0, t)),
+    );
+    expect(stand.u.holdMs).toBe(0);
+    expect(stand.u.guidance).toBe('GET_INTO_WALL_SIT');
+    const sit = run(
+      d,
+      n(secs(5), (t) => wallSitPose(1, t)),
+      stand.t,
+    );
+    expect(sit.u.holding).toBe(true);
+    expect(sit.u.holdMs!).toBeGreaterThan(4500);
+    expect(sit.u.holdMs!).toBeLessThanOrEqual(5000);
+  });
+
+  it('a half-way sit asks for lower; beginners may sit higher', () => {
+    const half = run(
+      new WallSitDetector(),
+      n(90, (t) => wallSitPose(0.55, t)),
+    );
+    expect(half.u.holdMs).toBe(0);
+    expect(half.u.guidance).toBe('GO_LOWER');
+    const easy = run(
+      new WallSitDetector(wallSitConfig('beginner')),
+      n(90, (t) => wallSitPose(0.6, t)),
+    );
+    expect(easy.u.holdMs!).toBeGreaterThan(2000);
+  });
+
+  it('leaning well forward off the wall does not count', () => {
+    const r = run(
+      new WallSitDetector(),
+      n(90, (t) => wallSitPose(1, t, { lean: 50 })),
+    );
+    expect(r.u.holdMs).toBe(0);
+    expect(r.u.guidance).toBe('BACK_AGAINST_WALL');
+  });
+
+  it('standing up pauses the clock and keeps the time; losing the camera never adds time', () => {
+    const d = new WallSitDetector();
+    const a = run(
+      d,
+      n(secs(3), (t) => wallSitPose(1, t)),
+    );
+    const kept = a.u.holdMs!;
+    const b = run(d, [...n(30, (t) => wallSitPose(0, t)), ...n(60, () => null)], a.t);
+    expect(b.u.holdMs).toBe(kept);
+    expect(b.u.holding).toBe(false);
+    // A stalled camera: one frame after a 5 s gap adds at most the per-frame cap.
+    const c = run(
+      d,
+      n(20, (t) => wallSitPose(1, t)),
+      b.t,
+    );
+    const before = c.u.holdMs!;
+    const u = d.update(wallSitPose(1, c.t + 5000), c.t + 5000);
+    expect(u.holdMs! - before).toBeLessThanOrEqual(200);
+  });
+});
+
+describe('side plank', () => {
+  it('tells which side you rest on and times each separately', () => {
+    const d = new SidePlankDetector();
+    const l = run(
+      d,
+      n(secs(4), (t) => sidePlankPose('left', 1, t)),
+    );
+    expect(l.u.holding).toBe(true);
+    expect(l.u.metrics!.down).toBe(-1);
+    const r = run(d, [...n(20, (t) => sidePlankPose('right', 0, t)), ...n(secs(3), (t) => sidePlankPose('right', 1, t))], l.t);
+    expect(r.u.metrics!.down).toBe(1);
+    expect(d.sides.left).toBeGreaterThan(3500);
+    expect(d.sides.right).toBeGreaterThan(2500);
+    expect(d.sides.right).toBeLessThan(3100);
+  });
+
+  it('hips down on the floor do not count', () => {
+    const r = run(
+      new SidePlankDetector(),
+      n(90, (t) => sidePlankPose('left', 0, t)),
+    );
+    expect(r.u.holdMs).toBe(0);
+    expect(r.u.guidance).toBe('LIFT_HIPS');
+  });
+
+  it('balances the two sides: past its half, one side stops counting and asks you to switch', () => {
+    const d = new SidePlankDetector();
+    d.setHoldTarget(10_000);
+    const l = run(
+      d,
+      n(secs(9), (t) => sidePlankPose('left', 1, t)),
+    );
+    expect(l.u.holdMs).toBe(5000);
+    expect(l.u.holding).toBe(false);
+    expect(l.u.guidance).toBe('SWITCH_SIDES');
+    const r = run(d, [...n(15, (t) => sidePlankPose('right', 0, t)), ...n(secs(6), (t) => sidePlankPose('right', 1, t))], l.t);
+    expect(r.u.holdMs).toBe(10_000);
+    expect(d.sides).toEqual({ left: 5000, right: 5000 });
+  });
+
+  it('a full set in the session completes only when both sides are done', () => {
+    const ex = getExercise('side_plank');
+    const events: ExerciseEvent[] = [];
+    const s = new ExerciseSessionController(ex, ex.createDetector!('intermediate'), 10, (e) => events.push(e), trialSessionOptions(ex.id));
+    let t = 0;
+    const feed = (count: number, f: F) => {
+      for (let i = 0; i < count; i++) s.update(f((t += FRAME_MS)), t);
+    };
+    feed(secs(12), (tt) => sidePlankPose('right', 1, tt));
+    expect(events.some((e) => e.type === 'setComplete')).toBe(false);
+    feed(15, (tt) => sidePlankPose('left', 0, tt));
+    feed(secs(6), (tt) => sidePlankPose('left', 1, tt));
+    expect(events.some((e) => e.type === 'setComplete')).toBe(true);
+  });
+
+  it('beginners may rest on their knees', () => {
+    expect(sidePlankConfig('beginner').allowKnees).toBe(true);
+  });
+});
+
+describe('the two holds in the library', () => {
+  it('are experimental and Lab-only until physically checked', () => {
+    for (const id of ['wall_sit', 'side_plank']) {
+      const ex = getExercise(id);
+      expect(ex.kind).toBe('hold');
+      expect(ex.reliability).toBe('experimental');
+      expect(ex.eligible).toEqual(['lab']);
+    }
+  });
+  it('the side plank target reads as a total split in half', () => {
+    expect(targetLabel(getExercise('side_plank'), 30)).toBe('30 s (15 s each side)');
+  });
+  it('the phone is told the split target, validated', () => {
+    const ok = parseGameMsg({ type: 'EXERCISE_BEGIN', setId: 's1', exerciseId: 'side_plank', difficulty: 'beginner', holdTargetMs: 30_000 });
+    expect(ok).toMatchObject({ holdTargetMs: 30_000 });
+    expect(parseGameMsg({ type: 'EXERCISE_BEGIN', setId: 's1', exerciseId: 'side_plank', difficulty: 'beginner', holdTargetMs: -5 })).toBeNull();
+    expect(parseGameMsg({ type: 'EXERCISE_BEGIN', setId: 's1', exerciseId: 'plank', difficulty: 'beginner' })).not.toHaveProperty('holdTargetMs');
+  });
+});

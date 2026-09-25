@@ -52,6 +52,8 @@ export const PAUSE_POLICIES: Record<string, PausePolicy> = {
   butt_kicks: { holdMs: 1500, feetTogether: true, still: true, standing: false },
   punch_front: { holdMs: 1500, feetTogether: true, still: true, standing: false },
   punch_side: { holdMs: 1500, feetTogether: true, still: true, standing: false },
+  // A wall sit keeps the hands low; standing up already stops its clock.
+  wall_sit: { holdMs: 1000, feetTogether: false, still: false, standing: false },
 };
 
 const DEFAULT_POLICY: PausePolicy = { holdMs: 1200, feetTogether: false, still: false, standing: true };

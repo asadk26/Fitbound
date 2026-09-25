@@ -151,6 +151,7 @@ export class ControllerBridge {
         const detector = ex.createDetector(msg.difficulty);
         // The PC decides when the set is complete; the phone just keeps counting.
         const ctrl = new ExerciseSessionController(ex, detector, 10_000, (e) => this.onExerciseEvent(msg.setId, e), trialSessionOptions(ex.id));
+        if (msg.holdTargetMs) detector.setHoldTarget?.(msg.holdTargetMs);
         this.set = { id: msg.setId, exerciseId: ex.id, ctrl, lastStage: null, lastSentAt: -Infinity, diag: new SetDiagnostics(), diagAt: -Infinity, heldSent: 0, heldAt: -Infinity };
         this.hub.setExercise(ex.id);
         this.progress = { setId: msg.setId, exerciseName: ex.name, count: 0, target: 0, manualMode: false, paused: false };

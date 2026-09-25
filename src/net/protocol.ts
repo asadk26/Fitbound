@@ -101,7 +101,7 @@ export type CtrlMsg = CtrlPayload & { seq: number; epoch: number };
 export type GameMsg =
   | { type: 'MODE'; mode: InputMode; epoch: number; calibration?: 'full' | 'quick' }
   | { type: 'SETTINGS'; turnStep: 45 | 90; lean: 'low' | 'normal' | 'high'; march: 'low' | 'normal' | 'high'; facing: 'user' | 'environment'; model: 'full' | 'lite'; pcSound: boolean }
-  | { type: 'EXERCISE_BEGIN'; setId: string; exerciseId: string; difficulty: 'beginner' | 'intermediate' | 'advanced' }
+  | { type: 'EXERCISE_BEGIN'; setId: string; exerciseId: string; difficulty: 'beginner' | 'intermediate' | 'advanced'; holdTargetMs?: number }
   | { type: 'EXERCISE_PROGRESS'; setId: string; count: number; target: number; manualMode: boolean; paused: boolean }
   | { type: 'EXERCISE_CONTROL'; setId: string; action: 'pause' | 'resume' | 'manual' }
   | { type: 'EXERCISE_END'; setId: string }
@@ -144,6 +144,11 @@ const GUIDANCE = [
   'GET_INTO_ROW',
   'LIE_ON_BACK',
   'STEP_BACK_TOGETHER',
+  'GET_INTO_WALL_SIT',
+  'BACK_AGAINST_WALL',
+  'GET_INTO_SIDE_PLANK',
+  'LIFT_HIPS',
+  'SWITCH_SIDES',
 ] as const;
 const VIA = ['motion', 'touch'] as const;
 const BLOCKERS = ['NO_BODY', 'BODY_HIDDEN', 'ARMS_HIDDEN', 'NOT_LEVEL', 'NOT_SIDEWAYS', 'HIPS_PIKED', 'ARMS_NOT_STRAIGHT'] as const;
@@ -331,7 +336,9 @@ export function parseGameMsg(v: unknown): GameMsg | null {
         ? { type: 'SETTINGS', turnStep: v.turnStep, lean: v.lean, march: v.march, facing: v.facing, model: v.model, pcSound: v.pcSound }
         : null;
     case 'EXERCISE_BEGIN':
-      return str(v.setId, 40) && str(v.exerciseId, 32) && oneOf(v.difficulty, ['beginner', 'intermediate', 'advanced'] as const) ? { type: 'EXERCISE_BEGIN', setId: v.setId, exerciseId: v.exerciseId, difficulty: v.difficulty } : null;
+      return str(v.setId, 40) && str(v.exerciseId, 32) && oneOf(v.difficulty, ['beginner', 'intermediate', 'advanced'] as const) && (v.holdTargetMs === undefined || int(v.holdTargetMs, 1, 600_000))
+        ? { type: 'EXERCISE_BEGIN', setId: v.setId, exerciseId: v.exerciseId, difficulty: v.difficulty, ...(v.holdTargetMs !== undefined ? { holdTargetMs: v.holdTargetMs } : {}) }
+        : null;
     case 'EXERCISE_PROGRESS':
       return str(v.setId, 40) && int(v.count, 0, 10_000) && int(v.target, 1, 10_000) && typeof v.manualMode === 'boolean' && typeof v.paused === 'boolean'
         ? { type: 'EXERCISE_PROGRESS', setId: v.setId, count: v.count, target: v.target, manualMode: v.manualMode, paused: v.paused }

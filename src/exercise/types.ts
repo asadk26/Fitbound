@@ -52,7 +52,12 @@ export type GuidanceCode =
   | 'NO_SWING'
   | 'GET_INTO_ROW'
   | 'LIE_ON_BACK'
-  | 'STEP_BACK_TOGETHER';
+  | 'STEP_BACK_TOGETHER'
+  | 'GET_INTO_WALL_SIT'
+  | 'BACK_AGAINST_WALL'
+  | 'GET_INTO_SIDE_PLANK'
+  | 'LIFT_HIPS'
+  | 'SWITCH_SIDES';
 
 /** The player's anatomical side, for exercises counted per side. */
 export type Side = 'left' | 'right';
@@ -110,6 +115,8 @@ export interface ExerciseDetector {
   reset(): void;
   /** Feed one frame. `null` means the tracker saw no body in this frame. */
   update(frame: PoseFrame | null, now: number): DetectorUpdate;
+  /** Hold exercises that split their target (side planks): the set's total target. */
+  setHoldTarget?(ms: number): void;
 }
 
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced';

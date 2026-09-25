@@ -54,8 +54,8 @@ export function trialSessionOptions(exerciseId: string): Partial<SessionOptions>
   return FLOOR_EXERCISES.has(exerciseId) ? { ...base, countdownMs: 0, readyHoldMs: 250 } : base;
 }
 
-/** Floor movements start the moment you're in position (nobody should hold a plank through a 3-2-1). */
-const FLOOR_EXERCISES = new Set(['pushup', 'plank', 'mountain_climber', 'dead_bug', 'glute_bridge', 'russian_twist']);
+/** Floor movements and wall sits start the moment you're in position (nobody should hold a plank or a wall sit through a 3-2-1). */
+const FLOOR_EXERCISES = new Set(['pushup', 'plank', 'mountain_climber', 'dead_bug', 'glute_bridge', 'russian_twist', 'side_plank', 'wall_sit']);
 
 export interface SessionSnapshot {
   stage: SessionStage;
@@ -108,6 +108,18 @@ export class ExerciseSessionController {
     this.opts = { ...SESSION_DEFAULTS, ...opts };
     this.nextTickMs = this.opts.holdTickMs;
     if (!detector) this.cameraUnavailable = true;
+    else if (exercise.kind === 'hold') detector.setHoldTarget?.(target * 1000);
+  }
+
+  /**
+   * Hold time the detector banked before the set went active (while you
+   * settled in) doesn't count. Split holds (side planks) are the exception:
+   * the detector caps each side at half the target, so subtracting anything
+   * would leave the set forever short; the few hundred ms before 'active'
+   * were spent holding anyway.
+   */
+  private baselineOf(u: DetectorUpdate): number {
+    return this.exercise.holdSplit ? 0 : (u.holdMs ?? 0);
   }
 
   get isHold(): boolean {
@@ -148,7 +160,7 @@ export class ExerciseSessionController {
             if (this.opts.countdownMs > 0) this.setStage('countdown', now);
             else {
               this.setStage('active', now);
-              this.holdBaseline = u.holdMs ?? 0;
+              this.holdBaseline = this.baselineOf(u);
               this.lastProgressAt = now;
             }
           }
@@ -159,7 +171,7 @@ export class ExerciseSessionController {
         // done during the countdown counts.
         if (now - (this.stageStart ?? now) >= this.opts.countdownMs) {
           this.setStage('active', now);
-          this.holdBaseline = u.holdMs ?? 0;
+          this.holdBaseline = this.baselineOf(u);
           this.lastProgressAt = now;
         }
         break;

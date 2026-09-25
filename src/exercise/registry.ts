@@ -2,6 +2,7 @@ import { JumpingJackDetector, jackConfig } from './detectors/jumpingJack';
 import { PlankDetector, plankConfig } from './detectors/plank';
 import { PushupDetector, pushupConfig } from './detectors/pushup';
 import { SquatDetector, squatConfig } from './detectors/squat';
+import { SidePlankDetector, sidePlankConfig, WallSitDetector, wallSitConfig } from './detectors/holds';
 import { ButtKickDetector, GluteBridgeDetector, LateralRaiseDetector, OverheadPressDetector, PunchDetector, SkaterDetector, TwistDetector } from './detectors/more';
 import { ClimberDetector, CrossCrunchDetector, CurlDetector, DeadBugDetector, HighKneesDetector, LungeDetector, lungeConfig, RowDetector } from './detectors/movements';
 import type { Difficulty, ExerciseDetector, ExerciseKind } from './types';
@@ -54,6 +55,8 @@ export interface ExerciseDefinition {
   needsSupport?: boolean;
   /** Counted per side; the target is per side and both must reach it. */
   sided: boolean;
+  /** Holds only: the target is the total, split evenly between the two sides (side planks). */
+  holdSplit?: boolean;
   /** Performed on the floor: allow extra time to stand before any dodge. */
   floor: boolean;
   calibration: CalibrationNeed;
@@ -655,6 +658,67 @@ export const EXERCISES: ExerciseDefinition[] = [
     animation: 'jab',
     createDetector: () => new PunchDetector('side'),
   },
+  {
+    id: 'wall_sit',
+    family: 'legs',
+    equipment: [],
+    sided: false,
+    floor: false,
+    calibration: 'standing-side',
+    reliability: 'experimental',
+    reliabilityNote: 'Lab test only. Side-on to the phone against a wall: knees near a right angle, thighs near level, back upright. Does the clock run only while you really sit?',
+    range: { min: 10, default: 20, max: 90 },
+    rpgAbility: 'bastion',
+    variants: ['Sit higher (beginner level accepts a shallower bend)', 'Hands on thighs'],
+    eligible: ['lab'],
+    name: 'Wall Sit',
+    kind: 'hold',
+    ability: { name: 'Bastion', effect: 'shield', description: 'Root yourself like a wall.', icon: 'shield', color: '#9bd36a' },
+    targets: { beginner: 15, intermediate: 20, advanced: 30 },
+    unlock: { level: 1 },
+    camera: {
+      view: 'side',
+      instructions: [
+        'Find a clear stretch of wall and put the phone about 2 m (6 ft) to your side, low, like for push-ups.',
+        'Back flat against the wall, slide down until your knees bend near a right angle.',
+        'The clock runs only while you hold. Stand up to rest; your time is kept.',
+      ],
+    },
+    alternative: 'A higher wall sit, or a chair squat hold.',
+    animation: 'brace',
+    createDetector: (d) => new WallSitDetector(wallSitConfig(d)),
+  },
+  {
+    id: 'side_plank',
+    family: 'core',
+    equipment: [],
+    sided: false,
+    holdSplit: true,
+    floor: true,
+    calibration: 'floor-side',
+    reliability: 'experimental',
+    reliabilityNote: "Lab test only. Lying on your side facing the phone. Half the time goes to each side: once one side's half is done it should say 'Switch sides', and only the other side should finish the set.",
+    range: { min: 10, default: 30, max: 90 },
+    rpgAbility: 'whirl',
+    variants: ['Knees down (beginner level)', 'Forearm or straight arm'],
+    eligible: ['lab'],
+    name: 'Side Plank',
+    kind: 'hold',
+    ability: { name: 'Whirling Ward', effect: 'bulwark', description: 'A ward held on each side.', icon: 'heart', color: '#6fc3e8' },
+    targets: { beginner: 20, intermediate: 30, advanced: 40 },
+    unlock: { level: 1 },
+    camera: {
+      view: 'front',
+      instructions: [
+        'Lay the phone on the floor about 2 m (6 ft) away, facing you.',
+        'Lie on your side facing the phone, propped on your lower forearm, feet stacked, and lift your hips into a line.',
+        'Half the time goes to each side. When one side is done, roll over for the other.',
+      ],
+    },
+    alternative: 'Knees-down side plank (beginner level).',
+    animation: 'brace',
+    createDetector: (d) => new SidePlankDetector(sidePlankConfig(d)),
+  },
 ];
 
 export const MAX_LOADOUT = 4;
@@ -681,7 +745,7 @@ export function exercisesIn(family: Family): ExerciseDefinition[] {
 
 /** Target unit label: "8 reps", "8 per side", "25 s". */
 export function targetLabel(ex: ExerciseDefinition, n: number): string {
-  if (ex.kind === 'hold') return `${n} s`;
+  if (ex.kind === 'hold') return ex.holdSplit ? `${n} s (${n / 2} s each side)` : `${n} s`;
   return ex.sided ? `${n} per side` : `${n} reps`;
 }
 

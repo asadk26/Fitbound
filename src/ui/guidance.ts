@@ -21,6 +21,11 @@ export const GUIDANCE: Record<GuidanceCode, string> = {
   GET_INTO_ROW: 'Bend over with a hand on your support, rowing arm nearest the phone',
   LIE_ON_BACK: 'Lie on your back side-on to the phone, arms up, knees over hips',
   STEP_BACK_TOGETHER: 'Step one foot back and lower — both knees level is a squat',
+  GET_INTO_WALL_SIT: 'Back against the wall, slide down until your knees bend',
+  BACK_AGAINST_WALL: 'Keep your back upright against the wall, shins straight up',
+  GET_INTO_SIDE_PLANK: 'Lie on your side facing the phone, propped on your lower arm',
+  LIFT_HIPS: 'Lift your hips until your body makes a straight line',
+  SWITCH_SIDES: 'That side is done. Switch sides',
 };
 
 /** Short spoken versions of the most important cues. */

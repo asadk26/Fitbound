@@ -687,6 +687,8 @@ If detection keeps failing (12 s stuck in setup, 15 s without a counted rep, 3 t
 | Butt kicks | Cardio | — | facing | **experimental** | `ButtKickDetector`: heel to within 0.3 shin of the knee while the knee stays low (a high knee doesn't count). Experimental: the heel is behind the leg |
 | Russian twists | Core | — | seated, facing | beta | `TwistDetector`: hands together travel ≥ 1.1 hip widths to each side, per side |
 | Punch test (facing / side-on) | — | — | both | Lab only | `PunchDetector`: see *Punch test* below |
+| Wall sit (hold) | Legs | a wall | side-on, standing | **experimental**, Lab only | `WallSitDetector`: knee 65–120° (beginner up to 140°), thigh within 28° of level (beginner 48°), back and shins upright. The camera can't see the wall, so a free-standing hold of the same shape also counts |
+| Side plank (hold) | Core | — | facing, on your side | **experimental**, Lab only | `SidePlankDetector`: the lower shoulder tells which side you rest on; shoulders stacked, hips lifted into a line (≥ 150°, beginner 140° and knees allowed). The target is the total, half per side (see below) |
 
 All the new movements start as **beta** (or experimental): they're eligible for random loadouts once you've checked them in the Movement Lab, and each has its own ability (Skyfall Hammer, Wingclip, Bastion Stomp, Rootbreaker, Upheaval, Slipstream, Cinder Kick, Whirling Ward).
 
@@ -696,6 +698,8 @@ All the new movements start as **beta** (or experimental): they're eligible for 
 - **Facing the phone.** Both arms stay visible, but the punch goes *toward* the camera, so it's read from the model's rough depth plus the elbow rising to shoulder height.
 
 A punch counts for the arm that threw it, only once that fist comes back toward guard. To try it, throw a known sequence and compare the left and right counts.
+
+**Wall sits and side planks** are timed holds, like the plank. The clock runs only while the position is valid; breaking it pauses the clock and keeps your time, and losing the camera never adds time. Both start the moment you're in position, with no 3-2-1. For the side plank, the target is the total, split evenly: once one side has held its half, holding that side adds nothing and the cue says *Switch sides*, so only the other side can finish the set. In Connected Play the PC tells the phone the target (a validated `holdTargetMs` on `EXERCISE_BEGIN`), because the phone is where the sides are told apart. Both are Lab-only until you've tried them for real.
 
 **Sided movements** (rows, curls, lunges, cross crunches, skaters, Russian twists) count each side separately. The target is per side, and a set completes only when both sides reach it; unbalanced work never completes a set. Both arms curling together count once per arm.
 

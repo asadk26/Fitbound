@@ -6,7 +6,7 @@
  * assert on what the state machines count.
  */
 import { LM } from '../exercise/geometry';
-import type { Landmark, PoseFrame } from '../exercise/types';
+import type { Landmark, PoseFrame, Side } from '../exercise/types';
 
 type P = [number, number];
 
@@ -597,4 +597,70 @@ function withZ(f: PoseFrame, z: Record<number, number>, vis: Record<number, numb
   for (const [i, v] of Object.entries(z)) f.landmarks[+i].z = v;
   for (const [i, v] of Object.entries(vis)) f.landmarks[+i].visibility = v;
   return f;
+}
+
+/**
+ * Wall sit, side-on (facing image-left): `k` 0 (standing) .. 1 (seated, knees
+ * at ~90°, thighs level). `lean` tips the torso forward, degrees.
+ */
+export function wallSitPose(k: number, t: number, o: { lean?: number } = {}): PoseFrame {
+  const A: P = [0.5, 0.9];
+  const K: P = [0.5 - 0.02 * k, 0.9 - 0.22];
+  const th = rad(90 - 90 * k); // thigh angle from horizontal: 90 standing .. 0 seated
+  const H: P = [K[0] + 0.22 * Math.cos(th), K[1] - 0.22 * Math.sin(th)];
+  const lean = rad(o.lean ?? 0);
+  const S: P = [H[0] - 0.28 * Math.sin(lean), H[1] - 0.28 * Math.cos(lean)];
+  const pts: Pts = {
+    [LM.NOSE]: [S[0] - 0.03, S[1] - 0.08],
+    [LM.L_SHOULDER]: S,
+    [LM.R_SHOULDER]: [S[0] + 0.005, S[1]],
+    [LM.L_ELBOW]: [S[0] - 0.02, S[1] + 0.13],
+    [LM.R_ELBOW]: [S[0] - 0.015, S[1] + 0.13],
+    [LM.L_WRIST]: [S[0] - 0.05, S[1] + 0.24],
+    [LM.R_WRIST]: [S[0] - 0.045, S[1] + 0.24],
+    [LM.L_HIP]: H,
+    [LM.R_HIP]: [H[0] + 0.005, H[1]],
+    [LM.L_KNEE]: K,
+    [LM.R_KNEE]: [K[0] + 0.005, K[1]],
+    [LM.L_ANKLE]: A,
+    [LM.R_ANKLE]: [A[0] + 0.005, A[1]],
+  };
+  return frameFrom(pts, 4 / 3, t);
+}
+
+/**
+ * Side plank facing the phone, resting on `down` (the player's side, whose
+ * landmarks are the lower ones). `lift` 0 (lying flat) .. 1 (hips up in a
+ * straight line).
+ */
+export function sidePlankPose(down: Side, lift: number, t: number): PoseFrame {
+  // Head toward image-left; the body runs diagonally down to the feet at image-right.
+  // The shoulders stack across the body line, a shoulder-width apart.
+  const lowSh: P = [0.41, 0.665];
+  const hiSh: P = [0.31, 0.435];
+  const feet: P = [1.05, 0.86];
+  const shMid: P = [(lowSh[0] + hiSh[0]) / 2, (lowSh[1] + hiSh[1]) / 2];
+  const line = lerp(shMid, feet, 0.45);
+  const sag: P = [line[0], 0.86];
+  const hip = lerp(sag, line, lift);
+  const knee = lerp(hip, feet, 0.5);
+  const low = down;
+  const high: Side = down === 'left' ? 'right' : 'left';
+  const L = (s: Side, left: number, right: number) => (s === 'left' ? left : right);
+  const pts: Pts = {
+    [LM.NOSE]: [0.26, 0.52],
+    [L(low, LM.L_SHOULDER, LM.R_SHOULDER)]: lowSh,
+    [L(high, LM.L_SHOULDER, LM.R_SHOULDER)]: hiSh,
+    [L(low, LM.L_ELBOW, LM.R_ELBOW)]: [0.36, 0.86],
+    [L(high, LM.L_ELBOW, LM.R_ELBOW)]: [0.48, 0.55],
+    [L(low, LM.L_WRIST, LM.R_WRIST)]: [0.24, 0.87],
+    [L(high, LM.L_WRIST, LM.R_WRIST)]: [0.56, 0.6],
+    [L(low, LM.L_HIP, LM.R_HIP)]: [hip[0], hip[1] + 0.03],
+    [L(high, LM.L_HIP, LM.R_HIP)]: [hip[0], hip[1] - 0.03],
+    [L(low, LM.L_KNEE, LM.R_KNEE)]: [knee[0], knee[1] + 0.02],
+    [L(high, LM.L_KNEE, LM.R_KNEE)]: [knee[0], knee[1] - 0.02],
+    [L(low, LM.L_ANKLE, LM.R_ANKLE)]: [feet[0], feet[1] + 0.01],
+    [L(high, LM.L_ANKLE, LM.R_ANKLE)]: [feet[0], feet[1] - 0.01],
+  };
+  return frameFrom(pts, 4 / 3, t);
 }

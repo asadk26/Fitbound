@@ -62,7 +62,8 @@ export class RemoteSet implements SetDriver {
     private readonly send: (m: GameMsg) => void,
     difficulty: 'beginner' | 'intermediate' | 'advanced',
   ) {
-    send({ type: 'EXERCISE_BEGIN', setId, exerciseId: exercise.id, difficulty });
+    // Holds that split their target by side (side planks) need it on the phone, where the sides are told apart.
+    send({ type: 'EXERCISE_BEGIN', setId, exerciseId: exercise.id, difficulty, ...(exercise.holdSplit ? { holdTargetMs: target * 1000 } : {}) });
     this.progress();
   }
 
