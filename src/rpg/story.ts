@@ -1,0 +1,36 @@
+/**
+ * Narrative for this milestone: light and non-spoiling.
+ *
+ * Canon kept here (for future writing): the Heart is a benevolent failsafe
+ * that keeps reconstructing the protagonist to find a way to restore a
+ * kingdom consumed by corruption. The Haze preserves fragmented versions of
+ * the kingdom. The protagonist is an Echo tied to the original anchor (not
+ * yet revealed). Elara guides from the Sanctuary and knows more than she
+ * says. The Spark is central to the Heart's mission; reaching it restores
+ * the land for a while, but not for good. Loadouts are different
+ * reconstructions of the protagonist's remembered abilities; blessings are
+ * fragments of techniques from other reconstructions; the Mirror of Unlived
+ * Lives lets you take on another configuration.
+ *
+ * Rule: nothing is revealed while the player is concentrating on a movement.
+ * Haven memories come after the stretches end.
+ */
+export const STORY = {
+  sanctuaryGreeting: 'You’re awake. Good. The Heart gathered you again — the pieces it could find. Tell me what you have to work with today, and we’ll see what your hands and feet remember.',
+  loadoutNote: 'Each expedition the Heart rebuilds you a little differently. Four kinds of strength; the forms they take will change.',
+  departure: 'The path to the Spark is open for now. I’ll be here when you come back. …Try to come back.',
+  blessingIntro: 'A fragment surfaces — a technique from some other version of you. The Heart offers it. Take one.',
+  mirrorIntro: 'A mirror stands where no mirror should. In it you move differently — another way you might have lived. The Heart offers it without explanation.',
+  mirrorKept: 'You look away. This is who you are today.',
+  mirrorChanged: 'The reflection steps forward, and you step back into it. Your body remembers new things. Everything you’ve already done stays done.',
+  havenIntro: 'A quiet hollow the Haze hasn’t touched. Rest here. Nothing will find you while you breathe.',
+  havenMemory:
+    'As your breath slows, something surfaces: a courtyard in the morning, a voice counting with you — one, two, three — patient, fond. You almost know the voice. Then it’s gone.',
+  havenElara: 'Elara, when you tell her later, is quiet for a moment. “Hold on to that,” she says. “The Heart doesn’t give those back easily.”',
+  bossIntro: 'Beyond the last rise the Spark burns, small and stubborn. Between you and it: the Warden of the Haze.',
+  victory: 'You touch the Spark. Colour floods back into the valley — grass, sky, the far towers catching light. Restoration. For now.',
+  victoryElara: '“It’s holding,” Elara says when you return. “It won’t hold forever. But you did this.” She doesn’t say what happens when it fades.',
+  fallen: 'Your form scatters into the Haze… and gathers again. The Heart does not give up on you. This time the Spark stays out of reach, but the path goes on.',
+  fallenEnd: 'The Heart gathers you back to the Sanctuary. What your body did out there, it did — that stays.',
+  suspended: 'You rest at the edge of the path. It will wait for you.',
+};

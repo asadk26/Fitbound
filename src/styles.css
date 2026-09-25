@@ -2178,3 +2178,643 @@ details summary {
 .cam-sees.compact .cam-sees-frame {
   width: 100%;
 }
+
+/* ── Heart of Haze: expeditions ─────────────────────────────────────────── */
+.logo + .subtitle {
+  font-family: var(--pixel);
+  font-size: 13px;
+  color: var(--cyan);
+  letter-spacing: 3px;
+  margin: 6px 0 0;
+}
+.btn.focus {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+}
+.expedition {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.expedition > *,
+.expedition .tv-overlay * {
+  pointer-events: auto;
+}
+.exp-route {
+  position: absolute;
+  left: 2.5vw;
+  bottom: calc(2vh + var(--safe-b));
+  font-family: var(--pixel);
+  font-size: max(9px, 2vh);
+  color: var(--mist);
+}
+.sanctuary {
+  width: min(1100px, 100%);
+}
+.elara {
+  font-size: 15px;
+  line-height: 1.45;
+  border-left: 4px solid var(--cyan);
+  padding-left: 12px;
+}
+.elara b {
+  color: var(--cyan);
+}
+.sanct-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 4px 20px;
+}
+.loadout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 8px 0;
+}
+.lo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  background: var(--ink);
+  border: 3px solid var(--fam, var(--night));
+  border-radius: 10px;
+}
+.lo-card small {
+  font-family: var(--pixel);
+  font-size: 9px;
+  color: var(--fam);
+}
+.lo-card b {
+  font-family: var(--pixel);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.lo-target,
+.lo-role {
+  font-size: 13px;
+  color: var(--mist);
+}
+.lo-ability {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+.lo-ability .pix-icon {
+  width: 22px;
+  height: 22px;
+}
+.lo-badge {
+  font-size: 11px;
+  color: var(--ink);
+  background: var(--gold);
+  border-radius: 99px;
+  padding: 1px 8px;
+  align-self: flex-start;
+}
+.lo-badge.exp {
+  background: var(--orange);
+}
+.ex-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+.ex-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: rgba(26, 28, 44, 0.7);
+  border-radius: 8px;
+}
+.ex-chip.off {
+  opacity: 0.55;
+}
+.ex-target {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.voice-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 10px 0;
+}
+.voice-chip {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(8px + var(--safe-t));
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-family: var(--pixel);
+  font-size: 10px;
+  background: rgba(26, 28, 44, 0.85);
+  border: 3px solid var(--ink);
+  border-radius: 99px;
+  pointer-events: none;
+}
+.voice-chip.denied,
+.voice-chip.error {
+  color: var(--orange);
+}
+.voice-chip b.accepted {
+  color: var(--lime);
+}
+.voice-chip b.not-now {
+  color: var(--gold);
+}
+
+/* Battle HUD */
+.rpg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.rpg > * {
+  pointer-events: auto;
+}
+.rpg-top {
+  position: absolute;
+  top: calc(1.6vh + var(--safe-t));
+  left: 2.5vw;
+  right: 2.5vw;
+  display: flex;
+  justify-content: space-between;
+  gap: 3vw;
+  pointer-events: none;
+}
+.rpg-hero {
+  flex: 0 1 30vw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vh;
+  font-family: var(--pixel);
+  font-size: max(10px, 2.6vh);
+  text-shadow: 3px 3px 0 var(--ink);
+}
+.rpg-stats {
+  font-size: max(9px, 2.2vh);
+}
+.rpg-shield {
+  color: var(--sky);
+}
+.rpg-charge {
+  color: #c77dff;
+}
+.rpg-counter {
+  color: var(--cyan);
+}
+.rpg-bless {
+  display: flex;
+  gap: 4px;
+}
+.rpg-bless .pix-icon {
+  width: max(18px, 3.4vh);
+  height: max(18px, 3.4vh);
+}
+.rpg-foes {
+  flex: 0 1 42vw;
+  display: flex;
+  flex-direction: column;
+  gap: 1vh;
+}
+.rpg-foe {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4vh;
+  padding: 0.8vh 1vw;
+  background: rgba(28, 24, 44, 0.78);
+  border: 3px solid var(--ink);
+  border-radius: 10px;
+}
+.rpg-foe.charging {
+  border-color: var(--orange);
+  animation: pulse 0.9s ease-in-out infinite;
+}
+.rpg-foe .bar {
+  height: max(8px, 2vh);
+  border-width: 3px;
+}
+.rpg-foe-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--pixel);
+  font-size: max(9px, 2.2vh);
+}
+.rpg-foe .tag {
+  font-family: var(--sans);
+  font-size: max(11px, 2.1vh);
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--night);
+}
+.tag.ward {
+  color: var(--cyan);
+}
+.tag.burn {
+  color: var(--orange);
+}
+.tag.weak {
+  color: var(--gold);
+}
+.rpg-intent {
+  font-size: max(12px, 2.5vh);
+  color: var(--white);
+}
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 4px rgba(239, 125, 87, 0.5);
+  }
+}
+.rpg-cards {
+  position: absolute;
+  left: 2.5vw;
+  right: 2.5vw;
+  bottom: calc(2vh + var(--safe-b));
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.4vw;
+}
+.rpg-cards-hint {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  gap: 2vw;
+}
+.rpg-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vh;
+  text-align: left;
+  padding: 1.4vh 1vw;
+  background: rgba(26, 28, 44, 0.9);
+  color: var(--white);
+  border: 4px solid var(--night);
+  border-radius: 12px;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.rpg-card.sel {
+  border-color: var(--fam, var(--gold));
+  transform: translateY(-1.2vh);
+  box-shadow: 0 0 0 3px rgba(255, 236, 190, 0.5);
+}
+.rpg-card.cool {
+  opacity: 0.45;
+}
+.rpg-card.off {
+  opacity: 0.4;
+  cursor: default;
+}
+.rpg-card small {
+  font-family: var(--pixel);
+  font-size: max(8px, 1.8vh);
+  color: var(--fam, var(--mist));
+}
+.rpg-card b {
+  display: flex;
+  align-items: center;
+  gap: 0.6vw;
+  font-family: var(--pixel);
+  font-size: max(10px, 2.6vh);
+  color: var(--fam, var(--gold));
+}
+.rpg-card b .pix-icon {
+  width: max(20px, 4vh);
+  height: max(20px, 4vh);
+}
+.rpg-card-ex {
+  font-size: max(12px, 2.6vh);
+  font-weight: 700;
+}
+.rpg-card-role {
+  font-size: max(11px, 2.2vh);
+  color: var(--mist);
+}
+.rpg-card-cd {
+  font-family: var(--pixel);
+  font-size: max(8px, 1.8vh);
+  color: var(--orange);
+}
+.rpg-card-hint {
+  font-size: max(11px, 2.2vh);
+  font-weight: 700;
+}
+.rpg-card-hint.strong {
+  color: var(--lime);
+}
+.rpg-card-hint.weak {
+  color: var(--orange);
+}
+.rpg-card-first {
+  font-size: max(10px, 2vh);
+  color: var(--gold);
+}
+.rpg-set-head {
+  position: absolute;
+  top: calc(20vh + var(--safe-t));
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--pixel);
+  text-shadow: 3px 3px 0 var(--ink);
+}
+.rpg-set-head small {
+  color: var(--cyan);
+  font-size: max(9px, 2.4vh);
+}
+.rpg-set-head b {
+  font-size: max(14px, 4.6vh);
+}
+.rpg-prepare {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  transform: translate(-50%, -50%);
+  max-width: 60vw;
+  text-align: center;
+  font-family: var(--pixel);
+  font-size: max(12px, 3.4vh);
+  line-height: 1.5;
+  padding: 2vh 2vw;
+  background: rgba(28, 24, 44, 0.86);
+  border: 4px solid var(--ink);
+  border-radius: 14px;
+}
+.rpg-sides {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 3vw;
+  font-family: var(--pixel);
+  font-size: max(11px, 3vh);
+  text-shadow: 3px 3px 0 var(--ink);
+}
+.rpg-sides .done {
+  color: var(--lime);
+}
+.rpg-set-actions {
+  position: absolute;
+  left: 2.5vw;
+  bottom: calc(3vh + var(--safe-b));
+  display: flex;
+  gap: 8px;
+}
+.rpg-readycard {
+  --ability: var(--lime);
+}
+.rpg-strike {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  transform: translate(-50%, -50%);
+  min-width: 46vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2vh;
+  padding: 2vh 3vw;
+  background: rgba(28, 24, 44, 0.9);
+  border: 5px solid var(--orange);
+  border-radius: 16px;
+  text-align: center;
+}
+.rpg-strike.low {
+  border-color: var(--gold);
+}
+.rpg-strike b {
+  font-family: var(--pixel);
+  font-size: max(18px, 7vh);
+  color: var(--orange);
+  text-shadow: 4px 4px 0 var(--ink);
+}
+.rpg-strike.low b {
+  color: var(--gold);
+}
+.rpg-strike.dodged {
+  border-color: var(--lime);
+}
+.rpg-strike.dodged b {
+  color: var(--lime);
+}
+.rpg-strike.unclear b {
+  color: var(--mist);
+  font-size: max(12px, 3.6vh);
+}
+.rpg-strike small {
+  font-size: max(12px, 2.6vh);
+  color: var(--mist);
+}
+.rpg-strike-bar {
+  width: 100%;
+  height: 2vh;
+  background: var(--ink);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.rpg-strike-bar i {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  color: var(--orange);
+  transition: width 0.05s linear;
+}
+.rpg-wait {
+  font-family: var(--pixel);
+  font-size: max(11px, 3vh);
+  color: var(--cyan);
+}
+
+/* Path, Haven, summary, Lab */
+.path-nodes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2vh;
+}
+.path-nodes li {
+  padding: 6px 10px;
+  border-radius: 99px;
+  background: var(--ink);
+  color: var(--mist);
+  font-size: max(12px, 2.4vh);
+}
+.path-nodes li.done {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+.path-nodes li.now {
+  color: var(--ink);
+  background: var(--gold);
+  font-weight: 700;
+}
+.haven {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(80vw, 1000px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2vh;
+  padding: 4vh 3vw;
+  text-align: center;
+  background: rgba(20, 40, 50, 0.82);
+  border: 4px solid var(--teal);
+  border-radius: 20px;
+}
+.haven small {
+  font-family: var(--pixel);
+  color: var(--cyan);
+  font-size: max(10px, 2.4vh);
+}
+.haven b {
+  font-size: max(18px, 5vh);
+  line-height: 1.35;
+}
+.haven-pos {
+  color: var(--mist);
+  font-size: max(13px, 3vh);
+}
+.haven-timer {
+  font-family: var(--pixel);
+  font-size: max(24px, 9vh);
+  color: var(--cyan);
+}
+.sum-cols {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 2vw;
+  text-align: left;
+}
+.sum-cols h3 {
+  font-family: var(--pixel);
+  font-size: max(11px, 2.6vh);
+  color: var(--cyan);
+}
+.sum-table tr.changed td {
+  color: var(--gold);
+}
+.lab-card {
+  width: min(1000px, 100%);
+}
+.lab-tabs {
+  margin-bottom: 12px;
+}
+.lab-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 10px 20px;
+}
+.lab-family h3 {
+  font-family: var(--pixel);
+  font-size: 12px;
+}
+.lab-ex {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--night);
+}
+.rel {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: var(--night);
+}
+.rel-stable,
+.rel-ok {
+  color: var(--lime);
+}
+.rel-beta {
+  color: var(--gold);
+}
+.rel-experimental {
+  color: var(--orange);
+}
+.lab-run {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lab-run .rpg-strike {
+  position: static;
+  transform: none;
+}
+.lab-run .tvb-guide {
+  position: static;
+  transform: none;
+  max-width: none;
+}
+.lab-count {
+  font-family: var(--pixel);
+  font-size: 22px;
+  color: var(--gold);
+}
+.lab-pip {
+  width: min(420px, 100%);
+  aspect-ratio: 16 / 9;
+  border: 4px solid var(--ink);
+  border-radius: 12px;
+}
+@media (max-width: 760px) {
+  .loadout,
+  .rpg-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sum-cols {
+    grid-template-columns: 1fr;
+  }
+}
+.exp-summary,
+.expedition .gmenu {
+  max-height: 94vh;
+  overflow-y: auto;
+}
+.exp-summary .sum-table,
+.expedition .gmenu .sum-table {
+  font-size: max(12px, 2.4vh);
+  width: 100%;
+}
+.exp-summary .sum-table td,
+.expedition .gmenu .sum-table td {
+  font-family: var(--sans);
+  font-size: max(12px, 2.4vh);
+}
+.exp-summary h2 {
+  font-size: max(13px, 4vh);
+}
+.exp-summary .sum-cols p {
+  font-size: max(12px, 2.4vh);
+  margin: 0.6vh 0;
+}
+.exp-summary .gmenu-opt {
+  padding: 1vh 1vw;
+}
+.exp-summary .gmenu-opt .pix-icon {
+  width: max(24px, 5vh);
+  height: max(24px, 5vh);
+}

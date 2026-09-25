@@ -45,14 +45,17 @@ export const SESSION_DEFAULTS: SessionOptions = {
 
 /**
  * Session timing used by the Motion Trial (both the local camera and the phone
- * controller). Push-ups skip the 3-2-1 countdown and start counting as soon
- * as the start position is recognised, so nobody has to hold a plank while
- * waiting; the other exercises keep the countdown.
+ * controller). Floor exercises skip the 3-2-1 countdown and start counting
+ * as soon as the start position is recognised, so nobody has to hold a plank
+ * while waiting; the standing exercises keep the countdown.
  */
 export function trialSessionOptions(exerciseId: string): Partial<SessionOptions> {
   const base = { setupStuckMs: 20000, activeStuckMs: 20000 };
-  return exerciseId === 'pushup' ? { ...base, countdownMs: 0, readyHoldMs: 250 } : base;
+  return FLOOR_EXERCISES.has(exerciseId) ? { ...base, countdownMs: 0, readyHoldMs: 250 } : base;
 }
+
+/** Floor movements start the moment you're in position (nobody should hold a plank through a 3-2-1). */
+const FLOOR_EXERCISES = new Set(['pushup', 'plank', 'mountain_climber', 'dead_bug']);
 
 export interface SessionSnapshot {
   stage: SessionStage;

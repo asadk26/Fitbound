@@ -253,7 +253,11 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
   const lostSince = useRef<number | null>(null);
   const lostCue = useRef(0);
   useEffect(() => {
-    if (stage !== 'explore') return;
+    // Assisted traversal (gamepad / keys) doesn't need the body: no tracking warnings while exploring.
+    if (stage !== 'explore' || assisted) {
+      setLostBanner(false);
+      return;
+    }
     const off = input.onReading((x) => {
       const now = performance.now();
       if (!x) return;
@@ -274,12 +278,23 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
       }
     });
     return off;
-  }, [stage]);
+  }, [stage, assisted]);
 
   useInputEvents((e) => {
     if (e.type === 'step' && stageRef.current === 'explore') log.current.exploreSteps++;
     if (e.type === 'confirm' || e.type === 'back' || e.type === 'pause') log.current.gestures++;
     const st = stageRef.current;
+    if (pausedRef.current && st !== 'battle' && e.type === 'resume' && canResume) {
+      setPaused(false);
+      return;
+    }
+    if (e.type === 'recalibrate' && (st === 'explore' || st === 'dialog' || st === 'reward')) {
+      calKind.current = 'quick';
+      pausedRef.current = false;
+      setPausedState(false);
+      setStage('calibrate');
+      return;
+    }
     // Pause from exploration, dialogue and reward menus (battles handle their own).
     if (e.type === 'pause' && !pausedRef.current && (st === 'explore' || st === 'dialog' || st === 'reward')) {
       setPaused(true);
@@ -337,7 +352,7 @@ export function TrialRun({ onExit, connected = false }: { onExit: () => void; /*
           </div>
           {connected ? (
             <div className="tv-pip tv-pip-ctrl">
-              <ControllerStatus />
+              <ControllerStatus bodyNeeded={!assisted} />
             </div>
           ) : (
             <CameraView className="tv-pip" good={r?.tracking === 'good'} />

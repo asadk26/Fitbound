@@ -1,4 +1,5 @@
 import type { CombatEffect } from '../combat/CombatEngine';
+import type { RpgFx } from '../rpg/engine';
 import type { MapId } from '../phaser/maps';
 
 /** What the Motion Trial wants the diorama to show. */
@@ -46,6 +47,23 @@ export interface BusEvents {
   'battle:effects': { effects: CombatEffect[]; intensity?: number };
   'battle:end': undefined;
   'battle:charge': { level: number; color: string };
+  // Expedition battles (RpgScene)
+  'rpg:start': { foes: RpgFoeView[]; heroHp: number; heroMaxHp: number; backdrop: 'meadow' | 'dungeon'; boss: boolean };
+  'rpg:fx': { fx: RpgFx[]; foes?: RpgFoeView[] };
+  /** A strike's telegraph (wind-up), its swing at impact, and clearing. */
+  'rpg:strike': { uid: number; height: 'high' | 'low'; phase: 'telegraph' | 'swing' | 'clear' };
+  /** Hero pose while dodging (from the body reading), for feedback. */
+  'rpg:pose': { duck: number; airborne: boolean };
+  'rpg:end': undefined;
+}
+
+/** How to draw one expedition foe. */
+export interface RpgFoeView {
+  uid: number;
+  sprite: string;
+  tint?: number;
+  scale?: number;
+  name: string;
 }
 
 type Handler<T> = (payload: T) => void;

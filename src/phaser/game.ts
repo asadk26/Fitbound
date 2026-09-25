@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { bus, type BusEvents, type DioramaState } from '../game/bus';
 import { BattleScene } from './scenes/BattleScene';
+import { RpgScene } from './scenes/RpgScene';
 import { BootScene } from './scenes/BootScene';
 import { DioramaScene } from './scenes/DioramaScene';
 import { WorldScene } from './scenes/WorldScene';
@@ -32,7 +33,7 @@ export function createGame(parent: HTMLElement): Phaser.Game {
     scale: { mode: Phaser.Scale.RESIZE, width: parent.clientWidth || 390, height: parent.clientHeight || 700 },
     input: { activePointers: 2 },
     audio: { noAudio: true },
-    scene: [BootScene, WorldScene, DioramaScene, BattleScene],
+    scene: [BootScene, WorldScene, DioramaScene, BattleScene, RpgScene],
   });
   return game;
 }
@@ -61,7 +62,7 @@ function whenBooted(fn: () => void): void {
 export function showScene(key: 'World' | 'Diorama', data: object = {}): void {
   whenBooted(() => {
     const sm = game!.scene;
-    for (const k of ['World', 'Diorama', 'Battle']) if (k !== key && (sm.isActive(k) || sm.isSleeping(k))) sm.stop(k);
+    for (const k of ['World', 'Diorama', 'Battle', 'Rpg']) if (k !== key && (sm.isActive(k) || sm.isSleeping(k))) sm.stop(k);
     paused = null;
     if (sm.isActive(key) || sm.isSleeping(key)) sm.stop(key);
     sm.run(key, data);
@@ -97,4 +98,30 @@ export function endBattle(): void {
   else if (!sm.isActive(k)) sm.run(k);
   if (k === 'World') bus.emit('world:refresh');
   else bus.emit('diorama:state', dioramaState);
+}
+
+/** Expedition battle: sleep the diorama and run the RPG scene. */
+export function startRpgBattle(data: BusEvents['rpg:start']): void {
+  whenBooted(() => {
+    const sm = game!.scene;
+    for (const k of ['World', 'Diorama'] as const) {
+      if (sm.isActive(k)) {
+        sm.sleep(k);
+        paused = k;
+      }
+    }
+    if (sm.isActive('Rpg') || sm.isSleeping('Rpg')) sm.stop('Rpg');
+    sm.run('Rpg', data);
+  });
+}
+
+export function endRpgBattle(): void {
+  if (!game) return;
+  const sm = game.scene;
+  sm.stop('Rpg');
+  const k = paused ?? 'Diorama';
+  paused = null;
+  if (sm.isSleeping(k)) sm.wake(k);
+  else if (!sm.isActive(k)) sm.run(k, { attract: true });
+  if (k === 'Diorama') bus.emit('diorama:state', dioramaState);
 }

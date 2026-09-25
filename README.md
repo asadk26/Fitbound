@@ -1,16 +1,213 @@
-# FITBOUND
+# FITBOUND: Heart of Haze
 
-A fantasy RPG you play with real bodyweight exercises. A phone camera watches you through MediaPipe Pose: marching walks your hero, a lean turns them, raised hands pick options, and every counted repetition becomes an attack, a shield or a spell.
+A fitness roguelite you play with real exercises. A phone camera watches you through MediaPipe Pose, and each set you do powers one of four magical abilities. You choose the ability, do the movement, watch it land, then duck or hop when the enemy strikes back.
 
-There are three ways to play:
+Ways to play:
 
 | Mode | Screen | Controller | When to use it |
 |---|---|---|---|
-| **Connected Play** (recommended) | A PC's browser, shown on the TV over HDMI | Your phone, propped up in one place, as a motion controller | Living-room play on a TV. No AirPlay lag. |
-| **Motion Trial · phone only** | The phone (optionally mirrored to a TV) | The same phone's camera | No PC available. |
+| **Expedition · PC + phone** (the main game) | A PC's browser, shown on the TV over HDMI | Your phone as the camera controller, plus a gamepad, keyboard or your voice | The full game: randomised four-family loadouts, exercise-powered combat, dodging, blessings, the Mirror, a Haven, the Warden. |
+| **Expedition · phone only** | The phone (optionally mirrored) | The same phone's camera | No PC available. |
+| **Tutorial trial** (PC + phone, or phone only) | as above | Marching, leaning and hand gestures | The original four-encounter demo: guided trail, push-ups, squats, jumping jacks. |
 | **Classic adventure** | The phone, portrait | Touch, plus the camera for battles | The original touch RPG. |
 
-All three share one input system, one combat engine, one progression system and one save.
+All modes share one input system, one exercise library, one progression system and one save. Expeditions use their own combat engine (`src/rpg/`); the tutorial trial and classic mode keep the original one.
+
+## Heart of Haze: expeditions
+
+*The Heart is a failsafe built to save a kingdom consumed by corruption. It keeps reconstructing you — an Echo of someone it lost — and sends you through the Haze toward the Spark. Each expedition you come back a little different.*
+
+### Start one
+
+1. Double-click **`Play FITBOUND.bat`** on the laptop (or run `npm run play`). The browser opens the game.
+2. Choose **Expedition · PC + phone**. Pair the phone as before (QR code, then *Start … camera* on the phone).
+3. **Continue to the Sanctuary.** You don't need to be in view yet. Menus, choices, the path and the Haven all work from the couch with a gamepad, keyboard or mouse.
+4. In **the Sanctuary** (setup, about 20 seconds):
+   - say whether you have **dumbbells** today, and a **chair or bench** for rows;
+   - say **how you feel** (Take it easy, Normal or Strong). This scales your own targets and nothing else;
+   - pick a **route**: Full (about 20–25 min, 6 fights) or Short (about 12–15 min, 4 fights);
+   - review the **four-movement loadout**. Use *Swap* for one movement, or *Reroll all*;
+   - optionally: rest a movement today, adjust your per-exercise targets, include experimental movements, and switch **voice commands** on.
+5. **Begin.** The camera checks you just before the first fight (a quick "stand tall"), not before.
+
+A saved run shows **Resume expedition · Phase N** on the title screen.
+
+### A run
+
+```
+Phase 1  The Training Yard (Straw Echo) → Rusted Causeway (Iron Husk) → a blessing
+Phase 2  The Bone Field (Bone Charger) → the Mirror of Unlived Lives → Drifting Hollow (Haze Wisps) → a blessing
+Phase 3  A Quiet Haven → The Veiled Stair (Hollow Acolyte) → a blessing → Before the Spark (Warden of the Haze)
+```
+
+- Between nodes, **the path** shows where you are. Continue, or **Save and stop here**; phase boundaries are the natural places to stop.
+- Resuming later restores your node, HP, loadout, blessings and the workout so far. Suspending isn't losing.
+- Enemy HP is sized so a full route is about 20 sets, not padded with travel or dialogue.
+
+### The four families and the loadout
+
+Every run has the same four ability slots. The movement in each slot changes between runs, and can change mid-run at the Mirror.
+
+| Family | Combat role | Movements (ability) |
+|---|---|---|
+| **Upper body** | Heavy single-target hits, armour breaking, disruption | Push-ups (Sundering Strike), Dumbbell rows (Reaping Hook), Bicep curls (Twin Fang) |
+| **Legs** | Area hits, stagger, some guard | Squats (Quake Stomp), Reverse lunges (Stone Stride) |
+| **Cardio** | Elemental hits that chain or burn; builds Storm Charge | Jumping jacks (Arc Lightning), High knees (Ember Rush), Mountain climbers (Gale Flurry) |
+| **Core** | Shields, heals, counterattacks | Plank (Aegis Ward), Dead bugs (Mending Tide), Standing cross crunches (Riposte Stance) |
+
+**How the loadout is chosen** (`src/rpg/loadout.ts`):
+
+1. A movement is never picked if it needs equipment you didn't confirm, if you rested it today, or if it's experimental and you didn't opt in.
+2. Movements must be **checked on your setup** to be picked normally:
+   - *stable* movements (push-ups, squats, jumping jacks, all physically playtested) always qualify;
+   - *beta* movements qualify once you've passed a quick check in the **Movement Lab** ("did the count match what you did?").
+3. If a family has nothing checked, the most reliable beta movement is used and marked **First-time check**. Plank is the usual case for core.
+4. Movements that were demanding in your last session or two are picked less often. A reroll never returns the same pick when there's an alternative.
+5. If a family has nothing at all (e.g. you rested every upper-body movement), that slot **rests**, and the other three abilities still win fights.
+
+Targets are yours (Sanctuary → *Rest a movement today · targets*), scaled only by how you feel. They never rise with enemy difficulty.
+
+### Combat
+
+The player turn and the enemy turn stay separate:
+
+1. **Choose an ability** from four cards. Each card shows:
+   - the movement and target;
+   - the ability's role;
+   - whether it's recharging;
+   - a hint when it's especially effective right now, e.g. *★ Breaks armour*, *★ Cancels the charge*, *★ Hits all foes*, *★ Overloads the ward*.
+
+   Choose with the gamepad d-pad and A, the arrow keys and Enter, a lean and a raised right hand, or a click. No body tracking is needed to choose.
+2. **Do the set.** Counting starts when the camera sees you in position ("Step into view when ready"); floor movements have no countdown. **Enemies never act during a set.**
+3. The ability resolves.
+4. **Ready check.** Stand tall with arms relaxed, or press *I'm ready* / A / Enter. After a floor exercise you're told to take your time getting up, and the first strike gets extra wind-up.
+5. **Enemy turn.** Foes act on the *intent* they showed before you chose: attacks, wind-ups, wards, armour, summons. Attacks become strikes to dodge.
+
+**Recharge and variety:**
+
+- An ability can't be used two turns in a row. At least three are always ready.
+- Switching families from your last turn gives +10%.
+- Cardio builds **Storm Charge**; your next non-cardio ability spends it for +15% per charge.
+- No enemy needs one specific movement. Stagger also cracks armour, so even without upper-body work every fight is winnable (a test checks the boss with legs, cardio and core only).
+
+**Enemy archetypes** (`src/rpg/enemies.ts`):
+
+| Enemy | Mechanic | Answer |
+|---|---|---|
+| Straw Echo | Training: one gentle HIGH or LOW swing | Anything; learn to dodge |
+| Iron Husk | Armour (each stack −18% damage) and *Harden* | Upper body breaks armour; stagger cracks it |
+| Bone Charger | Winds up a two-strike *Horn Charge* | Disrupt it (Reaping Hook) or stagger it before it lands |
+| Haze Wisps ×3 | A pack; weak to lightning and wind | Area (legs) and chains (cardio) |
+| Hollow Acolyte | A ward that drinks damage and reweaves; resists fire | Lightning overloads wards ×2 |
+| Warden of the Haze | Armour, summons wisps, winds up a three-strike *Cataclysm*, shrouds itself, reforges | All of the above |
+
+**Blessings** (`src/rpg/blessings.ts`) are fragments of techniques from other lives, offered three at a time after certain fights and leaning toward your loadout. There are 13; some combine:
+
+- *Tempered Edge* plus push-ups shreds armour;
+- *Static Mantle* plus a shield plus Storm Charge throws blocked hits back as lightning;
+- *Full Circle* rewards using all four families;
+- *Echo of Resolve* makes partial sets work at 70% or more;
+- *Second Wind* and *Mirror Step* turn dodges into recharge and charge.
+
+### Finishing a set early
+
+Say **"Finish set"**, press **F** or gamepad **Y**, tap *Finish set* on the TV or the phone, or choose *Finish this set* in the pause menu. The verified reps (or whole seconds held) resolve as a **partial ability**:
+
+- strength = 35% + 65% × (done ÷ target);
+- 5 of 8 push-ups ≈ 76%;
+- even one rep is worth 40%;
+- sided exercises credit each side up to its target, so a lopsided set can't count double;
+- a set with no verified work fizzles, and the ability isn't used up.
+
+Pausing, hesitating or losing tracking never ends a set by itself. Reaching the target still completes it automatically. Nothing invents reps. Exhaustion never costs HP; only missed dodges do.
+
+### Dodging (HIGH duck, LOW hop)
+
+- **HIGH (▲, orange): duck** — a quick squat. **LOW (▼, gold): a small hop.**
+- Each strike has a 2.6 s wind-up with a countdown bar, a spoken "High! Duck!" or "Low! Hop!", and an attack line drawn at head or foot height.
+- A correct move counts from 1 s before impact to 0.4 s after. Sequences (e.g. the Warden's LOW–HIGH–LOW) pause about a second between strikes.
+- **Nothing counts until the phone has a still, standing baseline.** Standing up after push-ups can never be a dodge.
+- **Out of view, the attack waits** ("Step into view — the attack waits for you"). If the camera loses you during the swing itself, the result is *unclear*: no damage. It is never counted as a failed dodge.
+- **Couch fallback:** *Pause → Dodge with a controller* uses the gamepad d-pad ▼ (duck) and ▲ or A (hop), the keyboard (↓, and ↑ or Space), or the phone's Duck/Hop touch buttons.
+- A missed dodge costs HP; shields absorb it first. If HP reaches 0 the character falls (see below).
+
+### Voice commands
+
+| Say | Does | Also on |
+|---|---|---|
+| **"Pause"** | Pauses gameplay and any set in progress | Start button, P, both hands up (standing), phone Pause |
+| **"Resume"** | Leaves the pause menu | A / Enter, right hand |
+| **"Finish set"** | Ends the current set now; verified work counts | Y, F, phone and TV buttons |
+| **"Recalibrate"** | Quick camera recalibration; nothing is lost | Pause menu |
+
+A few natural variants work: "okay pause", "finish the set", "I'm done", "continue", "re-calibrate". A command only fires when it's the **whole utterance**, give or take a filler word; "we should pause for a sec" does nothing.
+
+Each utterance fires once. The same command is ignored for 2.5 s, and any command for 0.9 s. **Nothing is accepted while the game's narrator is speaking**, or for 0.7 s after, so the TV can't trigger itself.
+
+Commands are mode-aware:
+
+- "Finish set" exists only mid-set or in the pause menu, and can't advance dialogue or move the hero;
+- "Resume" only works in menus;
+- a command that doesn't apply shows "— not available right now" and does nothing else.
+
+**Where it runs, and the privacy tradeoff.** Voice uses the **laptop's** microphone and the browser's speech recognition. Switch it on in the Sanctuary; the choice is remembered.
+
+- **Chrome 139+** can recognise speech **on the device** once its English pack is installed. The game asks for that first, and the Sanctuary says *"Recognised on this computer"* when it's active.
+- **Otherwise Chrome sends the audio to Google, and Edge to Microsoft, while listening.** That needs the internet and is not offline. The Sanctuary says so when this applies.
+- **Firefox** has no speech recognition.
+- Only matched commands are used. The game doesn't store or send transcripts itself.
+
+**Why not the phone:** Safari's speech recognition is known to break down or stall alongside an active camera or video on iOS. The camera is the one thing that must never stop, so voice stays on the laptop. A fully offline recogniser (e.g. Vosk WebAssembly with a ~40 MB model) remains a possible follow-up.
+
+### The Mirror of Unlived Lives
+
+A node between fights. You can:
+
+- keep your loadout;
+- **change one movement** (pick a family and see its alternative);
+- **step into another life** (reroll all four).
+
+The change is always previewed before you commit. It follows the same eligibility rules, never happens mid-set or mid-fight, and leaves the workout done so far untouched.
+
+### Haven
+
+- The Haven fully restores HP.
+- It then offers a few minutes of guided recovery: standing side reach or shoulder rolls, then cat-cow and child's pose.
+- The movements are timed and spoken, with a soft synthesised ambient pad. Nothing is scored and no camera is needed.
+- Raise your right hand (or press A) to move on; Start or P pauses.
+- The memory fragment and Elara's line come **after** the movements end.
+
+### Workout versus RPG
+
+These are separate outcomes:
+
+- **RPG defeat:** HP hits 0 from missed dodges. The character falls. **Reform and carry on** continues the workout at 60% HP (the Spark can't be restored this run); **End the session** goes to the summary.
+- **Fitness completion:** sets done against about 20 planned.
+
+Nothing physical is ever lost: every set is saved the moment it ends, through defeat, rerolls, quitting or reloading. The summary shows the two side by side:
+
+- **Workout:** camera-verified reps per movement (left and right for sided movements), hold seconds, manual reps labelled separately, sets, Haven time, and time spent moving versus session time.
+- **Expedition:** result, dodges (dodged, hit, unseen), loadout and blessings.
+
+The last 20 sessions are kept (per-movement sets and volume) so the loadout director can vary your workout.
+
+### Movement Lab
+
+Reached from the Sanctuary.
+
+- **Movements:** try any movement for a short set. Afterwards you confirm whether the count matched what you did; *Yes* marks it checked for your setup.
+- **Dodge practice:** four practice strikes, with the body or a controller.
+- **Voice test:** status, engine, and the last command heard with its verdict.
+- **Encounter select:** jump straight into any fight, a blessing, the Mirror or the Haven with your current loadout. It never touches a saved run.
+
+### Camera tracking follows the game state
+
+- The **body is only required when a mechanic needs it:** the camera check before the first fight, sets, the ready check and dodging.
+- In the Sanctuary, on the path, in choices, blessings, the Mirror and the Haven there are no tracking warnings. The phone stops sending "what the camera sees" in menus and dialogue.
+- In the tutorial trial with **Gamepad or keyboard** traversal, the "Tracking lost" banner and voice cue are gone, and the phone status says *Controller mode*.
+- Camera connection and body visibility are separate: "Phone connected / Camera on" isn't an error just because nobody is in view.
+- The camera and MediaPipe keep running through menus; nothing restarts.
+- If you leave the frame between sets, the next set and any strike simply wait. There is no HP penalty and no failed dodge.
 
 ## Connected Play
 
@@ -217,25 +414,9 @@ The two bold rows are the likely culprits for real, low-camera push-ups: 2D elbo
 - **Choosing a camera:** the phone's Start screen has a **Camera** card with big *Front (selfie)* / *Back (sharper)* buttons. The start button says which one will start, and the choice is remembered on the phone. The dashboard has the same card, with *Restart camera with this choice*. The PC setup screen shows the name of the camera in use.
 - **Lens:** the phone's Camera card (*More cameras and zoom*) lists the cameras the browser exposes. The names appear once the camera has been allowed; on recent iPhones Safari may list an *Ultra Wide* camera. A *widest zoom* option applies the lowest zoom a camera reports (e.g. 0.5×) if it offers one. Neither is guaranteed across iPhone models or iOS versions; the default camera always works. Wider views make you smaller in the picture, which can reduce tracking reliability, so compare push-ups with each.
 
-### Voice commands (researched, deferred)
+### Voice commands
 
-A spoken "pause" that works on the floor is the right long-term answer. It isn't built, because a reliable, private version is a separate piece of work:
-
-- **Cloud recognition is ruled out as the default.** The browser's built-in speech recognition (Chrome, Edge; Safari's `webkitSpeechRecognition`) sends audio to Google, Microsoft or Apple for transcription. Newer Chrome versions have an on-device option, but it is experimental and not something to rely on yet.
-- **Recommended: a small offline keyword spotter running on the laptop:**
-  - either Vosk's WebAssembly build with a small English model (about 40 MB), restricted to the words *pause, resume, recalibrate*;
-  - or a tiny keyword-spotting model (TensorFlow.js *speech-commands* style) trained on those words.
-  - Why the laptop, not the phone:
-    - the phone already runs the camera and MediaPipe, and adding continuous audio inference there costs heat and battery;
-    - iOS Safari only reliably runs camera and microphone together while the page stays in the foreground, and suspends audio processing when it's backgrounded;
-    - on the laptop, Chrome's echo cancellation (`getUserMedia({ audio: { echoCancellation: true } })`) can remove the game's own sound, which comes from the same page, before recognition.
-- **Things that need testing in the room:**
-  - microphone distance (a laptop 3 m away beside the TV);
-  - TV speakers playing other audio, e.g. an AV receiver, which in-browser echo cancellation may not cover;
-  - a one-time microphone permission prompt;
-  - automatic restart after the browser suspends audio;
-  - false triggers from the game's spoken cues. A short confirm tone, plus ignoring recognition while the game is speaking, would help.
-- **Voice will never be the only way to pause.** It would plug into the existing command path as one more input source (`input.command({ type: 'pause' }, source)` with a new `'voice'` source), obeying the same mode rules.
+Built in this round: see *Heart of Haze → Voice commands*. It runs on the laptop, and works in the tutorial trial too (pause, resume, finish set, recalibrate).
 
 ### Networking and HTTPS
 
@@ -335,7 +516,7 @@ npm run play         # Connected Play: build + relay (PC http://localhost:8080, 
 npm run relay        # the relay alone, using the existing build
 npm run dev          # http://localhost:5173 (single-device play; the camera works on localhost)
 npm run dev:https    # the same, over HTTPS on the LAN, for a phone
-npm test             # 195 automated tests
+npm test             # 275 automated tests
 npm run build        # type-check + production build into dist/ (game, controller, detector lab)
 ```
 
@@ -383,16 +564,31 @@ If detection keeps failing (12 s stuck in setup, 15 s without a counted rep, 3 t
 
 ## Exercises
 
-| Exercise | Ability | Camera detector | Status |
-|---|---|---|---|
-| Push-ups | Sword Slash | ✅ `PushupDetector` | Starting ability |
-| Squats | Shield Stance | ✅ `SquatDetector` | Starting ability |
-| Jumping jacks | Arcane Burst | ✅ `JumpingJackDetector` | Starting ability |
-| Plank (hold) | Iron Bulwark | ✅ `PlankDetector` | Unlocks at Lv 2 |
-| Reverse lunges | Gale Step | ❌ none yet | Unlocks at Lv 3, **cannot be equipped** |
-| Mountain climbers | Flurry Strikes | ❌ none yet | Unlocks at Lv 4, **cannot be equipped** |
+| Movement | Family | Equipment | View | Reliability | Detector and signal |
+|---|---|---|---|---|---|
+| Push-ups | Upper | — | side-on, floor | **stable** (playtested) | `PushupDetector`: elbow angle, adaptive top, debounce |
+| Dumbbell rows | Upper | dumbbells + chair/bench | side-on, bent over | **experimental** | `RowDetector`: elbow angle plus wrist lift per arm; the body must be bent over with the legs standing (so push-ups can't count) |
+| Bicep curls | Upper | dumbbells | facing | beta | `CurlDetector`: wrist from below to well above the elbow per arm; torso swing over 14° or a raised elbow rejects the rep |
+| Squats | Legs | — | facing or side | **stable** | `SquatDetector`: thigh rise |
+| Reverse lunges | Legs | — | facing | beta | `LungeDetector`: hips drop ≥ 0.32 thigh with the knees split ≥ 0.28 thigh; the side is the lower (back) knee; level knees (a squat) don't count |
+| Jumping jacks | Cardio | — | facing | **stable** | `JumpingJackDetector` |
+| High knees | Cardio | — | facing | beta | `HighKneesDetector`: each knee to within half a thigh of hip height; marching never gets there |
+| Mountain climbers | Cardio | — | side-on, floor | **experimental** | `ClimberDetector`: shoulder–hip–knee angle per leg from a plank |
+| Plank (hold) | Core | — | side-on, floor | beta | `PlankDetector`: straight, horizontal, supported line; now also over Connected Play |
+| Dead bugs | Core | — | side-on, lying | **experimental** | `DeadBugDetector`: leg extension from tabletop, arms up |
+| Standing cross crunches | Core | — | facing | beta | `CrossCrunchDetector`: knee drive plus the opposite elbow within 0.55 torso of the knee |
 
-Exercises without a detector are shown as *Camera detector in development*. They are never equipped and never routed to another exercise's detector.
+**Sided movements** (rows, curls, lunges, cross crunches) count each side separately. The target is per side, and a set completes only when both sides reach it; unbalanced work never completes a set. Both arms curling together count once per arm.
+
+**Why some are experimental**, with practical alternates:
+
+- **Rows:** from a side view the far arm is hidden, so the rowing arm must be nearest the phone, and you turn around to switch sides. The anatomical side labels from a side view still need checking. Alternates: bicep curls, or push-ups.
+- **Mountain climbers:** the two legs overlap from the side and blur at speed. Alternate: high knees, which are facing the phone like marching (proven).
+- **Dead bugs:** lying side-on, the legs overlap, and only leg extensions are checked (the opposite arm isn't). Alternates: plank, or standing cross crunches.
+
+**Adding a movement** means a registry entry and a detector. `src/exercise/detectors/limbCycle.ts` handles the common "limb goes out and back" pattern, so a new detector is mostly its measurements (see `movements.ts`). Combat needs no changes if it reuses an ability; a test checks that every family always has an equipment-free stable or beta option.
+
+**Recovery** (`src/exercise/recovery.ts`) is a separate, unscored library for Havens: standing side reach, shoulder rolls, cat-cow and child's pose.
 
 ### How detection works
 
@@ -430,7 +626,10 @@ src/trial/        Motion Trial config: rep targets, encounter plans, rewards
 src/testing/      synthetic pose generators shared by tests and the ?debug browser hooks
 src/exercise/     detectors (pure TS), rep diagnostics, roll levelling, registry, session controller (setup → countdown → active → complete)
 src/pose/         camera + MediaPipe PoseLandmarker (GPU with CPU fallback), frame conversion
-src/combat/       CombatEngine (pure rules → CombatEffects), enemies & boss phases
+src/combat/       CombatEngine for the tutorial trial and classic mode
+src/rpg/          expedition engine (abilities, enemies, blessings, turns, strikes), dodge reader + strike timing,
+                  loadout director, workout records, expedition state/persistence/routes, story text
+src/ui/expedition/ Sanctuary, path, RpgBattle, blessings, Mirror, Haven, summary, Movement Lab, set runner, dodge source
 src/game/         progression, save (localStorage, validated), store, audio (WebAudio synth + speech), event bus
 src/phaser/       diorama/ figurines, props, board, trail graph & walker, steering & collisions; pixel art & tiles for classic; scenes
 src/ui/           React UI: TrialRun, Calibration, AutoBattle, Connected (pairing, remote calibration, controller status), gesture menus; classic UI
@@ -439,7 +638,19 @@ src/lab/          Detector Lab
 
 Saved automatically: level/XP, gold, upgrades, abilities, defeated enemies, dungeon clears, location, settings (including turn step and sensitivities) and lifetime totals.
 
-## Toward the combat overhaul (architecture notes)
+## Combat architecture: the earlier notes, resolved
+
+The five obstacles listed last round were addressed like this:
+
+1. **Ability is separate from exercise.** `rpg/abilities.ts` defines abilities per family, and each movement names its variant (`rpgAbility`).
+2. **Enemies no longer prescribe exercises.** Weaknesses are multipliers and hints.
+3. **Run state** lives in `rpg/expedition.ts`: loadout, blessings, HP, node, and the workout.
+4. **Enemy attacks** are intent → wind-up → strikes → dodge window → resolve (`rpg/engine.ts`, `rpg/dodge.ts`), in their own `dodge` input mode.
+5. **Battle pacing** is a small stage machine in `ui/expedition/RpgBattle.tsx` on pausable timers.
+
+The notes below are kept for history.
+
+## Toward the combat overhaul (architecture notes, previous round)
 
 The planned direction:
 
@@ -466,6 +677,76 @@ Already in place and reusable:
 - The "ready" neutral-pose recognition.
 
 ## Testing done
+
+- **Heart of Haze milestone (this round):**
+  - **Automated:** `npm test`, **275 passing** (20 files), 73 of them new:
+    - **Movements** (`tests/movements.test.ts`):
+      - curls count per arm (both arms together = one each); swinging the body or raising the elbows is rejected; a half curl is partial;
+      - rows count the rowing arm by side; the supporting arm, push-ups and standing curls never count;
+      - lunges count by the leg that stepped back; squats and shallow dips never count;
+      - high knees count knee drives; marching doesn't;
+      - cross crunches need the opposite elbow;
+      - mountain climbers and dead bugs count from their floor positions and not from standing;
+      - every family has an equipment-free stable or beta movement; entries are well-formed; push-ups count exactly as before.
+    - **Sets** (`tests/sets.test.ts`):
+      - 5 of 8 push-ups then *Finish set* resolves exactly 5, and nothing counts afterwards;
+      - pausing, 10 s out of view and 10 s holding still never end a set;
+      - reaching the target still auto-completes;
+      - finishing a plank resolves the whole seconds held;
+      - sided sets complete only when both sides reach the target (3 left + 1 right doesn't);
+      - Connected Play: sided reps need a side and both arms may land together; hold time can't run faster than real time or while paused; the phone's Finish button is validated and routed to the active set only; the phone bridge streams plank hold totals and lunge sides.
+    - **Voice** (`tests/voice.test.ts`):
+      - the four commands and variants match; commands buried in sentences don't;
+      - one utterance fires once across interim and final results;
+      - debounce works, and nothing is accepted while the narrator speaks;
+      - *Finish set* is refused in exploration, dialogue, ready, dodge and calibration; *Resume* only works in menus;
+      - dodge mode only takes a duck, a hop or a pause.
+    - **Combat** (`tests/rpg.test.ts`):
+      - effectiveness scaling, including sided credit and the Echo of Resolve floor;
+      - recharge (never two turns running; three abilities always ready);
+      - a zero-rep set fizzles without using the ability; partial vs full damage;
+      - armour blunts until broken, and stagger cracks it;
+      - a charge lands unless disrupted; area and chain hit a pack; lightning overloads wards and fire is resisted;
+      - **the boss is beatable without any upper-body movement**;
+      - blessing interactions: Tempered Edge, Aftershock, Static Mantle, Full Circle, Quickened Heart, Second Wind;
+      - missed dodges cost HP (shield first) while dodged or unclear cost nothing; defeat only comes from missed dodges.
+    - **Dodge reading and timing:**
+      - no baseline while rising from a squat, so standing up is never a dodge;
+      - a quick squat is a duck and a small hop is a hop; marching is neither;
+      - a hop too early doesn't count;
+      - out of view the strike waits; lost mid-swing is *unclear*, never a hit;
+      - the controller fallback works.
+    - **Loadouts and records** (`tests/expedition.test.ts`):
+      - 200 random loadouts respect equipment, exclusions, experimental opt-in and families;
+      - rows need a support;
+      - only checked movements are picked normally, with a first-time check otherwise;
+      - a fully excluded family sits out;
+      - rerolls change the pick when possible;
+      - demanding recent movements are picked less often;
+      - targets never scale with enemies;
+      - a reroll keeps the sets done; defeat and victory both keep the record;
+      - suspend and resume restore the node, HP, blessings, targets and workout; a corrupted run is dropped;
+      - the main save keeps setup, targets, checks and history.
+    - **Tracking follows the game state** (`tests/tracking_state.test.ts`):
+      - gamepad exploration, menus and the ready check work with nobody in view;
+      - the phone sends no "camera sees" warnings in menus or dialogue, but does in dodge mode;
+      - a set doesn't start and strikes don't run until you're tracked;
+      - camera loss mid-strike costs no HP.
+  - **Headless Chromium, PC + phone through the real relay** (a scripted synthetic body on the phone):
+    - **A full short expedition, start to finish:**
+      - pairing and the Sanctuary with nobody in view; the path; the camera check before the first fight;
+      - 14 sets (push-ups, squats, jumping jacks, cross crunches counted L 8 / R 8);
+      - a blessing; the Mirror (a full reroll, previewed: Cross Crunches → Plank);
+      - the Haven stretches with calm audio and the memory after them;
+      - victory over the Warden;
+      - the summary and history were recorded;
+      - no page errors.
+    - **A Movement Lab encounter (Iron Husk):**
+      - voice *pause* mid-set → paused; *resume* → back; *finish set* → resolved with the reps so far;
+      - three strikes (LOW, HIGH, LOW) all **dodged** by the phone's duck/hop reading over the network.
+    - **Dodge practice:** 4 of 4 dodged.
+    - The tutorial-trial regression (guided trail, four battles, pause and recalibrate) passes.
+  - **Not verified:** everything physical. See the checklist below.
 
 - **Playtest-3 fixes (this round):**
   - **What was fixed or added:**
@@ -594,9 +875,36 @@ Already in place and reusable:
   - Phone-event → PC-input measured in the browser was about 180–210 ms. That figure is dominated by this sandbox rendering the PC page in software at 7–13 fps; on a real PC with a GPU at 60 fps expect far less, but it has not been measured.
 - **Regressions:** the phone-only Motion Trial and the classic touch adventure (all four fights, level-ups, save and reload) were re-run end to end in the browser and still work.
 
-## Needs physical testing (not verified)
+## Physical playtest checklist (Heart of Haze)
 
-**Nothing in this round has been tried by a real person on a real device.** The playtest scenarios to try next:
+**Nothing in the expedition has been tried by a real person yet.** Suggested order for one or two sessions:
+
+1. **Voice (laptop, Chrome or Edge):** Sanctuary → *Voice commands on* → allow the mic.
+   - The Sanctuary says whether recognition is on this computer or online.
+   - From your play spot with game audio on, say "Pause" on the path; the chip should show *Pause — not available right now* (nothing to pause there).
+   - In a set, say "Pause", then "Resume", then "Finish set".
+   - Note misses and false triggers (TV speech, the narrator, conversation).
+2. **Movement Lab → Movements:** try each movement you might use, and answer *Did the count match?* honestly. In particular:
+   - reverse lunges: does it report the correct side?
+   - bicep curls: does a clean curl count, and does a swing get rejected?
+   - high knees and cross crunches;
+   - plank from your wall/floor placement;
+   - rows, if you have a bench: does the rowing arm need to face the phone as described?
+   - mountain climbers and dead bugs: expect trouble; note what happens.
+3. **Movement Lab → Dodge practice** with your body: is a quick squat enough for HIGH? Is a small hop enough for LOW? Is the 2.6 s wind-up generous or too slow?
+4. **A Short expedition** (about 12–15 min), then a **Full** one on another day:
+   - finish at least one set early on purpose;
+   - after push-ups, check that nothing attacks until you stand and say you're ready;
+   - leave the frame between sets (the next strike should wait) and during a swing (*unseen — no damage*);
+   - try *Pause → Dodge with a controller* from the couch;
+   - pause and recalibrate mid-fight;
+   - save and stop at a phase boundary, close the browser, then resume from the title screen;
+   - check that the summary's workout numbers match what you did.
+5. **Couch check:** in the tutorial trial with *Gamepad or keyboard* traversal, sit out of view. There should be no tracking warnings while exploring.
+
+## Needs physical testing (earlier rounds; still not verified)
+
+The earlier playtest scenarios:
 
 1. March through the meadow without steering.
 2. Stop marching and check the hero stops promptly.
@@ -624,17 +932,25 @@ Earlier items, still unverified:
 - Every exercise from the single fixed phone position, especially push-ups (a body lying side-on on the floor). If push-ups don't track from your placement, the floor check will say so and a clearly labelled manual count is offered. Nothing is ever counted as camera-verified unless the camera saw it.
 - Reconnecting after a real Wi-Fi drop, a phone lock or Safari backgrounding. Safari may stop the camera in the background, and the phone then needs *Start camera* again.
 
-## Known limitations
+## Known limitations and suggested follow-ups
+
+- **Voice:** online unless Chrome's on-device pack is installed. Follow-up: a small offline keyword spotter (Vosk WASM) on the laptop if the online path is unreliable or unwanted.
+- **Experimental detectors:** rows, mountain climbers and dead bugs are built from single-view geometry and need real footage in the Detector Lab. Follow-up: record a few sets with the Lab's video mode and tune thresholds.
+- **Dodge thresholds** (duck = shoulders drop a third of a torso; hop = both ankles and the hips lift) are guesses until tried; the timing constants live in `rpg/dodge.ts`.
+- **Balance:** enemy HP, blessing values and the "about 20 sets" route are first-pass numbers.
 
 - Connected Play needs the relay running on the PC (`npm run play`). It isn't available from a static deployment such as Vercel.
 - One controller per game. Multiplayer is out of scope.
 - The phone's calibration is kept only for that browser tab. If the tab is closed, re-pair and recalibrate (*Pause → Recalibrate*).
 - The first connection to a self-signed certificate shows a browser warning. Use mkcert to avoid it.
-- Hold exercises (plank) are only in the classic mode and aren't supported by the remote exercise protocol yet.
 - **Single camera placement** is plausible but unproven for push-ups. The floor check and manual fallback exist for this reason.
-- Mid-set pause gestures need a body in view. Lying on the floor you must stand first, or use touch, keyboard or gamepad (voice is deferred).
+- Mid-set pause gestures need a body in view. On the floor, say "Pause" (laptop voice), or use touch, keyboard or gamepad.
+- Voice needs Chrome or Edge on the laptop and, unless Chrome's on-device pack is available, an internet connection (see Voice commands).
+- Expedition content is a test route: two fixed routes, six enemy types and 13 blessings. There is no procedural map and no full story yet.
+- In the expedition, only the first fight and later physical nodes check the camera; a Lab encounter also checks it first.
+- Experimental movements (rows, mountain climbers, dead bugs) and all beta movements need a check on the real setup.
 - Guided traversal uses one hand-built trail for the meadow. New areas need their own trail graphs.
 - Roll correction only undoes sideways tilt. Pitch and perspective from a phone leaning against a wall are not corrected.
 - The camera runs continuously; expect battery drain and warmth. Keep the phone on a charger.
 - **iOS Safari:** the camera needs HTTPS. Screen wake-lock needs iOS 16.4+. Keep the page in the foreground. Older iPhones may need the *Fast* tracking model.
-- Reverse lunges and mountain climbers have no detectors yet. The game does not judge exercise form and makes no medical claims.
+- The game does not judge exercise form or joint loading and makes no medical claims. Form cues (e.g. "keep your body still") are about what the camera needs to count.

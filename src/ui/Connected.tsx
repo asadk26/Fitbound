@@ -139,7 +139,8 @@ export function CameraSees({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function ConnectedSetup({ onStart, onBack }: { onStart: () => void; onBack: () => void }) {
+export function ConnectedSetup({ onStart, onBack, purpose = 'trial' }: { onStart: () => void; onBack: () => void; /** 'expedition': continue as soon as the camera runs (no need to stand in view yet). */ purpose?: 'trial' | 'expedition' }) {
+  const expedition = purpose === 'expedition';
   const s = useLink();
   const [now, setNow] = useState(Date.now());
   const [goodSince, setGoodSince] = useState<number | null>(null);
@@ -160,7 +161,7 @@ export function ConnectedSetup({ onStart, onBack }: { onStart: () => void; onBac
     if (!seen && goodSince !== null) setGoodSince(null);
   }, [seen, goodSince]);
   // Hands-free: once the phone sees the player for a few seconds, go on.
-  const autoIn = goodSince !== null ? Math.max(0, 5 - Math.floor((now - goodSince) / 1000)) : null;
+  const autoIn = !expedition && goodSince !== null ? Math.max(0, 5 - Math.floor((now - goodSince) / 1000)) : null;
   const started = useRef(false);
   useEffect(() => {
     if (autoIn === 0 && !started.current) {
@@ -175,7 +176,7 @@ export function ConnectedSetup({ onStart, onBack }: { onStart: () => void; onBac
   return (
     <div className="title-screen">
       <div className="title-card setup-card connected-card">
-        <h2>Connected Play</h2>
+        <h2>{expedition ? 'Heart of Haze · connect your phone' : 'Connected Play'}</h2>
         <p className="muted small">The phone is your motion controller; this computer runs the game. Connect it to the TV with HDMI and press F11 for full screen.</p>
 
         {s.relay === 'unavailable' && (
@@ -227,9 +228,11 @@ export function ConnectedSetup({ onStart, onBack }: { onStart: () => void; onBac
             <Check ok={modelOk} pending={camOk && !modelOk}>
               {st?.model === 'error' ? 'The pose model failed to load on the phone' : 'Pose tracking ready'}
             </Check>
-            <Check ok={!!seen} pending={modelOk && !seen}>
-              {seen ? 'The phone can see you' : 'Stand 2.5–3 m in front of the phone'}
-            </Check>
+            {!expedition && (
+              <Check ok={!!seen} pending={modelOk && !seen}>
+                {seen ? 'The phone can see you' : 'Stand 2.5–3 m in front of the phone'}
+              </Check>
+            )}
           </ol>
         )}
         {camOk && (
@@ -237,14 +240,17 @@ export function ConnectedSetup({ onStart, onBack }: { onStart: () => void; onBac
             Using: <b>{st?.cameraLabel ?? 'phone camera'}</b> — to switch between front and back, use the Camera card on the phone.
           </p>
         )}
-        {modelOk && !seen && <CameraSees />}
+        {modelOk && !seen && !expedition && <CameraSees />}
+        {expedition && modelOk && <p className="muted small">You don’t need to be in view yet — menus work from the couch with a gamepad. The camera checks you just before the first fight.</p>}
 
-        <TraversalPicker />
+        {!expedition && <TraversalPicker />}
 
-        <details className="setup-settings">
-          <summary>Controls</summary>
-          <MotionSettings />
-        </details>
+        {!expedition && (
+          <details className="setup-settings">
+            <summary>Controls</summary>
+            <MotionSettings />
+          </details>
+        )}
 
         <div className="row">
           <button
@@ -262,7 +268,7 @@ export function ConnectedSetup({ onStart, onBack }: { onStart: () => void; onBac
             </button>
           )}
           <button className="btn btn-big" disabled={!modelOk} onClick={onStart}>
-            {autoIn !== null ? `Start calibration (${autoIn})` : 'Start calibration'}
+            {expedition ? 'Continue to the Sanctuary' : autoIn !== null ? `Start calibration (${autoIn})` : 'Start calibration'}
           </button>
         </div>
       </div>
@@ -286,7 +292,7 @@ export function RemoteCalibration({ onDone, kind = 'full' }: { onDone: (r: Calib
 }
 
 /** Phone connection / tracking status (replaces the camera picture on the TV). */
-export function ControllerStatus({ big = false }: { big?: boolean }) {
+export function ControllerStatus({ big = false, bodyNeeded = true }: { big?: boolean; /** False when nothing on screen needs the body (gamepad play): no tracking warnings. */ bodyNeeded?: boolean }) {
   const s = useLink();
   const r = useMotion();
   const st = s.status;
@@ -295,8 +301,9 @@ export function ControllerStatus({ big = false }: { big?: boolean }) {
   return (
     <div className={`ctrl-status ${big ? 'big' : ''} ${conn ? '' : 'lost'}`}>
       <span className={`dot ${conn ? 'ok' : 'bad'}`}>📱 {conn ? 'Phone connected' : 'Phone disconnected'}</span>
-      {conn && <span className={`dot ${trk === 'good' ? 'ok' : trk === 'partial' ? 'warn' : 'bad'}`}>{trk === 'good' ? 'Tracking you' : trk === 'partial' ? 'Weak tracking' : 'Not seeing you'}</span>}
-      {conn && <CameraSees compact={!big} />}
+      {conn && bodyNeeded && <span className={`dot ${trk === 'good' ? 'ok' : trk === 'partial' ? 'warn' : 'bad'}`}>{trk === 'good' ? 'Tracking you' : trk === 'partial' ? 'Weak tracking' : 'Not seeing you'}</span>}
+      {conn && !bodyNeeded && <span className="dot ok">🎮 Controller mode — step into view for battles</span>}
+      {conn && bodyNeeded && <CameraSees compact={!big} />}
       {big && conn && !s.peek && <span className="muted small">The camera picture stays on the phone — nothing is sent to this computer but your movements.</span>}
     </div>
   );

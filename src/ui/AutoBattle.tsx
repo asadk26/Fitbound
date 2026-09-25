@@ -344,6 +344,25 @@ export function AutoBattle({
   // Pause works in every phase; during a set only via that exercise's safe
   // gesture (or touch / keyboard / gamepad).
   useInputEvents((e) => {
+    // Voice / Y / F: end the set now; the reps already counted still count.
+    if (e.type === 'finish' && stageRef.current === 'set' && ctrl.current) {
+      audio.gesture();
+      if (pausedRef.current) setPaused(false);
+      ctrl.current.finish();
+      return;
+    }
+    if (e.type === 'recalibrate' && !recal && stageRef.current !== 'victory') {
+      if (!pausedRef.current) {
+        if (stageRef.current === 'set') ctrl.current?.pause();
+        setPaused(true);
+      }
+      startRecal();
+      return;
+    }
+    if (e.type === 'resume' && pausedRef.current && !recal) {
+      resume();
+      return;
+    }
     if (e.type === 'pause' && !pausedRef.current && stageRef.current !== 'victory') {
       if (stageRef.current === 'set') ctrl.current?.pause();
       setPaused(true);

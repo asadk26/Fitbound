@@ -37,6 +37,12 @@ export const PAUSE_POLICIES: Record<string, PausePolicy> = {
   jumping_jack: { holdMs: 1500, feetTogether: true, still: true, standing: false },
   pushup: { holdMs: 1000, feetTogether: false, still: false, standing: true },
   plank: { holdMs: 1000, feetTogether: false, still: false, standing: true },
+  // Curls stop at the shoulders and lunges keep the hands low: a plain hands-high hold.
+  bicep_curl: { holdMs: 1000, feetTogether: false, still: false, standing: false },
+  reverse_lunge: { holdMs: 1000, feetTogether: false, still: false, standing: false },
+  // Arms pump during high knees; cross crunches start with hands behind the head.
+  high_knees: { holdMs: 1500, feetTogether: true, still: true, standing: false },
+  cross_crunch: { holdMs: 1500, feetTogether: true, still: true, standing: false },
 };
 
 const DEFAULT_POLICY: PausePolicy = { holdMs: 1200, feetTogether: false, still: false, standing: true };

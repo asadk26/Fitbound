@@ -14,10 +14,13 @@ import { useSave } from './ui/useSave';
 import { TrialRun } from './ui/TrialRun';
 import { TrialSetup } from './ui/TrialSetup';
 import { ConnectedSetup } from './ui/Connected';
+import { Expedition } from './ui/expedition/Expedition';
+import { VoiceChip } from './ui/VoiceUi';
+import { currentNode, loadExpedition } from './rpg/expedition';
 import { startMotion, tilt } from './input/tilt';
 import type { Difficulty } from './exercise/types';
 
-type Screen = 'title' | 'newgame' | 'world' | 'battle' | 'trialsetup' | 'trial' | 'connectsetup' | 'connected';
+type Screen = 'title' | 'newgame' | 'world' | 'battle' | 'trialsetup' | 'trial' | 'connectsetup' | 'connected' | 'expconnect' | 'expedition';
 type Overlay = { kind: 'npc'; id: string } | { kind: 'message'; text: string } | { kind: 'abilities' } | { kind: 'menu' } | null;
 
 export default function App() {
@@ -27,6 +30,7 @@ export default function App() {
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [enemyId, setEnemyId] = useState<string | null>(null);
   const [hint, setHint] = useState(true);
+  const [exp, setExp] = useState<{ connected: boolean; resume: boolean }>({ connected: true, resume: false });
   const screenRef = useRef(screen);
   screenRef.current = screen;
   const overlayRef = useRef(overlay);
@@ -49,8 +53,18 @@ export default function App() {
 
   // The title and trial setup screens float over a slowly drifting diorama.
   useEffect(() => {
-    if (screen === 'title' || screen === 'trialsetup' || screen === 'connectsetup') showScene('Diorama', { attract: true });
+    if (screen === 'title' || screen === 'trialsetup' || screen === 'connectsetup' || screen === 'expconnect') showScene('Diorama', { attract: true });
   }, [screen]);
+
+  // A clicked button keeps keyboard focus; drop it so Enter/Space go back to the game.
+  useEffect(() => {
+    const blur = (e: MouseEvent) => {
+      const b = e.target instanceof Element ? e.target.closest('button') : null;
+      if (b) window.setTimeout(() => (b as HTMLElement).blur(), 0);
+    };
+    document.addEventListener('click', blur);
+    return () => document.removeEventListener('click', blur);
+  }, []);
 
   // World events from Phaser.
   useEffect(() => {
@@ -123,6 +137,12 @@ export default function App() {
 
       {screen === 'title' && (
         <TitleScreen
+          onExpedition={(connected, resume) => {
+            audio.unlock();
+            audio.select();
+            setExp({ connected, resume });
+            setScreen(connected ? 'expconnect' : 'expedition');
+          }}
           canContinue={save.created}
           onTrial={() => {
             audio.unlock();
@@ -159,6 +179,9 @@ export default function App() {
       {screen === 'trial' && <TrialRun onExit={() => setScreen('title')} />}
 
       {screen === 'connectsetup' && <ConnectedSetup onBack={() => setScreen('title')} onStart={startConnected} />}
+      {screen === 'expconnect' && <ConnectedSetup purpose="expedition" onBack={() => setScreen('title')} onStart={() => setScreen('expedition')} />}
+      {screen === 'expedition' && <Expedition connected={exp.connected} resume={exp.resume} onExit={() => setScreen('title')} />}
+      <VoiceChip />
       {screen === 'connected' && <TrialRun connected onExit={() => setScreen('title')} />}
 
       {screen === 'newgame' && (
@@ -236,27 +259,61 @@ export default function App() {
   );
 }
 
-function TitleScreen({ canContinue, onTrial, onConnected, onContinue, onNew }: { canContinue: boolean; onTrial: () => void; onConnected: () => void; onContinue: () => void; onNew: () => void }) {
+function TitleScreen({
+  canContinue,
+  onExpedition,
+  onTrial,
+  onConnected,
+  onContinue,
+  onNew,
+}: {
+  canContinue: boolean;
+  onExpedition: (connected: boolean, resume: boolean) => void;
+  onTrial: () => void;
+  onConnected: () => void;
+  onContinue: () => void;
+  onNew: () => void;
+}) {
+  const [saved] = useState(() => loadExpedition());
+  const node = saved ? currentNode(saved) : null;
   return (
     <div className="title-screen">
       <div className="title-card">
         <div className="logo">
           FIT<span>BOUND</span>
         </div>
-        <p className="tagline">A fantasy adventure you play with your body.</p>
+        <p className="tagline subtitle">Heart of Haze</p>
+        <p className="tagline">A fitness roguelite you play with your body.</p>
         <div className="title-figs">
           <img src={figureUrl('hero')} alt="" />
-          <img src={figureUrl('skeleton')} alt="" />
+          <img src={figureUrl('warden')} alt="" />
         </div>
         <div className="title-buttons">
-          <button className="btn btn-big" onClick={onConnected}>
-            Connected Play · PC + phone
+          {saved && node && (
+            <>
+              <button className="btn btn-big" onClick={() => onExpedition(true, true)}>
+                Resume expedition · Phase {node.phase}
+              </button>
+              <span className="title-sub">
+                Next: {node.title}. ♥ {saved.hp}/{saved.maxHp} · {saved.workout.sets.length} sets done so far.
+              </span>
+            </>
+          )}
+          <button className={`btn ${saved ? '' : 'btn-big'}`} onClick={() => onExpedition(true, false)}>
+            {saved ? 'New expedition' : 'Expedition'} · PC + phone
           </button>
-          <span className="title-sub">This computer runs the game on your TV; your phone is the motion controller.</span>
-          <button className="btn" onClick={onTrial}>
-            Motion Trial · phone only
-          </button>
-          <span className="title-sub">Prop up your phone and play on it (or mirror it to a TV).</span>
+          <span className="title-sub">Choose your movements, fight with four exercise-powered abilities, dodge HIGH and LOW, reach the Spark.{saved ? ' Starting new replaces the saved run (its workout is already recorded).' : ''}</span>
+          <div className="title-classic">
+            <button className="btn btn-sm btn-ghost" onClick={() => onExpedition(false, !!saved)}>
+              Expedition · phone only
+            </button>
+            <button className="btn btn-sm btn-ghost" onClick={onConnected}>
+              Tutorial trial · PC + phone
+            </button>
+            <button className="btn btn-sm btn-ghost" onClick={onTrial}>
+              Tutorial trial · phone only
+            </button>
+          </div>
           <div className="title-classic">
             {canContinue && (
               <button className="btn btn-sm btn-ghost" onClick={onContinue}>

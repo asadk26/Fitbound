@@ -252,6 +252,9 @@ export class InputHub {
       // One press = one turn, like one lean.
       if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.press('left');
       if (e.code === 'ArrowRight' || e.code === 'KeyD') this.press('right');
+      // Enter / Space on a focused button or field belongs to that control, not the game.
+      const onControl = e.target instanceof Element && !!e.target.closest?.('button, input, select, textarea, summary');
+      if ((e.code === 'Enter' || e.code === 'Space') && onControl) return;
       if (e.code === 'Enter' || e.code === 'Space') this.press('confirm');
       if (e.code === 'Escape' || e.code === 'Backspace') this.press('back');
       if (e.code === 'KeyP') this.press('pause');

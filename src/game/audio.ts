@@ -211,6 +211,74 @@ class Audio {
     if (this.musicTimer !== null) window.clearInterval(this.musicTimer);
     this.musicTimer = null;
     this.musicTrack = null;
+    this.calm(false);
+  }
+
+  private calmTimer: number | null = null;
+  private calmGain: GainNode | null = null;
+
+  /**
+   * Soft, slow ambient pad for Havens: sustained chords that swell and fade
+   * every eight seconds, with an occasional gentle chime. Synthesised here,
+   * like everything else — nothing is downloaded.
+   */
+  calm(on: boolean): void {
+    if (!on) {
+      if (this.calmTimer !== null) window.clearInterval(this.calmTimer);
+      this.calmTimer = null;
+      if (this.calmGain && this.ctx) {
+        const g = this.calmGain;
+        g.gain.setTargetAtTime(0.0001, this.ctx.currentTime, 0.8);
+        window.setTimeout(() => g.disconnect(), 4000);
+      }
+      this.calmGain = null;
+      return;
+    }
+    if (this.calmTimer !== null || !this.soundOn || !this.ctx || !this.master) return;
+    if (this.musicTimer !== null) window.clearInterval(this.musicTimer);
+    this.musicTimer = null;
+    this.musicTrack = null;
+    const ctx = this.ctx;
+    const out = ctx.createGain();
+    out.gain.value = 0.5;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 900;
+    out.connect(lp);
+    lp.connect(this.master);
+    this.calmGain = out;
+    const chords = [
+      [48, 55, 64, 71],
+      [45, 52, 60, 67],
+      [41, 48, 57, 64],
+      [43, 50, 59, 62],
+    ];
+    const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
+    let i = 0;
+    const play = () => {
+      if (!this.soundOn || !this.ctx) return;
+      const t = ctx.currentTime;
+      for (const n of chords[i % chords.length]) {
+        for (const detune of [-4, 4]) {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine';
+          o.frequency.value = midi(n);
+          o.detune.value = detune;
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(0.05, t + 3);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + 9.5);
+          o.connect(g);
+          g.connect(out);
+          o.start(t);
+          o.stop(t + 10);
+        }
+      }
+      if (i % 2 === 1) this.tone(midi(chords[i % chords.length][3] + 12), 2.5, 'sine', 0.05, 2, undefined, out);
+      i++;
+    };
+    play();
+    this.calmTimer = window.setInterval(play, 8000);
   }
 
   /** Duck the music while the player exercises so cues are audible. */
