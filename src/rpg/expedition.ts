@@ -1,0 +1,212 @@
+import { EXERCISES, FAMILIES, getExercise, type Family } from '../exercise/registry';
+import { ABILITIES } from './abilities';
+import { BLESSINGS } from './blessings';
+import { RPG_ENEMIES } from './enemies';
+import type { Loadout } from './engine';
+import { DEFAULT_PREFS, type DayPrefs, type ExLoadout } from './loadout';
+import { newWorkout, type WorkoutData } from './workout';
+
+/**
+ * An expedition: a short, handcrafted route of encounters in three resumable
+ * phases. Between phases you may stop and come back later; your character,
+ * loadout, blessings and — separately — the workout so far are saved.
+ *
+ * Suspending is not the same as losing: if the character falls, the Heart
+ * reforms them and the run carries on (the Spark just can't be restored this
+ * time), so the workout never restarts from zero.
+ */
+export type NodeKind = 'fight' | 'blessing' | 'mirror' | 'haven' | 'boss';
+
+export interface ExNode {
+  kind: NodeKind;
+  phase: 1 | 2 | 3;
+  title: string;
+  enemies?: string[];
+  /** Enemy HP scale for this route. */
+  hpScale?: number;
+}
+
+export type RouteId = 'standard' | 'short';
+
+export const ROUTES: Record<RouteId, { name: string; blurb: string; nodes: ExNode[]; plannedSets: number }> = {
+  standard: {
+    name: 'Full expedition',
+    blurb: 'About 20–25 minutes · 6 fights, a Haven, the Warden',
+    plannedSets: 21,
+    nodes: [
+      { kind: 'fight', phase: 1, title: 'The Training Yard', enemies: ['echo_dummy'] },
+      { kind: 'fight', phase: 1, title: 'Rusted Causeway', enemies: ['iron_husk'] },
+      { kind: 'blessing', phase: 1, title: 'A Fragment Remembered' },
+      { kind: 'fight', phase: 2, title: 'The Bone Field', enemies: ['bone_charger'] },
+      { kind: 'mirror', phase: 2, title: 'The Mirror of Unlived Lives' },
+      { kind: 'fight', phase: 2, title: 'Drifting Hollow', enemies: ['haze_wisp', 'haze_wisp', 'haze_wisp'] },
+      { kind: 'blessing', phase: 2, title: 'A Fragment Remembered' },
+      { kind: 'haven', phase: 3, title: 'A Quiet Haven' },
+      { kind: 'fight', phase: 3, title: 'The Veiled Stair', enemies: ['hollow_acolyte'] },
+      { kind: 'blessing', phase: 3, title: 'A Fragment Remembered' },
+      { kind: 'boss', phase: 3, title: 'Before the Spark', enemies: ['warden_of_haze'] },
+    ],
+  },
+  short: {
+    name: 'Short expedition',
+    blurb: 'About 12–15 minutes · 4 fights and a Haven',
+    plannedSets: 12,
+    nodes: [
+      { kind: 'fight', phase: 1, title: 'The Training Yard', enemies: ['echo_dummy'] },
+      { kind: 'fight', phase: 1, title: 'The Bone Field', enemies: ['bone_charger'] },
+      { kind: 'blessing', phase: 1, title: 'A Fragment Remembered' },
+      { kind: 'mirror', phase: 2, title: 'The Mirror of Unlived Lives' },
+      { kind: 'fight', phase: 2, title: 'Drifting Hollow', enemies: ['haze_wisp', 'haze_wisp', 'haze_wisp'] },
+      { kind: 'haven', phase: 2, title: 'A Quiet Haven' },
+      { kind: 'boss', phase: 3, title: 'Before the Spark', enemies: ['warden_of_haze'], hpScale: 0.75 },
+    ],
+  },
+};
+
+export interface ExpeditionState {
+  v: 1;
+  id: string;
+  route: RouteId;
+  /** Index of the next node to play. */
+  index: number;
+  prefs: DayPrefs;
+  loadout: ExLoadout;
+  /** Rep / second targets per exercise for this run (the player's own). */
+  targets: Record<string, number>;
+  hp: number;
+  maxHp: number;
+  blessings: string[];
+  /** The character fell at least once: the run continues, but the Spark can't be restored. */
+  fallen: boolean;
+  workout: WorkoutData;
+  status: 'active' | 'suspended' | 'complete' | 'ended';
+  /** Dodge with the body (default) or with a controller (couch play). */
+  dodgeInput: 'body' | 'controller';
+}
+
+export const HERO_HP = 100;
+
+export function newExpedition(route: RouteId, prefs: DayPrefs, loadout: ExLoadout, targets: Record<string, number>, now = Date.now()): ExpeditionState {
+  return {
+    v: 1,
+    id: `x${now.toString(36)}`,
+    route,
+    index: 0,
+    prefs,
+    loadout,
+    targets,
+    hp: HERO_HP,
+    maxHp: HERO_HP,
+    blessings: [],
+    fallen: false,
+    workout: newWorkout(prefs.intensity, ROUTES[route].plannedSets, now),
+    status: 'active',
+    dodgeInput: 'body',
+  };
+}
+
+export function currentNode(s: ExpeditionState): ExNode | null {
+  return ROUTES[s.route].nodes[s.index] ?? null;
+}
+
+/** True when the next node starts a new phase (a natural place to stop). */
+export function atPhaseBoundary(s: ExpeditionState): boolean {
+  const nodes = ROUTES[s.route].nodes;
+  const prev = nodes[s.index - 1];
+  const next = nodes[s.index];
+  return !!prev && !!next && prev.phase !== next.phase;
+}
+
+/** The engine's ability loadout from the exercise loadout. */
+export function abilityLoadout(l: ExLoadout): Loadout {
+  const out: Loadout = {};
+  for (const f of FAMILIES) {
+    const slot = l[f];
+    if (slot) out[f] = getExercise(slot.exerciseId).rpgAbility;
+  }
+  return out;
+}
+
+export function familyOf(exerciseId: string): Family {
+  return getExercise(exerciseId).family;
+}
+
+// ── Persistence ───────────────────────────────────────────────────────────
+
+export const EXPEDITION_KEY = 'fitbound.expedition.v1';
+
+interface KV {
+  getItem(k: string): string | null;
+  setItem(k: string, v: string): void;
+  removeItem(k: string): void;
+}
+
+function kv(s?: KV): KV | null {
+  if (s) return s;
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveExpedition(x: ExpeditionState, s?: KV): void {
+  try {
+    kv(s)?.setItem(EXPEDITION_KEY, JSON.stringify(x));
+  } catch {
+    /* storage full or unavailable */
+  }
+}
+
+export function loadExpedition(s?: KV): ExpeditionState | null {
+  try {
+    const raw = kv(s)?.getItem(EXPEDITION_KEY);
+    return raw ? sanitizeExpedition(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearExpedition(s?: KV): void {
+  try {
+    kv(s)?.removeItem(EXPEDITION_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Validate a stored expedition; anything inconsistent is dropped rather than half-loaded. */
+export function sanitizeExpedition(v: unknown): ExpeditionState | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as ExpeditionState;
+  if (o.v !== 1 || typeof o.id !== 'string' || !(o.route in ROUTES)) return null;
+  if (!Number.isInteger(o.index) || o.index < 0 || o.index > ROUTES[o.route].nodes.length) return null;
+  if (typeof o.hp !== 'number' || typeof o.maxHp !== 'number' || o.hp < 0 || o.hp > o.maxHp) return null;
+  if (!o.loadout || !FAMILIES.every((f) => o.loadout[f] === null || (typeof o.loadout[f]?.exerciseId === 'string' && safeEx(o.loadout[f]!.exerciseId)))) return null;
+  if (!Array.isArray(o.blessings) || !o.blessings.every((b) => BLESSINGS.some((x) => x.id === b))) return null;
+  if (!o.workout || !Array.isArray(o.workout.sets)) return null;
+  if (!['active', 'suspended', 'complete', 'ended'].includes(o.status)) return null;
+  const prefs = { ...DEFAULT_PREFS, ...(o.prefs ?? {}) };
+  return { ...o, prefs, targets: o.targets ?? {}, dodgeInput: o.dodgeInput === 'controller' ? 'controller' : 'body', fallen: !!o.fallen };
+}
+
+function safeEx(id: string): boolean {
+  try {
+    getExercise(id);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Sanity: every enemy and ability a route or loadout names exists. */
+export function validateContent(): string[] {
+  const errs: string[] = [];
+  for (const r of Object.values(ROUTES)) for (const n of r.nodes) for (const e of n.enemies ?? []) if (!RPG_ENEMIES[e]) errs.push(`enemy ${e}`);
+  for (const ex of EXERCISES) {
+    const a = ABILITIES[ex.rpgAbility];
+    if (!a) errs.push(`ability ${ex.rpgAbility} for ${ex.id}`);
+    else if (a.family !== ex.family) errs.push(`ability ${a.id} is ${a.family}, ${ex.id} is ${ex.family}`);
+  }
+  return errs;
+}

@@ -48,7 +48,14 @@ export type GuidanceCode =
   | 'GO_LOWER'
   | 'EXTEND_FULLY'
   | 'ARMS_AND_LEGS_TOGETHER'
-  | 'REPOSITION';
+  | 'REPOSITION'
+  | 'NO_SWING'
+  | 'GET_INTO_ROW'
+  | 'LIE_ON_BACK'
+  | 'STEP_BACK_TOGETHER';
+
+/** The player's anatomical side, for exercises counted per side. */
+export type Side = 'left' | 'right';
 
 export interface DetectorUpdate {
   /** Name of the current state-machine phase, for display and debugging. */
@@ -62,6 +69,8 @@ export interface DetectorUpdate {
   ready: boolean;
   /** True on exactly the update in which a full repetition completed. */
   repCompleted: boolean;
+  /** Sided exercises: which side that repetition was (the player's anatomical side). */
+  repSide?: Side;
   /** Rough 0..1 progress through the current movement, for UI meters. */
   progress: number;
   /** Hold exercises only: accumulated valid hold time in ms. */
@@ -110,7 +119,7 @@ export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
 export type RepSource = 'camera' | 'manual';
 
 export type ExerciseEvent =
-  | { type: 'rep'; exerciseId: string; index: number; target: number; source: RepSource }
+  | { type: 'rep'; exerciseId: string; index: number; target: number; source: RepSource; side?: Side }
   | { type: 'holdTick'; exerciseId: string; heldMs: number; targetMs: number; source: RepSource }
   | {
       type: 'setComplete';
@@ -119,5 +128,17 @@ export type ExerciseEvent =
       verification: 'camera' | 'manual' | 'mixed';
       completed: number;
       target: number;
+      sides?: SideCounts;
     }
-  | { type: 'setEnded'; exerciseId: string; completed: number; target: number; reason: 'stopped' | 'abandoned' };
+  /**
+   * The set ended before its target. 'finished': the player chose to finish
+   * (voice, button, menu) — the verified work resolves as a partial ability.
+   * 'stopped' / 'abandoned': older flows (no ability resolution beyond reps).
+   */
+  | { type: 'setEnded'; exerciseId: string; completed: number; target: number; reason: 'stopped' | 'abandoned' | 'finished'; sides?: SideCounts };
+
+/** Verified reps per side for sided exercises. */
+export interface SideCounts {
+  left: number;
+  right: number;
+}

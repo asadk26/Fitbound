@@ -1,5 +1,5 @@
 import type { ExerciseDefinition } from './registry';
-import type { DetectorUpdate, ExerciseDetector, ExerciseEvent, PoseFrame } from './types';
+import type { DetectorUpdate, ExerciseDetector, ExerciseEvent, PoseFrame, Side, SideCounts } from './types';
 
 /**
  * Drives one set of one exercise: setup → countdown → active → complete.
@@ -7,6 +7,16 @@ import type { DetectorUpdate, ExerciseDetector, ExerciseEvent, PoseFrame } from 
  * Owns the bridge from detector output to ExerciseEvents. It never invents a
  * repetition: camera reps come only from `detector.repCompleted`, and manual
  * reps come only from an explicit player action and are tagged 'manual'.
+ *
+ * The ways a set can end are kept apart:
+ *   - reaching the target completes it automatically ('setComplete');
+ *   - `finish()` is the player choosing to stop early ("Finish set"): the
+ *     verified work so far resolves as a partial set ('setEnded', 'finished');
+ *   - `stop()` is the older "end this set" with no resolution beyond reps;
+ *   - pausing, hesitating or losing tracking never ends a set by itself.
+ *
+ * Sided exercises (lunges, rows, curls) count each side separately; the
+ * target is per side and both sides must reach it to complete.
  */
 export type SessionStage = 'setup' | 'countdown' | 'active' | 'complete';
 
@@ -48,6 +58,8 @@ export interface SessionSnapshot {
   stage: SessionStage;
   count: number;
   target: number;
+  /** Sided exercises: verified reps per side (the target applies to each). */
+  sides?: SideCounts;
   cameraReps: number;
   manualReps: number;
   /** Hold exercises: seconds held this set. */
@@ -80,6 +92,7 @@ export class ExerciseSessionController {
   private lastNow = 0;
   private last: DetectorUpdate | null = null;
   private cameraUnavailable = false;
+  private readonly sideCounts: SideCounts = { left: 0, right: 0 };
   private readonly opts: SessionOptions;
 
   constructor(
@@ -96,6 +109,10 @@ export class ExerciseSessionController {
 
   get isHold(): boolean {
     return this.exercise.kind === 'hold';
+  }
+
+  get isSided(): boolean {
+    return this.exercise.sided === true;
   }
 
   /** Camera failed or is denied: manual counting is the only option. */
@@ -151,10 +168,13 @@ export class ExerciseSessionController {
           this.heldMs = this.cameraHeldMs + this.manualHeldMs;
           this.emitHoldTicks('camera');
         } else if (u.repCompleted) {
+          // A sided exercise's rep must say which side it was; otherwise it can't be credited.
+          if (this.isSided && !u.repSide) break;
           this.count++;
           this.cameraReps++;
           this.lastProgressAt = now;
-          this.emit({ type: 'rep', exerciseId: this.exercise.id, index: this.count, target: this.target, source: 'camera' });
+          if (u.repSide) this.sideCounts[u.repSide]++;
+          this.emit({ type: 'rep', exerciseId: this.exercise.id, index: this.count, target: this.target, source: 'camera', ...(this.isSided && u.repSide ? { side: u.repSide } : {}) });
           this.checkRepComplete();
         }
         break;
@@ -168,11 +188,14 @@ export class ExerciseSessionController {
     if (this.stage !== 'complete') this.stage = 'active';
   }
 
-  manualRep(): void {
+  /** A manual rep; sided exercises credit the side that is behind (or the one given). */
+  manualRep(side?: Side): void {
     if (!this.manualMode || this.stage === 'complete' || this.isHold) return;
     this.count++;
     this.manualReps++;
-    this.emit({ type: 'rep', exerciseId: this.exercise.id, index: this.count, target: this.target, source: 'manual' });
+    const s: Side | undefined = this.isSided ? (side ?? (this.sideCounts.left <= this.sideCounts.right ? 'left' : 'right')) : undefined;
+    if (s) this.sideCounts[s]++;
+    this.emit({ type: 'rep', exerciseId: this.exercise.id, index: this.count, target: this.target, source: 'manual', ...(s ? { side: s } : {}) });
     this.checkRepComplete();
   }
 
@@ -211,7 +234,20 @@ export class ExerciseSessionController {
     if (this.stage === 'complete') return;
     this.stage = 'complete';
     const completed = this.isHold ? Math.floor(this.heldMs / 1000) : this.count;
-    this.emit({ type: 'setEnded', exerciseId: this.exercise.id, completed, target: this.target, reason });
+    this.emit({ type: 'setEnded', exerciseId: this.exercise.id, completed, target: this.target, reason, ...(this.isSided ? { sides: { ...this.sideCounts } } : {}) });
+  }
+
+  /**
+   * "Finish set": the player chooses to end the set now. The verified work so
+   * far (reps, or whole seconds held) resolves as a partial set. Works while
+   * paused too — it is always an explicit choice, never inferred.
+   */
+  finish(): void {
+    if (this.stage === 'complete') return;
+    this.paused = false;
+    this.stage = 'complete';
+    const completed = this.isHold ? Math.floor(this.heldMs / 1000) : this.count;
+    this.emit({ type: 'setEnded', exerciseId: this.exercise.id, completed, target: this.target, reason: 'finished', ...(this.isSided ? { sides: { ...this.sideCounts } } : {}) });
   }
 
   private emitHoldTicks(source: 'camera' | 'manual'): void {
@@ -228,10 +264,10 @@ export class ExerciseSessionController {
   }
 
   private checkRepComplete(): void {
-    if (this.count < this.target) return;
+    if (this.isSided ? Math.min(this.sideCounts.left, this.sideCounts.right) < this.target : this.count < this.target) return;
     this.stage = 'complete';
     const verification = this.manualReps === 0 ? 'camera' : this.cameraReps === 0 ? 'manual' : 'mixed';
-    this.emit({ type: 'setComplete', exerciseId: this.exercise.id, verification, completed: this.count, target: this.target });
+    this.emit({ type: 'setComplete', exerciseId: this.exercise.id, verification, completed: this.count, target: this.target, ...(this.isSided ? { sides: { ...this.sideCounts } } : {}) });
   }
 
   private setStage(s: SessionStage, now: number): void {
@@ -249,6 +285,7 @@ export class ExerciseSessionController {
       stage: this.stage,
       count: this.count,
       target: this.target,
+      ...(this.isSided ? { sides: { ...this.sideCounts } } : {}),
       cameraReps: this.cameraReps,
       manualReps: this.manualReps,
       heldMs: this.heldMs,

@@ -34,6 +34,8 @@ const COMMAND_OF: Partial<Record<CtrlMsg['type'], CommandType>> = {
   PAUSE: 'pause',
   STEP: 'step',
   READY: 'ready',
+  DUCK: 'duck',
+  HOP: 'hop',
 };
 
 export class ControllerGate {
@@ -70,11 +72,19 @@ export class ControllerGate {
         return { ok: true, msg };
       case 'CALIBRATION':
         return ctx.mode === 'calibration' ? { ok: true, msg } : { ok: false, reason: 'mode' };
+      case 'DODGE_STATUS':
+        if (ctx.mode !== 'dodge') return { ok: false, reason: 'mode' };
+        return msg.epoch === ctx.epoch ? { ok: true, msg } : { ok: false, reason: 'stale-epoch' };
       case 'EXERCISE_STATUS':
       case 'EXERCISE_REP':
+      case 'EXERCISE_HOLD':
       case 'MANUAL_MODE':
         if (ctx.mode !== 'exercise') return { ok: false, reason: 'mode' };
         return msg.epoch === ctx.epoch ? { ok: true, msg } : { ok: false, reason: 'stale-epoch' };
+      // Finishing is an explicit choice that may come while paused (menu);
+      // the active set checks the set id.
+      case 'FINISH_SET':
+        return ctx.mode === 'exercise' || ctx.mode === 'menu' ? { ok: true, msg } : { ok: false, reason: 'mode' };
     }
 
     let type = COMMAND_OF[msg.type]!;
@@ -111,6 +121,10 @@ export function toCommand(msg: CtrlMsg): Command | null {
       return { type: 'step' };
     case 'READY':
       return { type: 'ready' };
+    case 'DUCK':
+      return { type: 'duck' };
+    case 'HOP':
+      return { type: 'hop' };
     default:
       return null;
   }

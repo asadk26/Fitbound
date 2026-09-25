@@ -286,3 +286,162 @@ export function standPose(t: number, o: StandOpts = {}): PoseFrame {
   }
   return frameFrom(pts, 1, t, 0.95, o.noise);
 }
+
+/**
+ * Standing, facing the phone, curling. `left` / `right` are 0 (arm hanging)
+ * .. 1 (full curl) for the player's own arms. `lean` sways the whole upper
+ * body (a swing); `elbowForward` lifts the elbows toward the camera.
+ */
+export function curlPose(left: number, right: number, t: number, o: { lean?: number; elbowRaise?: number } = {}): PoseFrame {
+  const lean = rad(o.lean ?? 0);
+  const hc: P = [0.5, 0.55];
+  const rot = (dx: number, dy: number): P => [hc[0] + dx * Math.cos(lean) - dy * Math.sin(lean), hc[1] + dx * Math.sin(lean) + dy * Math.cos(lean)];
+  const UA = 0.13;
+  const arm = (side: 1 | -1, k: number) => {
+    const S = rot(side * 0.08, -0.25);
+    const E: P = [S[0] + side * 0.01, S[1] + UA - (o.elbowRaise ?? 0)];
+    const phi = rad(140 * k);
+    const W: P = [E[0] + side * 0.01, E[1] + UA * Math.cos(phi)];
+    return { S, E, W };
+  };
+  const L = arm(1, left);
+  const R = arm(-1, right);
+  const pts: Partial<Record<number, P>> = {
+    [LM.NOSE]: rot(0, -0.36),
+    [LM.L_SHOULDER]: L.S,
+    [LM.R_SHOULDER]: R.S,
+    [LM.L_ELBOW]: L.E,
+    [LM.R_ELBOW]: R.E,
+    [LM.L_WRIST]: L.W,
+    [LM.R_WRIST]: R.W,
+    [LM.L_HIP]: [0.55, 0.55],
+    [LM.R_HIP]: [0.45, 0.55],
+    [LM.L_KNEE]: [0.55, 0.75],
+    [LM.R_KNEE]: [0.45, 0.75],
+    [LM.L_ANKLE]: [0.55, 0.95],
+    [LM.R_ANKLE]: [0.45, 0.95],
+  };
+  return frameFrom(pts, 1, t);
+}
+
+/**
+ * Supported one-arm dumbbell row seen side-on: torso bent over near
+ * horizontal, legs standing. `k` is 0 (arm hanging) .. 1 (dumbbell at the
+ * ribs) for the rowing arm; the other arm hangs still onto the support.
+ */
+export function rowPose(side: 'left' | 'right', k: number, t: number): PoseFrame {
+  const UA = 0.14;
+  const S: P = [0.35, 0.5];
+  const H: P = [0.62, 0.53];
+  const th = rad(80 * k);
+  const E: P = [S[0] + UA * Math.sin(th), S[1] + UA * Math.cos(th)];
+  const W: P = [E[0], E[1] + UA];
+  const sE: P = [S[0] - 0.02, S[1] + UA];
+  const sW: P = [S[0] - 0.02, S[1] + 2 * UA];
+  const work = side === 'left' ? [LM.L_ELBOW, LM.L_WRIST] : [LM.R_ELBOW, LM.R_WRIST];
+  const sup = side === 'left' ? [LM.R_ELBOW, LM.R_WRIST] : [LM.L_ELBOW, LM.L_WRIST];
+  const pts: Partial<Record<number, P>> = {
+    [LM.NOSE]: [S[0] - 0.1, S[1] + 0.02],
+    [LM.L_SHOULDER]: S,
+    [LM.R_SHOULDER]: [S[0] + 0.005, S[1]],
+    [work[0]]: E,
+    [work[1]]: W,
+    [sup[0]]: sE,
+    [sup[1]]: sW,
+    [LM.L_HIP]: H,
+    [LM.R_HIP]: H,
+    [LM.L_KNEE]: [0.62, 0.74],
+    [LM.R_KNEE]: [0.6, 0.74],
+    [LM.L_ANKLE]: [0.62, 0.95],
+    [LM.R_ANKLE]: [0.6, 0.95],
+  };
+  return frameFrom(pts, 4 / 3, t);
+}
+
+/** Reverse lunge facing the phone: depth 0 (standing) .. 1 (bottom); `back` is the leg that steps back. */
+export function lungePose(depth: number, back: 'left' | 'right', t: number): PoseFrame {
+  const d = depth;
+  const hipY = 0.55 + 0.12 * d;
+  const knee = (side: 'left' | 'right') => 0.75 + (side === back ? 0.15 : 0.03) * d;
+  const ankle = (side: 'left' | 'right') => 0.95 - (side === back ? 0.05 : 0) * d;
+  const pts: Partial<Record<number, P>> = {
+    [LM.NOSE]: [0.5, hipY - 0.36],
+    [LM.L_SHOULDER]: [0.58, hipY - 0.25],
+    [LM.R_SHOULDER]: [0.42, hipY - 0.25],
+    [LM.L_ELBOW]: [0.6, hipY - 0.12],
+    [LM.R_ELBOW]: [0.4, hipY - 0.12],
+    [LM.L_WRIST]: [0.6, hipY],
+    [LM.R_WRIST]: [0.4, hipY],
+    [LM.L_HIP]: [0.55, hipY],
+    [LM.R_HIP]: [0.45, hipY],
+    [LM.L_KNEE]: [0.56 + 0.03 * d, knee('left')],
+    [LM.R_KNEE]: [0.44 - 0.03 * d, knee('right')],
+    [LM.L_ANKLE]: [0.55, ankle('left')],
+    [LM.R_ANKLE]: [0.45, ankle('right')],
+  };
+  return frameFrom(pts, 1, t);
+}
+
+/** Standing cross-body crunch: `knee` side drives up by k (0..1) while the opposite elbow comes across to meet it. */
+export function crossCrunchPose(knee: 'left' | 'right', k: number, t: number, o: { elbow?: boolean } = {}): PoseFrame {
+  const f = standPose(t, { liftL: knee === 'left' ? 1.3 * k : 0, liftR: knee === 'right' ? 1.3 * k : 0, rightHand: 'shoulder', leftHand: 'shoulder' });
+  if (o.elbow !== false && k > 0) {
+    const kn = f.landmarks[knee === 'left' ? LM.L_KNEE : LM.R_KNEE];
+    const eIdx = knee === 'left' ? LM.R_ELBOW : LM.L_ELBOW;
+    const e = f.landmarks[eIdx];
+    f.landmarks[eIdx] = { ...e, x: e.x + (kn.x - e.x) * k, y: e.y + (kn.y - 0.05 - e.y) * k };
+  }
+  return f;
+}
+
+/** Mountain climber side-on: plank with each knee driven toward the chest by 0..1. */
+export function climberPose(driveL: number, driveR: number, t: number): PoseFrame {
+  const f = pushupPose(170, t);
+  const l = f.landmarks;
+  const hip = l[LM.L_HIP];
+  const drive = (ki: number, ai: number, k: number) => {
+    // Swing the thigh from along the body toward under the chest.
+    const a = rad(180 - 85 * k);
+    const len = Math.hypot(l[ki].x - hip.x, l[ki].y - hip.y);
+    const base = Math.atan2(hip.y - l[LM.L_SHOULDER].y, hip.x - l[LM.L_SHOULDER].x);
+    const dir = base + (Math.PI - a);
+    l[ki] = { ...l[ki], x: hip.x + Math.cos(dir) * len, y: hip.y + Math.sin(dir) * len };
+    l[ai] = { ...l[ai], x: l[ki].x - 0.05 * k, y: l[ki].y + 0.12 * k };
+  };
+  drive(LM.L_KNEE, LM.L_ANKLE, driveL);
+  drive(LM.R_KNEE, LM.R_ANKLE, driveR);
+  return f;
+}
+
+/** Dead bug side-on, lying on the back: each leg 0 (tabletop, knee over hip) .. 1 (extended). */
+export function deadBugPose(extL: number, extR: number, t: number): PoseFrame {
+  const S: P = [0.45, 0.8];
+  const H: P = [0.75, 0.8];
+  const leg = (e: number) => {
+    const K: P = [H[0] + 0.02 + 0.1 * e, H[1] - 0.18 + 0.12 * e];
+    // Tabletop: shin horizontal (knee 90°); extended: straight line from hip.
+    const shin = rad(90 + 90 * e);
+    const dir = Math.atan2(K[1] - H[1], K[0] - H[0]);
+    const a = dir + Math.PI - shin;
+    const A: P = [K[0] + Math.cos(a) * 0.19, K[1] + Math.sin(a) * 0.19];
+    return { K, A };
+  };
+  const Ll = leg(extL);
+  const Rl = leg(extR);
+  const pts: Partial<Record<number, P>> = {
+    [LM.NOSE]: [0.35, 0.78],
+    [LM.L_SHOULDER]: S,
+    [LM.R_SHOULDER]: [S[0] + 0.005, S[1]],
+    [LM.L_ELBOW]: [S[0], S[1] - 0.14],
+    [LM.R_ELBOW]: [S[0] + 0.01, S[1] - 0.14],
+    [LM.L_WRIST]: [S[0], S[1] - 0.27],
+    [LM.R_WRIST]: [S[0] + 0.01, S[1] - 0.27],
+    [LM.L_HIP]: H,
+    [LM.R_HIP]: H,
+    [LM.L_KNEE]: Ll.K,
+    [LM.R_KNEE]: Rl.K,
+    [LM.L_ANKLE]: Ll.A,
+    [LM.R_ANKLE]: Rl.A,
+  };
+  return frameFrom(pts, 4 / 3, t);
+}

@@ -80,7 +80,7 @@ describe('what the camera sees', () => {
     expect(gate.check('s', parseCtrlMsg({ seq: 5, epoch: 0, type: 'PEEK', image: null })!, { mode: 'explore', epoch: 0 }).ok).toBe(true);
   });
 
-  function run(peekEnabled: boolean) {
+  function run(peekEnabled: boolean, mode: 'explore' | 'menu' = 'explore') {
     let seq = 0;
     let now = 0;
     const sent: CtrlMsg[] = [];
@@ -88,7 +88,7 @@ describe('what the camera sees', () => {
     let grabs = 0;
     bridge.peek = () => (grabs++, 'data:image/jpeg;base64,AAAA');
     bridge.peekEnabled = peekEnabled;
-    bridge.applyMode('menu', 1);
+    bridge.applyMode(mode, 1);
     const feed = (n: number, f: (t: number) => PoseFrame | null) => {
       for (let i = 0; i < n; i++) bridge.frame(f((now += FRAME_MS)), now);
     };
@@ -109,6 +109,12 @@ describe('what the camera sees', () => {
     expect(grabs).toBe(0);
     const last = sent.filter((m) => m.type === 'VIEW').at(-1) as Extract<CtrlMsg, { type: 'VIEW' }>;
     expect(last.view).toBeNull();
+  });
+
+  it('menus and dialogue never need the body: no camera-sees panel there (couch play)', () => {
+    const { sent } = run(true, 'menu');
+    expect(sent.some((m) => m.type === 'VIEW' && m.view)).toBe(false);
+    expect(sent.some((m) => m.type === 'PEEK' && m.image)).toBe(false);
   });
 
   it('the preview is opt-in: about one still a second while lost, then cleared', () => {

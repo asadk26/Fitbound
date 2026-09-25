@@ -23,13 +23,14 @@ export type { InputMode } from './modes';
  * bumps `epoch`, so a command issued for the previous mode can be recognised
  * and dropped when it arrives late.
  */
-export type InputSource = 'motion' | 'keyboard' | 'touch' | 'remote' | 'gamepad';
+export type InputSource = 'motion' | 'keyboard' | 'touch' | 'remote' | 'gamepad' | 'voice';
 
-export type InputEvent =
-  | { type: 'confirm' | 'back' | 'pause' | 'step' | 'ready'; source: InputSource }
-  | { type: 'nav' | 'turn'; dir: -1 | 1; source: InputSource };
+/** Simple commands (no payload). */
+export type SimpleCommand = 'confirm' | 'back' | 'pause' | 'step' | 'ready' | 'finish' | 'resume' | 'recalibrate' | 'duck' | 'hop';
 
-export type Command = { type: 'move'; forward: number } | { type: 'turn' | 'nav'; dir: -1 | 1 } | { type: 'confirm' | 'back' | 'pause' | 'step' | 'ready' };
+export type InputEvent = { type: SimpleCommand; source: InputSource } | { type: 'nav' | 'turn'; dir: -1 | 1; source: InputSource };
+
+export type Command = { type: 'move'; forward: number } | { type: 'turn' | 'nav'; dir: -1 | 1 } | { type: SimpleCommand };
 
 /** A conventional (non-exercise) movement vector, screen-relative, length ≤ 1. */
 export interface FreeMove {
@@ -232,9 +233,9 @@ export class InputHub {
   }
 
   /** Keyboard / touch equivalents, filtered by mode like motion input. */
-  press(action: 'confirm' | 'back' | 'pause' | 'left' | 'right' | 'ready', source: 'keyboard' | 'touch' | 'gamepad' = 'keyboard'): void {
-    if (action === 'left' || action === 'right') this.command({ type: 'turn', dir: action === 'left' ? -1 : 1 }, source);
-    else this.command({ type: action }, source);
+  press(action: SimpleCommand | 'left' | 'right', source: 'keyboard' | 'touch' | 'gamepad' | 'voice' = 'keyboard'): boolean {
+    if (action === 'left' || action === 'right') return this.command({ type: 'turn', dir: action === 'left' ? -1 : 1 }, source);
+    return this.command({ type: action }, source);
   }
 
   setKey(key: 'forward' | 'up' | 'down' | 'left' | 'right', down: boolean): void {
@@ -254,6 +255,10 @@ export class InputHub {
       if (e.code === 'Enter' || e.code === 'Space') this.press('confirm');
       if (e.code === 'Escape' || e.code === 'Backspace') this.press('back');
       if (e.code === 'KeyP') this.press('pause');
+      if (e.code === 'KeyF') this.press('finish');
+      // Dodging (only in dodge mode): down = duck, up / space = hop.
+      if (e.code === 'ArrowDown' || e.code === 'KeyS') this.press('duck');
+      if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') this.press('hop');
     };
     const up = (e: KeyboardEvent) => {
       if (dirs[e.code]) this.setKey(dirs[e.code], false);

@@ -17,6 +17,10 @@ export const GUIDANCE: Record<GuidanceCode, string> = {
   EXTEND_FULLY: 'Straighten your arms at the top to begin',
   ARMS_AND_LEGS_TOGETHER: 'Arms up AND feet apart together to count',
   REPOSITION: 'Reposition your phone so your whole body is visible',
+  NO_SWING: 'Keep your body and elbows still — that one didn’t count',
+  GET_INTO_ROW: 'Bend over with a hand on your support, rowing arm nearest the phone',
+  LIE_ON_BACK: 'Lie on your back side-on to the phone, arms up, knees over hips',
+  STEP_BACK_TOGETHER: 'Step one foot back and lower — both knees level is a squat',
 };
 
 /** Short spoken versions of the most important cues. */

@@ -1,8 +1,10 @@
-import { EXERCISES, isPlayable, isUnlocked, MAX_LOADOUT } from '../exercise/registry';
+import { EXERCISES, isClassicPlayable, isUnlocked, MAX_LOADOUT } from '../exercise/registry';
 import type { Difficulty } from '../exercise/types';
 import { levelForXp, type Upgrades } from './progression';
 import { DEFAULT_TARGETS, type TrialTargets } from '../trial/config';
 import type { Sensitivity } from '../input/motion';
+import { DEFAULT_PREFS, type Calibrations, type DayPrefs } from '../rpg/loadout';
+import type { WorkoutRecord } from '../rpg/workout';
 
 export const SAVE_KEY = 'fitbound.save.v1';
 export const SAVE_VERSION = 1;
@@ -22,6 +24,8 @@ export interface Settings {
   cameraFacing: 'user' | 'environment';
   /** Body-controller tuning: degrees per lean, and how easily a lean / step registers. */
   motion: MotionSettings;
+  /** Voice commands through this computer's microphone. */
+  voiceCommands: boolean;
 }
 
 export interface MotionSettings {
@@ -52,6 +56,14 @@ export interface SaveData {
   settings: Settings;
   /** Lifetime totals, split by how they were verified. */
   totals: { cameraReps: number; manualReps: number; holdSeconds: number; battlesWon: number };
+  /** Expedition setup remembered from last time. */
+  expeditionPrefs: DayPrefs;
+  /** Your own target per exercise (reps, per side, or seconds); defaults from the library. */
+  exerciseTargets: Record<string, number>;
+  /** Movements you've checked in the Movement Lab (makes beta ones eligible). */
+  calibrations: Calibrations;
+  /** Recent sessions, for varying the workout. */
+  workouts: WorkoutRecord[];
 }
 
 export function defaultSave(): SaveData {
@@ -77,8 +89,13 @@ export function defaultSave(): SaveData {
       trialTargets: { ...DEFAULT_TARGETS },
       cameraFacing: 'user',
       motion: { turnStep: 45, lean: 'normal', march: 'normal', navigation: 'guided', traversal: 'active', diagnostics: true },
+      voiceCommands: false,
     },
     totals: { cameraReps: 0, manualReps: 0, holdSeconds: 0, battlesWon: 0 },
+    expeditionPrefs: { ...DEFAULT_PREFS },
+    exerciseTargets: {},
+    calibrations: {},
+    workouts: [],
   };
 }
 
@@ -162,7 +179,12 @@ export function sanitize(input: unknown): SaveData {
       motion: { ...d.settings.motion, ...(o.settings?.motion ?? {}) },
     },
     totals: { ...d.totals, ...(o.totals ?? {}) },
+    expeditionPrefs: sanitizePrefs(o.expeditionPrefs, known),
+    exerciseTargets: Object.fromEntries(Object.entries(o.exerciseTargets ?? {}).filter(([k, v]) => known.has(k) && typeof v === 'number' && Number.isFinite(v) && v >= 1 && v <= 600).map(([k, v]) => [k, Math.round(v as number)])),
+    calibrations: Object.fromEntries(Object.entries(o.calibrations ?? {}).filter(([k, v]) => known.has(k) && v && typeof v.at === 'number' && typeof v.reps === 'number')),
+    workouts: Array.isArray(o.workouts) ? o.workouts.filter((w) => w && typeof w.id === 'string' && typeof w.at === 'number' && w.volume && typeof w.volume === 'object').slice(-20) : [],
   };
+  if (typeof out.settings.voiceCommands !== 'boolean') out.settings.voiceCommands = false;
   if (!['beginner', 'intermediate', 'advanced'].includes(out.settings.difficulty)) out.settings.difficulty = 'beginner';
   if (out.settings.model !== 'lite' && out.settings.model !== 'full') out.settings.model = 'full';
   if (out.settings.cameraFacing !== 'environment') out.settings.cameraFacing = 'user';
@@ -181,6 +203,17 @@ export function sanitize(input: unknown): SaveData {
   return reconcileUnlocks(out);
 }
 
+function sanitizePrefs(v: unknown, known: Set<string>): DayPrefs {
+  const p = (v && typeof v === 'object' ? v : {}) as Partial<DayPrefs>;
+  return {
+    dumbbells: p.dumbbells === true,
+    support: p.support === true,
+    exclude: Array.isArray(p.exclude) ? p.exclude.filter((x): x is string => typeof x === 'string' && known.has(x)) : [],
+    intensity: p.intensity === 'easy' || p.intensity === 'strong' ? p.intensity : 'normal',
+    experimental: p.experimental === true,
+  };
+}
+
 /** Ensure unlocks match the level and the loadout holds only playable, unlocked exercises. */
 export function reconcileUnlocks(s: SaveData): SaveData {
   const level = levelForXp(s.xp);
@@ -189,7 +222,7 @@ export function reconcileUnlocks(s: SaveData): SaveData {
   s.unlocked = EXERCISES.filter((e) => unlocked.has(e.id)).map((e) => e.id);
   const loadout = [...new Set(s.loadout)].filter((id) => {
     const ex = EXERCISES.find((e) => e.id === id);
-    return ex && unlocked.has(id) && isPlayable(ex);
+    return ex && unlocked.has(id) && isClassicPlayable(ex);
   });
   s.loadout = loadout.slice(0, MAX_LOADOUT);
   if (s.loadout.length === 0) s.loadout = ['pushup', 'squat', 'jumping_jack'];

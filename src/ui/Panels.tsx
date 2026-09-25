@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { EXERCISES, isPlayable, isUnlocked, MAX_LOADOUT, targetFor } from '../exercise/registry';
+import { EXERCISES, isClassicPlayable, isUnlocked, MAX_LOADOUT, targetFor } from '../exercise/registry';
 import type { Difficulty } from '../exercise/types';
 import { audio } from '../game/audio';
 import { levelForXp, MAX_UPGRADE, SHOP_ITEMS, statsFor, upgradeCost, xpProgress } from '../game/progression';
@@ -53,9 +53,9 @@ export function AbilitiesPanel({ onClose }: { onClose: () => void }) {
         Equip up to {MAX_LOADOUT} exercise abilities ({save.loadout.length}/{MAX_LOADOUT} equipped). Pick the workout you want today — you never need every ability in every battle.
       </p>
       <div className="ex-list">
-        {EXERCISES.map((ex) => {
+        {EXERCISES.filter((e) => e.classic).map((ex) => {
           const unlocked = isUnlocked(ex, level);
-          const playable = isPlayable(ex);
+          const playable = isClassicPlayable(ex);
           const equipped = save.loadout.includes(ex.id);
           const t = targetFor(ex, d, save.settings.targetAdjust);
           return (
@@ -136,7 +136,7 @@ export function MenuPanel({ onClose, onQuitToTitle }: { onClose: () => void; onQ
         <p className="muted small">{DIFFICULTY_INFO[save.settings.difficulty].blurb} Damage per set is the same at every level.</p>
         <details>
           <summary>Adjust set sizes</summary>
-          {EXERCISES.filter(isPlayable).map((ex) => {
+          {EXERCISES.filter(isClassicPlayable).map((ex) => {
             const adj = save.settings.targetAdjust[ex.id] ?? 0;
             const t = targetFor(ex, save.settings.difficulty, save.settings.targetAdjust);
             const step = ex.kind === 'hold' ? 5 : 1;

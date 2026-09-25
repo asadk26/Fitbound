@@ -6,8 +6,10 @@ import type { InputHub } from './InputHub';
  *
  *   left stick / d-pad   free movement (Assisted Traversal); d-pad ◀ ▶ also
  *                        chooses routes and menu options
- *   A (bottom button)    confirm / continue
+ *   A (bottom button)    confirm / continue; hop when dodging
  *   B (right button)     back
+ *   Y (top button)       finish the current set
+ *   d-pad ▼ / ▲          duck / hop when dodging
  *   Start / Menu         pause
  *   Select / View        switch Active ⇄ Assisted traversal
  *
@@ -27,6 +29,7 @@ export function deadzone(x: number, y: number, dz = STICK_DEADZONE): { x: number
 
 const A = 0;
 const B = 1;
+const Y = 3;
 const SELECT = 8;
 const START = 9;
 const UP = 12;
@@ -70,7 +73,13 @@ export class GamepadInput {
       const pressed = pad.buttons.map((b) => b.pressed);
       const was = this.prev.get(pad.index) ?? [];
       const edge = (i: number) => !!pressed[i] && !was[i];
-      if (edge(A)) this.hub.press('confirm', 'gamepad');
+      if (edge(A)) {
+        this.hub.press('confirm', 'gamepad');
+        this.hub.press('hop', 'gamepad');
+      }
+      if (edge(Y)) this.hub.press('finish', 'gamepad');
+      if (edge(DOWN)) this.hub.press('duck', 'gamepad');
+      if (edge(UP)) this.hub.press('hop', 'gamepad');
       if (edge(B)) this.hub.press('back', 'gamepad');
       if (edge(START)) this.hub.press('pause', 'gamepad');
       if (edge(SELECT)) this.onToggleTraversal();

@@ -68,6 +68,8 @@ export class HostLink {
   activeSet: RemoteSet | null = null;
   /** The latest rep-diagnostics summary from the phone (arrives just after a set ends). */
   lastDiag: Extract<CtrlMsg, { type: 'EXERCISE_DIAG' }> | null = null;
+  /** Dodge mode: the phone's latest duck/hop reading and when it arrived. */
+  dodge: { tracking: 'good' | 'partial' | 'lost'; baseline: boolean; ducking: boolean; duck: number; hops: number; at: number } | null = null;
   /** Rejected messages, by reason (shown in the debug hook and logged). */
   readonly rejected: Record<string, number> = {};
 
@@ -223,7 +225,7 @@ export class HostLink {
     const res = this.gate.check(sid, raw, { mode: this.hub.mode, epoch: this.hub.epoch });
     // Always acknowledge reps so the phone stops resending, accepted or not.
     const rawObj = raw as { type?: unknown; seq?: unknown };
-    if (sid === this.gate.sid && rawObj?.type === 'EXERCISE_REP' && typeof rawObj.seq === 'number') this.send({ type: 'ACK', seq: rawObj.seq });
+    if (sid === this.gate.sid && (rawObj?.type === 'EXERCISE_REP' || rawObj?.type === 'FINISH_SET' || rawObj?.type === 'MANUAL_MODE') && typeof rawObj.seq === 'number') this.send({ type: 'ACK', seq: rawObj.seq });
     if (!res.ok) {
       this.rejected[res.reason] = (this.rejected[res.reason] ?? 0) + 1;
       return;
@@ -273,6 +275,17 @@ export class HostLink {
       }
       case 'MANUAL_MODE':
         this.activeSet?.requestManual(msg);
+        return;
+      case 'DODGE_STATUS': {
+        const { tracking, baseline, ducking, duck, hops } = msg;
+        this.dodge = { tracking, baseline, ducking, duck, hops, at: now };
+        return;
+      }
+      case 'EXERCISE_HOLD':
+        this.activeSet?.hold(msg, now);
+        return;
+      case 'FINISH_SET':
+        this.activeSet?.requestFinish(msg);
         return;
     }
     const cmd = toCommand(msg);

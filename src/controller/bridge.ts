@@ -10,6 +10,7 @@ import { motionPreset, type MotionReading, type NeutralPose } from '../input/mot
 import type { CameraState, CtrlPayload, GameMsg, ModelState } from '../net/protocol';
 import type { TiltWatch } from '../input/tilt';
 import { viewSummary } from '../net/view';
+import { DodgeReader } from '../rpg/dodge';
 
 /**
  * The phone's brain in Connected Play. It runs the detectors the game asks
@@ -51,7 +52,12 @@ interface ActiveSet {
   lastSentAt: number;
   diag: SetDiagnostics;
   diagAt: number;
+  /** Hold exercises: last hold time reported to the PC. */
+  heldSent: number;
+  heldAt: number;
 }
+
+export const HOLD_REPORT_MS = 250;
 
 export interface Progress {
   setId: string;
@@ -105,6 +111,10 @@ export class ControllerBridge {
   private statusAt = -Infinity;
   private statusKey = '';
   private lastCalSentAt = -Infinity;
+  /** Dodge mode: duck / hop reading, restarted (new baseline) each time dodging begins. */
+  readonly dodge = new DodgeReader();
+  private dodgeKey = '';
+  private dodgeAt = -Infinity;
 
   constructor(
     /** Send one message (the link adds the sequence number and this epoch). */
@@ -133,11 +143,11 @@ export class ControllerBridge {
         return;
       case 'EXERCISE_BEGIN': {
         const ex = EXERCISES.find((e) => e.id === msg.exerciseId);
-        if (!ex?.createDetector || ex.kind !== 'reps') return;
+        if (!ex?.createDetector) return;
         const detector = ex.createDetector(msg.difficulty);
         // The PC decides when the set is complete; the phone just keeps counting.
         const ctrl = new ExerciseSessionController(ex, detector, 10_000, (e) => this.onExerciseEvent(msg.setId, e), trialSessionOptions(ex.id));
-        this.set = { id: msg.setId, exerciseId: ex.id, ctrl, lastStage: null, lastSentAt: -Infinity, diag: new SetDiagnostics(), diagAt: -Infinity };
+        this.set = { id: msg.setId, exerciseId: ex.id, ctrl, lastStage: null, lastSentAt: -Infinity, diag: new SetDiagnostics(), diagAt: -Infinity, heldSent: 0, heldAt: -Infinity };
         this.hub.setExercise(ex.id);
         this.progress = { setId: msg.setId, exerciseName: ex.name, count: 0, target: 0, manualMode: false, paused: false };
         return;
@@ -174,6 +184,10 @@ export class ControllerBridge {
     this.mode = mode;
     this.hub.setMode(mode);
     this.moveSent = 0;
+    if (mode === 'dodge') {
+      this.dodge.reset();
+      this.dodgeKey = '';
+    }
     if (mode === 'calibration') {
       this.calibration = null;
       this.calib = new CalibrationFlow(
@@ -212,6 +226,11 @@ export class ControllerBridge {
       this.exerciseFallback = snap.fallbackAvailable;
       this.exerciseBlocker = snap.last?.diag?.blocker ?? null;
       if (now - s.diagAt >= DIAG_MS) this.sendDiag(s, now);
+      if (s.ctrl.isHold && snap.heldMs > s.heldSent && now - s.heldAt >= HOLD_REPORT_MS) {
+        s.heldSent = Math.floor(snap.heldMs);
+        s.heldAt = now;
+        this.out({ type: 'EXERCISE_HOLD', setId: s.id, heldMs: s.heldSent });
+      }
       if (snap.stage !== s.lastStage || now - s.lastSentAt >= EXERCISE_STATUS_MS) {
         s.lastStage = snap.stage;
         s.lastSentAt = now;
@@ -228,6 +247,15 @@ export class ControllerBridge {
           blocker: this.exerciseBlocker,
           pauseProgress: this.hub.exercisePauseProgress,
         });
+      }
+    } else if (d.dodge) {
+      const r = this.dodge.update(frame, now);
+      this.tracking = r.tracking;
+      const key = `${r.tracking}|${r.baseline}|${r.ducking}|${r.hops}`;
+      if (key !== this.dodgeKey || now - this.dodgeAt >= 66) {
+        this.dodgeKey = key;
+        this.dodgeAt = now;
+        this.out({ type: 'DODGE_STATUS', tracking: r.tracking, baseline: r.baseline, ducking: r.ducking, duck: Math.round(r.duck * 100) / 100, hops: r.hops });
       }
     } else if (d.march || d.lean || d.gestures) {
       const r = this.hub.feed(frame, now);
@@ -257,7 +285,9 @@ export class ControllerBridge {
         });
       }
     } else this.tracking = frame ? 'good' : 'lost';
-    this.updateView(frame, now);
+    // Menus and dialogue don't need the body (a gamepad player may be on the couch).
+    if (this.mode === 'menu' || this.mode === 'dialogue') this.clearView();
+    else this.updateView(frame, now);
     this.tick(now);
   }
 
@@ -339,7 +369,7 @@ export class ControllerBridge {
   }
 
   // ── Touch fallback ──────────────────────────────────────────────────────
-  touch(action: 'left' | 'right' | 'confirm' | 'back' | 'pause' | 'ready'): void {
+  touch(action: 'left' | 'right' | 'confirm' | 'back' | 'pause' | 'ready' | 'duck' | 'hop'): void {
     this.hub.press(action, 'touch');
   }
 
@@ -358,6 +388,14 @@ export class ControllerBridge {
 
   manualRep(): void {
     this.set?.ctrl.manualRep();
+  }
+
+  /** The player tapped "Finish set" on the phone; the PC resolves it. */
+  finishSet(): void {
+    const s = this.set;
+    if (!s) return;
+    this.out({ type: 'FINISH_SET', setId: s.id });
+    this.note('✓ Finish set');
   }
 
   get exerciseActive(): boolean {
@@ -405,6 +443,14 @@ export class ControllerBridge {
         this.out({ type: 'READY', via });
         this.note('✓ Ready');
         return;
+      case 'duck':
+        this.out({ type: 'DUCK', via });
+        this.note('⬇ Duck');
+        return;
+      case 'hop':
+        this.out({ type: 'HOP', via });
+        this.note('⬆ Hop');
+        return;
     }
   }
 
@@ -421,7 +467,7 @@ export class ControllerBridge {
 
   private onExerciseEvent(setId: string, e: ExerciseEvent): void {
     if (e.type !== 'rep' || this.set?.id !== setId) return;
-    this.out({ type: 'EXERCISE_REP', setId, exerciseId: e.exerciseId, index: e.index, source: e.source });
+    this.out({ type: 'EXERCISE_REP', setId, exerciseId: e.exerciseId, index: e.index, source: e.source, ...(e.side ? { side: e.side } : {}) });
     this.note(e.source === 'manual' ? '+1 rep (manual)' : '+1 rep');
   }
 }

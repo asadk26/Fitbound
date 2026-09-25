@@ -27,6 +27,7 @@ const MODE_LABEL: Record<InputMode, string> = {
   menu: 'Menu',
   exercise: 'Exercise',
   ready: 'Stand tall to continue',
+  dodge: 'Dodge! Duck or hop',
 };
 
 const CAMERA_KEY = 'fitbound.ctrl.camera';
@@ -424,6 +425,9 @@ function Dashboard({ ls }: { ls: CtrlLinkState }) {
               +1 rep (manual)
             </button>
           )}
+          <button className="ghost" onClick={() => bridge.finishSet()}>
+            Finish set now (reps so far count)
+          </button>
         </section>
       )}
 
@@ -502,6 +506,13 @@ function TouchPad({ mode }: { mode: InputMode }) {
         <button onClick={() => bridge.touch('confirm')}>Choose</button>
         <button onClick={() => bridge.touch('right')}>▶</button>
         <button onClick={() => bridge.touch('back')}>Back</button>
+      </div>
+    );
+  if (mode === 'dodge')
+    return (
+      <div className="touchpad">
+        <button onClick={() => bridge.touch('duck')}>⬇ Duck</button>
+        <button onClick={() => bridge.touch('hop')}>⬆ Hop</button>
       </div>
     );
   if (mode === 'calibration')

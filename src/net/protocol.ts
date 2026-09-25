@@ -1,7 +1,7 @@
 import { CAL_STEP_IDS, type CalStep } from '../input/calibration';
 import { INPUT_MODES, type InputMode } from '../input/modes';
 import type { SessionStage } from '../exercise/session';
-import type { DiagBlocker, DiagEvent, GuidanceCode, RepSource, TrackingQuality } from '../exercise/types';
+import type { DiagBlocker, DiagEvent, GuidanceCode, RepSource, Side, TrackingQuality } from '../exercise/types';
 import type { DiagSummary } from '../exercise/diagnostics';
 
 /**
@@ -63,7 +63,9 @@ export type CtrlPayload =
   | { type: 'TELEMETRY'; r: Telemetry }
   | { type: 'MOVE_START'; intensity: number }
   | { type: 'MOVE_STOP' }
-  | { type: 'TURN_LEFT' | 'TURN_RIGHT' | 'INTERACT' | 'BACK' | 'PAUSE' | 'STEP' | 'READY'; via: 'motion' | 'touch' }
+  | { type: 'TURN_LEFT' | 'TURN_RIGHT' | 'INTERACT' | 'BACK' | 'PAUSE' | 'STEP' | 'READY' | 'DUCK' | 'HOP'; via: 'motion' | 'touch' }
+  /** Dodge mode: the phone's duck/hop reading, ~15 times a second. */
+  | { type: 'DODGE_STATUS'; tracking: TrackingQuality; baseline: boolean; ducking: boolean; duck: number; hops: number }
   | { type: 'NAV'; dir: -1 | 1; via: 'motion' | 'touch' }
   | { type: 'CALIBRATION'; step: CalStep; progress: number; hint: string | null; floorOk: boolean }
   | {
@@ -82,7 +84,11 @@ export type CtrlPayload =
       pauseProgress?: number;
     }
   | { type: 'EXERCISE_DIAG'; setId: string; summary: DiagSummary }
-  | { type: 'EXERCISE_REP'; setId: string; exerciseId: string; index: number; source: RepSource }
+  | { type: 'EXERCISE_REP'; setId: string; exerciseId: string; index: number; source: RepSource; side?: Side }
+  /** Hold exercises: total valid hold time so far in this set (never decreases). */
+  | { type: 'EXERCISE_HOLD'; setId: string; heldMs: number }
+  /** The player asked to finish the set now (phone button). */
+  | { type: 'FINISH_SET'; setId: string }
   | { type: 'MANUAL_MODE'; setId: string }
   | { type: 'VIEW'; view: ViewSummary | null }
   /** Opt-in only: a tiny, low-resolution preview while tracking is lost (null clears it). */
@@ -129,6 +135,10 @@ const GUIDANCE = [
   'EXTEND_FULLY',
   'ARMS_AND_LEGS_TOGETHER',
   'REPOSITION',
+  'NO_SWING',
+  'GET_INTO_ROW',
+  'LIE_ON_BACK',
+  'STEP_BACK_TOGETHER',
 ] as const;
 const VIA = ['motion', 'touch'] as const;
 const BLOCKERS = ['NO_BODY', 'BODY_HIDDEN', 'ARMS_HIDDEN', 'NOT_LEVEL', 'NOT_SIDEWAYS', 'HIPS_PIKED', 'ARMS_NOT_STRAIGHT'] as const;
@@ -235,7 +245,13 @@ export function parseCtrlMsg(v: unknown): CtrlMsg | null {
     case 'PAUSE':
     case 'STEP':
     case 'READY':
+    case 'DUCK':
+    case 'HOP':
       return oneOf(v.via, VIA) ? { ...base, type: v.type, via: v.via } : null;
+    case 'DODGE_STATUS':
+      return oneOf(v.tracking, TRACKING) && typeof v.baseline === 'boolean' && typeof v.ducking === 'boolean' && num(v.duck, 0, 1) && int(v.hops, 0, 100_000)
+        ? { ...base, type: 'DODGE_STATUS', tracking: v.tracking, baseline: v.baseline, ducking: v.ducking, duck: v.duck, hops: v.hops }
+        : null;
     case 'NAV':
       return oneOf(v.dir, [-1, 1] as const) && oneOf(v.via, VIA) ? { ...base, type: 'NAV', dir: v.dir, via: v.via } : null;
     case 'CALIBRATION':
@@ -265,9 +281,14 @@ export function parseCtrlMsg(v: unknown): CtrlMsg | null {
           }
         : null;
     case 'EXERCISE_REP':
+      if (v.side !== undefined && !oneOf(v.side, ['left', 'right'] as const)) return null;
       return str(v.setId, 40) && str(v.exerciseId, 32) && int(v.index, 1, 10_000) && oneOf(v.source, ['camera', 'manual'] as const)
-        ? { ...base, type: 'EXERCISE_REP', setId: v.setId, exerciseId: v.exerciseId, index: v.index, source: v.source }
+        ? { ...base, type: 'EXERCISE_REP', setId: v.setId, exerciseId: v.exerciseId, index: v.index, source: v.source, ...(v.side ? { side: v.side as Side } : {}) }
         : null;
+    case 'EXERCISE_HOLD':
+      return str(v.setId, 40) && int(v.heldMs, 0, 3_600_000) ? { ...base, type: 'EXERCISE_HOLD', setId: v.setId, heldMs: v.heldMs } : null;
+    case 'FINISH_SET':
+      return str(v.setId, 40) ? { ...base, type: 'FINISH_SET', setId: v.setId } : null;
     case 'MANUAL_MODE':
       return str(v.setId, 40) ? { ...base, type: 'MANUAL_MODE', setId: v.setId } : null;
     case 'VIEW': {
@@ -327,4 +348,4 @@ export function parseGameMsg(v: unknown): GameMsg | null {
 
 /** Controller messages that must survive a reconnect (resent until ACKed).
  *  Everything else is state that is simply re-sent fresh after reconnecting. */
-export const RELIABLE: ReadonlySet<CtrlPayload['type']> = new Set(['EXERCISE_REP', 'MANUAL_MODE']);
+export const RELIABLE: ReadonlySet<CtrlPayload['type']> = new Set(['EXERCISE_REP', 'MANUAL_MODE', 'FINISH_SET']);

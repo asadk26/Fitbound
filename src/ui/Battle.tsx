@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { CombatEngine, type CombatEffect } from '../combat/CombatEngine';
 import { ENEMIES } from '../combat/enemies';
-import { getExercise, isPlayable, targetFor, type ExerciseDefinition } from '../exercise/registry';
+import { getExercise, isClassicPlayable, targetFor, type ExerciseDefinition } from '../exercise/registry';
 import { ExerciseSessionController, type SessionSnapshot } from '../exercise/session';
 import type { ExerciseEvent, GuidanceCode } from '../exercise/types';
 import { audio } from '../game/audio';
@@ -245,7 +245,7 @@ export function Battle({ enemyId, onExit }: Props) {
   };
 
   const chooseAbility = (ex: ExerciseDefinition) => {
-    if (!isPlayable(ex)) return;
+    if (!isClassicPlayable(ex)) return;
     const s = getSave();
     audio.unlock();
     audio.select();
@@ -330,7 +330,7 @@ export function Battle({ enemyId, onExit }: Props) {
     const unlocked: ExerciseDefinition[] = [];
     for (let l = levelBefore + 1; l <= levelAfter; l++) unlocked.push(...unlocksAtLevel(l));
     // Auto-equip newly unlocked, playable abilities while there's room.
-    const playableNew = unlocked.filter(isPlayable);
+    const playableNew = unlocked.filter(isClassicPlayable);
     if (playableNew.length) {
       updateSave((s) => {
         for (const ex of playableNew) if (s.loadout.length < 4 && !s.loadout.includes(ex.id)) s.loadout.push(ex.id);
@@ -364,7 +364,7 @@ export function Battle({ enemyId, onExit }: Props) {
   const menuAbilities = useMemo(() => {
     const ids = [...save.loadout];
     if (phase && !ids.includes(phase.required)) ids.push(phase.required);
-    return ids.map(getExercise).filter(isPlayable);
+    return ids.map(getExercise).filter(isClassicPlayable);
   }, [save.loadout, phase]);
 
   const difficulty = save.settings.difficulty;
@@ -544,7 +544,7 @@ function VictoryModal({ rewards, enemyName, onDone }: { rewards: Rewards; enemyN
                 <b>New ability: {ex.ability.name}</b>
                 <span>
                   {ex.name}
-                  {isPlayable(ex) ? ' — equipped if you had a free slot. Manage it under Abilities.' : ' — camera detector still in development, so it can’t be equipped yet.'}
+                  {isClassicPlayable(ex) ? ' — equipped if you had a free slot. Manage it under Abilities.' : ' — camera detector still in development, so it can’t be equipped yet.'}
                 </span>
               </div>
             </div>

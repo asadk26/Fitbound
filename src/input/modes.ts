@@ -15,22 +15,29 @@
  *                 waits for the player to stand tall with hands relaxed
  *                 (or a Continue press). Only "ready" and pause count, so
  *                 standing up after push-ups can't be read as anything else.
+ *  - dodge:       the enemy's attack: only a duck or a hop (from the body, or
+ *                 a controller fallback) and pause count.
  *  - off:         nothing.
+ *
+ * Voice commands ride the same table: "finish set" exists only in exercise
+ * mode and in the pause menu (a set paused mid-way), "resume" only in menus,
+ * so no voice command can advance dialogue or move the hero.
  */
-export type InputMode = 'off' | 'calibration' | 'explore' | 'dialogue' | 'menu' | 'exercise' | 'ready';
+export type InputMode = 'off' | 'calibration' | 'explore' | 'dialogue' | 'menu' | 'exercise' | 'ready' | 'dodge';
 
-export const INPUT_MODES: readonly InputMode[] = ['off', 'calibration', 'explore', 'dialogue', 'menu', 'exercise', 'ready'];
+export const INPUT_MODES: readonly InputMode[] = ['off', 'calibration', 'explore', 'dialogue', 'menu', 'exercise', 'ready', 'dodge'];
 
-export type CommandType = 'move' | 'turn' | 'nav' | 'confirm' | 'back' | 'pause' | 'step' | 'ready';
+export type CommandType = 'move' | 'turn' | 'nav' | 'confirm' | 'back' | 'pause' | 'step' | 'ready' | 'finish' | 'resume' | 'recalibrate' | 'duck' | 'hop';
 
 const ALLOWED: Record<InputMode, readonly CommandType[]> = {
   off: [],
   calibration: ['confirm', 'back', 'step'],
-  explore: ['move', 'turn', 'confirm', 'back', 'pause', 'step'],
-  dialogue: ['nav', 'confirm', 'back', 'pause'],
-  menu: ['nav', 'confirm', 'back', 'pause'],
-  exercise: ['pause'],
-  ready: ['ready', 'pause'],
+  explore: ['move', 'turn', 'confirm', 'back', 'pause', 'step', 'recalibrate'],
+  dialogue: ['nav', 'confirm', 'back', 'pause', 'recalibrate'],
+  menu: ['nav', 'confirm', 'back', 'pause', 'resume', 'finish', 'recalibrate'],
+  exercise: ['pause', 'finish', 'recalibrate'],
+  ready: ['ready', 'pause', 'recalibrate'],
+  dodge: ['duck', 'hop', 'pause', 'recalibrate'],
 };
 
 export function commandAllowed(mode: InputMode, type: CommandType): boolean {
@@ -51,6 +58,8 @@ export interface DetectorSet {
   calibration: boolean;
   /** The standing-neutral "ready" check. */
   neutral: boolean;
+  /** Duck / hop reading for dodging. */
+  dodge: boolean;
 }
 
 export function detectorsFor(mode: InputMode): DetectorSet {
@@ -61,5 +70,6 @@ export function detectorsFor(mode: InputMode): DetectorSet {
     exercise: mode === 'exercise',
     calibration: mode === 'calibration',
     neutral: mode === 'ready',
+    dodge: mode === 'dodge',
   };
 }

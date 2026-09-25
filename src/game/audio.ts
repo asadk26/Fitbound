@@ -218,6 +218,15 @@ class Audio {
     if (this.musicGain && this.ctx) this.musicGain.gain.setTargetAtTime(on ? 0.06 : 0.18, this.ctx.currentTime, 0.2);
   }
 
+  /** When the game last finished speaking (Infinity while it speaks) — voice commands ignore that window. */
+  speakingUntil = -Infinity;
+
+  /** The time speech ended, or Infinity while the game is talking. */
+  speechEndedAt(): number {
+    if (typeof speechSynthesis !== 'undefined' && speechSynthesis.speaking) return Infinity;
+    return this.speakingUntil === Infinity ? performance.now() : this.speakingUntil;
+  }
+
   say(text: string, interrupt = true): void {
     if (!this.voiceOn || typeof speechSynthesis === 'undefined') return;
     try {
@@ -225,6 +234,12 @@ class Audio {
       const u = new SpeechSynthesisUtterance(speakable(text));
       u.rate = 1.05;
       u.pitch = 1;
+      this.speakingUntil = Infinity;
+      const done = () => {
+        if (!speechSynthesis.speaking) this.speakingUntil = performance.now();
+      };
+      u.onend = done;
+      u.onerror = done;
       speechSynthesis.speak(u);
     } catch {
       /* speech unavailable */
