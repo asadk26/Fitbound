@@ -33,4 +33,16 @@ export const STORY = {
   fallen: 'Your form scatters into the Haze… and gathers again. The Heart does not give up on you. This time the Spark stays out of reach, but the path goes on.',
   fallenEnd: 'The Heart gathers you back to the Sanctuary. What your body did out there, it did — that stays.',
   suspended: 'You rest at the edge of the path. It will wait for you.',
+  shrine: 'The Mossy Shrine hums as you pass. Some of your strength returns.',
+  /** A line as each march begins, keyed by the destination's title. */
+  legs: {
+    'The Training Yard': 'The Sanctuary gate opens onto a meadow the Haze has only half remembered. Somewhere ahead, straw rustles.',
+    'Rusted Causeway': 'The path narrows toward an old signpost. Iron grinds against iron — something is guarding the way.',
+    'The Bone Field': 'Past the ward-gate the grass turns grey. Hooves of bone scrape on stone.',
+    'The Mirror of Unlived Lives': 'At the crossroads, the light gathers into something like glass.',
+    'Drifting Hollow': 'The air thickens by the quarry. Faint shapes drift between the stones.',
+    'A Quiet Haven': 'A campfire burns in the tower’s shadow, somehow untouched by the Haze.',
+    'The Veiled Stair': 'Crystals hum along the stair. Someone is weaving the Haze into a wall.',
+    'Before the Spark': 'The last rise. The Spark flickers — and something vast stands before it.',
+  } as Record<string, string>,
 };

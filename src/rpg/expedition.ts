@@ -2,6 +2,7 @@ import { EXERCISES, FAMILIES, getExercise, type Family } from '../exercise/regis
 import { ABILITIES } from './abilities';
 import { BLESSINGS } from './blessings';
 import { RPG_ENEMIES, type Cues } from './enemies';
+import type { BoardMarker } from '../game/bus';
 import type { Loadout } from './engine';
 import { DEFAULT_PREFS, type DayPrefs, type ExLoadout } from './loadout';
 import { newWorkout, type WorkoutData } from './workout';
@@ -26,6 +27,8 @@ export interface ExNode {
   hpScale?: number;
   /** How plainly attacks are announced (early fights spell it out, later ones rely on body language). */
   cues?: Cues;
+  /** Trail stop on the meadow board where this encounter stands (you march there). */
+  at?: string;
 }
 
 export type RouteId = 'standard' | 'short';
@@ -36,17 +39,17 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string; nodes: ExNod
     blurb: 'About 20–25 minutes · 6 fights, a Haven, the Warden',
     plannedSets: 21,
     nodes: [
-      { kind: 'fight', phase: 1, title: 'The Training Yard', enemies: ['echo_dummy'], cues: 'obvious' },
-      { kind: 'fight', phase: 1, title: 'Rusted Causeway', enemies: ['iron_husk'], cues: 'obvious' },
+      { kind: 'fight', phase: 1, title: 'The Training Yard', enemies: ['echo_dummy'], cues: 'obvious', at: 'dummyStop' },
+      { kind: 'fight', phase: 1, title: 'Rusted Causeway', enemies: ['iron_husk'], cues: 'obvious', at: 'signStop' },
       { kind: 'blessing', phase: 1, title: 'A Fragment Remembered' },
-      { kind: 'fight', phase: 2, title: 'The Bone Field', enemies: ['bone_charger'], cues: 'clear' },
-      { kind: 'mirror', phase: 2, title: 'The Mirror of Unlived Lives' },
-      { kind: 'fight', phase: 2, title: 'Drifting Hollow', enemies: ['haze_wisp', 'haze_wisp', 'haze_wisp'], cues: 'clear' },
+      { kind: 'fight', phase: 2, title: 'The Bone Field', enemies: ['bone_charger'], cues: 'clear', at: 'skeleton' },
+      { kind: 'mirror', phase: 2, title: 'The Mirror of Unlived Lives', at: 'forkC' },
+      { kind: 'fight', phase: 2, title: 'Drifting Hollow', enemies: ['haze_wisp', 'haze_wisp', 'haze_wisp'], cues: 'clear', at: 'golem' },
       { kind: 'blessing', phase: 2, title: 'A Fragment Remembered' },
-      { kind: 'haven', phase: 3, title: 'A Quiet Haven' },
-      { kind: 'fight', phase: 3, title: 'The Veiled Stair', enemies: ['hollow_acolyte'], cues: 'subtle' },
+      { kind: 'haven', phase: 3, title: 'A Quiet Haven', at: 'mage' },
+      { kind: 'fight', phase: 3, title: 'The Veiled Stair', enemies: ['hollow_acolyte'], cues: 'subtle', at: 'veil' },
       { kind: 'blessing', phase: 3, title: 'A Fragment Remembered' },
-      { kind: 'boss', phase: 3, title: 'Before the Spark', enemies: ['warden_of_haze'], cues: 'subtle' },
+      { kind: 'boss', phase: 3, title: 'Before the Spark', enemies: ['warden_of_haze'], cues: 'subtle', at: 'warden' },
     ],
   },
   short: {
@@ -54,13 +57,13 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string; nodes: ExNod
     blurb: 'About 12–15 minutes · 4 fights and a Haven',
     plannedSets: 12,
     nodes: [
-      { kind: 'fight', phase: 1, title: 'The Training Yard', enemies: ['echo_dummy'], cues: 'obvious' },
-      { kind: 'fight', phase: 1, title: 'The Bone Field', enemies: ['bone_charger'], cues: 'clear' },
+      { kind: 'fight', phase: 1, title: 'The Training Yard', enemies: ['echo_dummy'], cues: 'obvious', at: 'dummyStop' },
+      { kind: 'fight', phase: 1, title: 'The Bone Field', enemies: ['bone_charger'], cues: 'clear', at: 'skeleton' },
       { kind: 'blessing', phase: 1, title: 'A Fragment Remembered' },
-      { kind: 'mirror', phase: 2, title: 'The Mirror of Unlived Lives' },
-      { kind: 'fight', phase: 2, title: 'Drifting Hollow', enemies: ['haze_wisp', 'haze_wisp', 'haze_wisp'], cues: 'clear' },
-      { kind: 'haven', phase: 2, title: 'A Quiet Haven' },
-      { kind: 'boss', phase: 3, title: 'Before the Spark', enemies: ['warden_of_haze'], hpScale: 0.75, cues: 'subtle' },
+      { kind: 'mirror', phase: 2, title: 'The Mirror of Unlived Lives', at: 'forkC' },
+      { kind: 'fight', phase: 2, title: 'Drifting Hollow', enemies: ['haze_wisp', 'haze_wisp', 'haze_wisp'], cues: 'clear', at: 'golem' },
+      { kind: 'haven', phase: 2, title: 'A Quiet Haven', at: 'mage' },
+      { kind: 'boss', phase: 3, title: 'Before the Spark', enemies: ['warden_of_haze'], hpScale: 0.75, cues: 'subtle', at: 'warden' },
     ],
   },
 };
@@ -84,6 +87,8 @@ export interface ExpeditionState {
   status: 'active' | 'suspended' | 'complete' | 'ended';
   /** Dodge with the body (default) or with a controller (couch play). */
   dodgeInput: 'body' | 'controller';
+  /** The Mossy Shrine detour has been used this run. */
+  shrineUsed?: boolean;
 }
 
 export const HERO_HP = 100;
@@ -117,6 +122,23 @@ export function atPhaseBoundary(s: ExpeditionState): boolean {
   const prev = nodes[s.index - 1];
   const next = nodes[s.index];
   return !!prev && !!next && prev.phase !== next.phase;
+}
+
+/** Trail stop the hero stands at now: the last visited encounter's, or the start. */
+export function standingAt(s: ExpeditionState): string {
+  const nodes = ROUTES[s.route].nodes;
+  for (let i = Math.min(s.index, nodes.length) - 1; i >= 0; i--) if (nodes[i].at) return nodes[i].at!;
+  return 'start';
+}
+
+/** The encounters on the board, for the diorama. */
+export function boardMarkers(route: RouteId): BoardMarker[] {
+  return ROUTES[route].nodes.flatMap((n, i): BoardMarker[] => {
+    if (!n.at) return [];
+    if (n.kind === 'mirror' || n.kind === 'haven') return [{ id: `n${i}`, node: n.at, kind: n.kind }];
+    const e = RPG_ENEMIES[n.enemies![0]];
+    return [{ id: `n${i}`, node: n.at, kind: 'enemy' as const, sprite: e.sprite, tint: e.tint, scale: e.scale, count: n.enemies!.length }];
+  });
 }
 
 /** The engine's ability loadout from the exercise loadout. */

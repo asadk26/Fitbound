@@ -207,7 +207,6 @@ function DodgeDrill({ connected }: { connected: boolean }) {
     const h: 'high' | 'low' = Math.random() < 0.5 ? 'high' : 'low';
     const st = new StrikeTimer(h, STRIKE_TIMING, controller);
     timer.current = st;
-    audio.say(h === 'high' ? 'High! Duck!' : 'Low! Hop!', false);
     loop.current = window.setInterval(() => {
       const s = controller ? null : src.current.sample();
       const wait = controller ? null : !s || s.tracking !== 'good' ? 'Step into view' : !s.baseline ? 'Stand still…' : null;

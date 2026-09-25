@@ -2841,3 +2841,146 @@ details summary {
 .rpg .rpg-strike .rpg-wait {
   font-size: max(10px, 2.2vh);
 }
+
+/* ── Battle, round 2: console-RPG staging ─────────────────────────────── */
+.rpg-party {
+  position: absolute;
+  left: 2.5vw;
+  bottom: calc(2.5vh + var(--safe-b));
+  width: min(30vw, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5vh;
+  padding: 1.2vh 1.2vw;
+  background: linear-gradient(90deg, rgba(20, 16, 34, 0.9), rgba(20, 16, 34, 0.55));
+  border-left: 4px solid var(--gold);
+  font-family: var(--pixel);
+  text-shadow: 2px 2px 0 var(--ink);
+  pointer-events: none;
+}
+.rpg-party small {
+  font-size: max(8px, 1.8vh);
+  color: var(--mist);
+}
+.rpg-party b {
+  font-size: max(11px, 3vh);
+}
+.rpg-party .bar {
+  height: max(10px, 2.4vh);
+  border-width: 3px;
+}
+.rpg-cmd {
+  position: absolute;
+  /* On the open ground between the hero and the foes. */
+  left: 35vw;
+  bottom: calc(2.5vh + var(--safe-b));
+  width: min(30vw, 440px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6vh;
+}
+.rpg-cmd-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3vh;
+  text-align: left;
+  padding: 0.7vh 1.1vw;
+  background: rgba(20, 16, 34, 0.82);
+  color: var(--white);
+  border: none;
+  border-left: 6px solid var(--fam, var(--night));
+  font-family: var(--sans);
+  cursor: pointer;
+  transform: skewX(-8deg);
+  transition:
+    transform 0.12s,
+    background 0.12s;
+}
+.rpg-cmd-item > * {
+  transform: skewX(8deg);
+}
+.rpg-cmd-item.sel {
+  background: rgba(58, 46, 84, 0.94);
+  transform: skewX(-8deg) translateX(-1.6vw);
+  box-shadow: 0 0 0 2px var(--fam, var(--gold));
+}
+.rpg-cmd-item.cool {
+  opacity: 0.45;
+}
+.rpg-cmd-item.off {
+  opacity: 0.35;
+  cursor: default;
+}
+.rpg-cmd-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8vw;
+}
+.rpg-cmd-row .pix-icon {
+  width: max(18px, 3.6vh);
+  height: max(18px, 3.6vh);
+}
+.rpg-cmd-row b {
+  font-family: var(--pixel);
+  font-size: max(10px, 2.2vh);
+  color: var(--fam, var(--gold));
+}
+.rpg-cmd-star {
+  color: var(--lime);
+  font-size: max(12px, 2.6vh);
+}
+.rpg-cmd-cd {
+  margin-left: auto;
+  font-size: max(10px, 1.9vh);
+  color: var(--orange);
+}
+.rpg-cmd-ex {
+  font-size: max(11px, 2.2vh);
+  color: var(--mist);
+}
+.rpg-cmd-role {
+  font-size: max(11px, 2.2vh);
+  color: var(--white);
+}
+.rpg-cmd-hint {
+  display: flex;
+  justify-content: flex-start;
+  white-space: nowrap;
+  gap: 1vw;
+  transform: scale(0.85);
+  transform-origin: left;
+}
+.rpg-waitchip,
+.rpg-tip {
+  position: absolute;
+  left: 50%;
+  top: calc(3vh + var(--safe-t));
+  transform: translateX(-50%);
+  max-width: 70vw;
+  padding: 1vh 1.6vw;
+  font-size: max(12px, 2.6vh);
+  background: rgba(20, 16, 34, 0.85);
+  border: 3px solid var(--cyan);
+  border-radius: 99px;
+  text-align: center;
+}
+.rpg-tip {
+  border-color: var(--gold);
+}
+.rpg .tvb-cam {
+  right: auto;
+  left: 2.5vw;
+}
+.rpg .tvb-note {
+  bottom: auto;
+  top: calc(3vh + var(--safe-t));
+}
+.travel-line {
+  max-width: 70vw;
+  font-size: max(13px, 3vh);
+  line-height: 1.4;
+}
+.rpg .rpg-set-actions {
+  left: auto;
+  right: 2.5vw;
+}

@@ -9,10 +9,10 @@ import { tilt } from '../../input/tilt';
 import { host } from '../../net/host';
 import { showScene } from '../../phaser/game';
 import { tracker, TrackerError } from '../../pose/PoseTracker';
-import { clearExpedition, currentNode, HERO_HP, loadExpedition, newExpedition, ROUTES, saveExpedition, type ExNode, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
+import { atPhaseBoundary, clearExpedition, currentNode, HERO_HP, loadExpedition, newExpedition, ROUTES, saveExpedition, type ExNode, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
 import { generateLoadout, setTarget } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
-import { addDodge, addSet, newWorkout, toRecord } from '../../rpg/workout';
+import { addDodge, addMarch, addSet, newWorkout, toRecord } from '../../rpg/workout';
 import { Calibration } from '../Calibration';
 import { ControllerLost, RemoteCalibration, useLink } from '../Connected';
 import { useInputEvents } from '../motionUi';
@@ -20,6 +20,7 @@ import { BlessingPick, Fallen, Haven, Mirror, PathView, Summary } from './Events
 import { MovementLab } from './MovementLab';
 import { RpgBattle } from './RpgBattle';
 import { Sanctuary } from './Sanctuary';
+import { marchNeedsBody, Travel, type MarchTally } from './Travel';
 import type { SetResult } from './setRunner';
 
 /**
@@ -30,7 +31,7 @@ import type { SetResult } from './setRunner';
  * choices and the Haven work from the couch with a gamepad, and the camera
  * check happens right before the first fight rather than at the start.
  */
-type View = 'sanctuary' | 'lab' | 'calibrate' | 'path' | 'node' | 'fallen' | 'summary';
+type View = 'sanctuary' | 'lab' | 'calibrate' | 'path' | 'travel' | 'node' | 'fallen' | 'summary';
 
 export function Expedition({ connected, resume, onExit }: { connected: boolean; resume: boolean; onExit: () => void }) {
   const [x, setXState] = useState<ExpeditionState | null>(() => {
@@ -113,6 +114,11 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     afterCal.current();
   };
 
+  // The Sanctuary floats over the drifting board; marches restart it for real.
+  useEffect(() => {
+    if (view === 'sanctuary') showScene('Diorama', { attract: true });
+  }, [view]);
+
   useInputEvents((e) => {
     if (e.type === 'recalibrate' && (view === 'path' || view === 'sanctuary')) {
       calibrated.current = false;
@@ -132,8 +138,30 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     const next = newExpedition(route, prefs, loadout, targets);
     commit(next);
     audio.say(STORY.departure);
-    setView('path');
+    routeNext();
   };
+
+  /** What comes after a node: march to the next stop, or (blessings) happen right here. */
+  const routeNext = () => {
+    const cur = xRef.current!;
+    const n = currentNode(cur);
+    if (!n) return finish(cur.fallen ? 'defeat' : 'victory');
+    if (!n.at) return enter();
+    if (atPhaseBoundary(cur)) return setView('path');
+    goTravel();
+  };
+
+  const [travelKey, setTravelKey] = useState(0);
+  const goTravel = () => {
+    const go = () => {
+      setTravelKey((k) => k + 1);
+      setView('travel');
+    };
+    if (marchNeedsBody()) needCamera(go);
+    else go();
+  };
+
+  const recordMarch = (m: MarchTally) => mutate((d) => addMarch(d.workout, m.steps, Math.round(m.active), Math.round(m.assisted)));
 
   const target = (id: string) => xRef.current?.targets[id] ?? setTarget(getExercise(id), xRef.current?.prefs ?? getSave().expeditionPrefs, getSave().exerciseTargets);
 
@@ -163,9 +191,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
   const advance = () => {
     if (debug) return backToLab();
     mutate((d) => void d.index++);
-    const cur = xRef.current!;
-    if (!currentNode(cur)) return finish(cur.fallen ? 'defeat' : 'victory');
-    setView('path');
+    routeNext();
   };
 
   const finish = (outcome: 'victory' | 'defeat' | 'ended') => {
@@ -254,7 +280,38 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
 
       {view === 'calibrate' && (connected ? <RemoteCalibration kind="quick" onDone={onCalibrated} /> : <Calibration kind="quick" camera={camera} onDone={onCalibrated} />)}
 
-      {view === 'path' && x && <PathView x={x} onContinue={enter} onStop={suspend} />}
+      {view === 'path' && x && <PathView x={x} onContinue={() => (currentNode(x)?.at ? goTravel() : enter())} onStop={suspend} />}
+      {view === 'travel' && x && (
+        <Travel
+          key={travelKey}
+          x={x}
+          connected={connected}
+          onArrive={(m) => {
+            recordMarch(m);
+            enter();
+          }}
+          onShrine={() => {
+            if (xRef.current?.shrineUsed) return;
+            mutate((d) => {
+              d.shrineUsed = true;
+              d.hp = Math.min(d.maxHp, d.hp + 30);
+            });
+            audio.heal();
+            audio.say(STORY.shrine);
+          }}
+          onStop={(m) => {
+            recordMarch(m);
+            suspend();
+          }}
+          onRecalibrate={() => {
+            calibrated.current = false;
+            needCamera(() => {
+              setTravelKey((k) => k + 1);
+              setView('travel');
+            });
+          }}
+        />
+      )}
 
       {view === 'node' && x && node && (node.kind === 'fight' || node.kind === 'boss') && (
         <RpgBattle
@@ -270,6 +327,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
           connected={connected}
           difficulty={getSave().settings.difficulty}
           dodgeInput={x.dodgeInput}
+          tutorial={node.enemies!.includes('echo_dummy')}
           cues={getSave().settings.attackCues === 'obvious' ? 'obvious' : (node.cues ?? ROUTES.standard.nodes.find((n) => n.enemies?.join() === node.enemies!.join())?.cues ?? 'obvious')}
           onDodgeInput={(d) => mutate((s) => void (s.dodgeInput = d))}
           onSet={onSet}

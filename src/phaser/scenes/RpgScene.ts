@@ -1,24 +1,36 @@
 import Phaser from 'phaser';
 import { audio } from '../../game/audio';
-import { bus, type BusEvents, type RpgFoeView } from '../../game/bus';
+import { bus, type BusEvents, type RpgFoeStatus, type RpgFoeView } from '../../game/bus';
 import type { RpgFx } from '../../rpg/engine';
 import { PAL } from '../art';
 import { BG } from '../diorama/backdrops';
 import { FIG_H, FIG_ORIGIN_Y } from '../diorama/figures';
 
 /**
- * Expedition battles: the hero on the left, one to four foes on the right,
- * drawn with the same diorama figurines and backdrops as the Motion Trial.
- * Pure animation: all numbers come from the RPG engine through the bus, and
- * the React HUD shows HP, intents and ability cards.
+ * Expedition battles, staged like a (much simpler) console turn-based RPG:
+ * the hero stands front-left, foes on a receding line back-right. Every
+ * exchange is shown in the world — the hero dashes in to strike, foes wind
+ * up in place, charge across and swing — and the camera leans into each
+ * one. HP, wards and intents float over each foe; intents say *what* a foe
+ * will do (attack, charge, ward…) but never whether it will strike high or
+ * low: that has to be read from its body.
+ *
+ * Pure animation: all numbers come from the RPG engine through the bus.
  */
 const W = 200;
 const H = 120;
-const FLOOR = 98;
 const FIG_UNITS = 50;
-const HERO_X = 46;
+const HERO = { x: 50, y: 106, scale: 1.25 };
 const FONT = '"Press Start 2P", monospace';
 const hex = (c: string) => parseInt(c.slice(1), 16);
+
+/** Slots on the back-right diagonal, by foe count. */
+const SLOTS: Record<number, [number, number][]> = {
+  1: [[170, 80]],
+  2: [[150, 88], [188, 76]],
+  3: [[140, 91], [168, 82], [196, 73]],
+  4: [[132, 93], [156, 85], [180, 77], [204, 69]],
+};
 
 interface FoeSprite {
   view: RpgFoeView;
@@ -27,8 +39,12 @@ interface FoeSprite {
   ward: Phaser.GameObjects.Image;
   baseScale: number;
   x: number;
+  y: number;
   idle?: Phaser.Tweens.Tween;
   alive: boolean;
+  status: RpgFoeStatus | null;
+  label: Phaser.GameObjects.Text;
+  intent: Phaser.GameObjects.Text;
 }
 
 const ELEMENT_TINT: Record<string, number[]> = {
@@ -46,6 +62,7 @@ export class RpgScene extends Phaser.Scene {
   private heroScale = 1;
   private bubble!: Phaser.GameObjects.Image;
   private aura!: Phaser.GameObjects.Image;
+  private hud!: Phaser.GameObjects.Graphics;
   private foes = new Map<number, FoeSprite>();
   private queue: (() => number)[] = [];
   private busy = false;
@@ -54,6 +71,7 @@ export class RpgScene extends Phaser.Scene {
   private telegraph: Phaser.GameObjects.Graphics | null = null;
   private cueObjs: Phaser.GameObjects.GameObject[] = [];
   private maxHp = 100;
+  private baseZoom = 1;
 
   constructor() {
     super('Rpg');
@@ -65,6 +83,7 @@ export class RpgScene extends Phaser.Scene {
     this.queue = [];
     this.busy = false;
     this.labels = [];
+    this.cueObjs = [];
     this.maxHp = data.heroMaxHp;
   }
 
@@ -76,15 +95,16 @@ export class RpgScene extends Phaser.Scene {
       .setOrigin(0)
       .setScale(1 / BG.ppu)
       .setDepth(-10);
-    this.heroScale = FIG_UNITS / FIG_H;
-    this.add.image(HERO_X, FLOOR + 1, 'dshadow').setScale(0.28, 0.22).setAlpha(0.8);
-    this.aura = this.add.image(HERO_X, FLOOR - 20, 'glow').setScale(0).setBlendMode(Phaser.BlendModes.ADD).setTint(0xc77dff);
-    this.hero = this.add.sprite(HERO_X, FLOOR, 'fig-hero').setOrigin(0.5, FIG_ORIGIN_Y).setScale(this.heroScale);
+    this.heroScale = (FIG_UNITS / FIG_H) * HERO.scale;
+    this.add.image(HERO.x, HERO.y + 1, 'dshadow').setScale(0.34, 0.26).setAlpha(0.8).setDepth(HERO.y - 1);
+    this.aura = this.add.image(HERO.x, HERO.y - 24, 'glow').setScale(0).setBlendMode(Phaser.BlendModes.ADD).setTint(0xc77dff).setDepth(HERO.y - 0.5);
+    this.hero = this.add.sprite(HERO.x, HERO.y, 'fig-hero').setOrigin(0.5, FIG_ORIGIN_Y).setScale(this.heroScale).setDepth(HERO.y);
     this.tweens.add({ targets: this.hero, scaleY: this.heroScale * 1.03, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-    this.bubble = this.add.image(HERO_X, FLOOR - 22, 'glow').setTint(0x41a6f6).setBlendMode(Phaser.BlendModes.ADD).setScale(2.2).setAlpha(0);
+    this.bubble = this.add.image(HERO.x, HERO.y - 26, 'glow').setTint(0x41a6f6).setBlendMode(Phaser.BlendModes.ADD).setScale(2.6).setAlpha(0).setDepth(HERO.y + 1);
+    this.hud = this.add.graphics().setDepth(300);
     this.placeFoes(this.start0.foes, true);
     this.hero.x = -20;
-    this.tweens.add({ targets: this.hero, x: HERO_X, duration: 450, ease: 'Back.out' });
+    this.tweens.add({ targets: this.hero, x: HERO.x, duration: 450, ease: 'Back.out' });
 
     this.fit();
     this.scale.on('resize', this.fit, this);
@@ -93,6 +113,13 @@ export class RpgScene extends Phaser.Scene {
         if (foes?.length) this.queue.push(() => (this.placeFoes(foes, false), 400));
         for (const f of fx) this.queue.push(() => this.play(f));
         if (!this.busy) this.next();
+      }),
+      bus.on('rpg:foes', ({ foes }) => {
+        for (const s of foes) {
+          const f = this.foes.get(s.uid);
+          if (f) f.status = s;
+        }
+        this.drawHud();
       }),
       bus.on('rpg:strike', (s) => this.strike(s)),
       bus.on('rpg:pose', (p) => this.pose(p)),
@@ -107,41 +134,98 @@ export class RpgScene extends Phaser.Scene {
 
   private fit(): void {
     const cam = this.cameras.main;
-    const zoom = Math.min(this.scale.width / W, this.scale.height / H);
-    cam.setZoom(zoom);
+    this.baseZoom = Math.min(this.scale.width / W, this.scale.height / H);
+    cam.setZoom(this.baseZoom);
     cam.centerOn(W / 2, H / 2);
-    for (const t of this.labels) if (t.active) t.setResolution(Math.max(1, Math.ceil(zoom)));
+    for (const t of this.labels) if (t.active) t.setResolution(Math.max(1, Math.ceil(this.baseZoom)));
   }
 
-  /** Lay the living foes out across the right half. */
+  /** Lean the camera toward an exchange, then settle back. */
+  private focus(x: number, y: number, ms = 700): void {
+    const cam = this.cameras.main;
+    cam.pan(W / 2 + (x - W / 2) * 0.35, H / 2 + (y - H / 2) * 0.25, 260, 'Sine.easeOut', true);
+    cam.zoomTo(this.baseZoom * 1.1, 260, 'Sine.easeOut', true);
+    this.hudAlpha(0);
+    this.time.delayedCall(ms, () => this.settle());
+  }
+
+  /** The in-world HUD steps aside during a close-up, so it's never cropped. */
+  private hudAlpha(alpha: number): void {
+    const t = [this.hud, ...[...this.foes.values()].flatMap((f) => [f.label, f.intent])];
+    this.tweens.add({ targets: t, alpha, duration: alpha ? 300 : 160 });
+  }
+
+  private settle(): void {
+    const cam = this.cameras.main;
+    cam.pan(W / 2, H / 2, 380, 'Sine.easeInOut', true);
+    cam.zoomTo(this.baseZoom, 380, 'Sine.easeInOut', true);
+    this.hudAlpha(1);
+  }
+
+  /** Lay the living foes out on the diagonal. */
   private placeFoes(add: RpgFoeView[], entrance: boolean): void {
     for (const v of add) {
-      const baseScale = this.heroScale * (v.scale ?? 1);
-      const shadow = this.add.image(0, FLOOR + 1, 'dshadow').setScale(0.3 * (v.scale ?? 1), 0.22).setAlpha(0.8);
-      const fig = this.add.sprite(W + 30, FLOOR, `fig-${v.sprite}`).setOrigin(0.5, FIG_ORIGIN_Y).setScale(baseScale);
+      const baseScale = (FIG_UNITS / FIG_H) * (v.scale ?? 1);
+      const shadow = this.add.image(0, 0, 'dshadow').setScale(0.3 * (v.scale ?? 1), 0.22).setAlpha(0.8);
+      const fig = this.add.sprite(W + 30, 88, `fig-${v.sprite}`).setOrigin(0.5, FIG_ORIGIN_Y).setScale(baseScale).setFlipX(true);
       if (v.tint) fig.setTint(v.tint);
-      const ward = this.add.image(0, FLOOR - 24, 'glow').setTint(0x73eff7).setBlendMode(Phaser.BlendModes.ADD).setScale(2.4 * (v.scale ?? 1)).setAlpha(0);
-      this.foes.set(v.uid, { view: v, fig, shadow, ward, baseScale, x: 0, alive: true });
+      const ward = this.add.image(0, 0, 'glow').setTint(0x73eff7).setBlendMode(Phaser.BlendModes.ADD).setScale(2.4 * (v.scale ?? 1)).setAlpha(0);
+      const label = this.txt(0, 0, v.name.toUpperCase(), 4, PAL.white).setOrigin(0.5, 1).setDepth(301);
+      const intent = this.txt(0, 0, '', 4, PAL.gold).setOrigin(0.5, 1).setDepth(301);
+      this.foes.set(v.uid, { view: v, fig, shadow, ward, baseScale, x: 0, y: 0, alive: true, status: null, label, intent });
     }
     const living = [...this.foes.values()].filter((f) => f.alive);
-    const n = living.length;
+    const slots = SLOTS[Math.min(4, Math.max(1, living.length))];
     living.forEach((f, i) => {
-      const x = n === 1 ? 146 : 104 + ((180 - 104) * i) / Math.max(1, n - 1);
+      const [x, y] = slots[i];
+      // Farther back = a little smaller.
+      const depthScale = 0.86 + (y - 72) / 150;
       f.x = x;
-      f.shadow.x = x;
-      f.ward.x = x;
+      f.y = y;
+      f.baseScale = (FIG_UNITS / FIG_H) * (f.view.scale ?? 1) * depthScale;
+      f.shadow.setPosition(x, y + 1).setDepth(y - 1);
+      f.ward.setPosition(x, y - 22).setDepth(y + 0.5);
+      f.fig.setDepth(y).setScale(f.baseScale);
       f.idle?.stop();
       this.tweens.add({
         targets: f.fig,
         x,
+        y,
         duration: entrance ? 450 : 350,
         delay: entrance ? 150 + i * 80 : 0,
         ease: 'Back.out',
-        onComplete: () => {
-          f.idle = this.tweens.add({ targets: f.fig, y: FLOOR - 2, duration: 700 + i * 90, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-        },
+        onComplete: () => this.idle(f, i),
       });
     });
+    this.drawHud();
+  }
+
+  private idle(f: FoeSprite, i = 0): void {
+    if (!f.alive) return;
+    f.idle?.stop();
+    f.idle = this.tweens.add({ targets: f.fig, y: f.y - 2, duration: 700 + i * 90, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+  }
+
+  /** Name, HP / ward bar, armour pips and intent over each foe. */
+  private drawHud(): void {
+    const g = this.hud.clear();
+    for (const f of this.foes.values()) {
+      const s = f.status;
+      const show = f.alive && !!s;
+      f.label.setVisible(show);
+      f.intent.setVisible(show);
+      if (!show || !s) continue;
+      const top = f.y - f.fig.displayHeight * 0.95;
+      const w = 26;
+      const bx = f.x - w / 2;
+      const by = top - 4;
+      g.fillStyle(hex(PAL.ink), 0.85).fillRect(bx - 1, by - 1, w + 2, 4);
+      g.fillStyle(hex(PAL.red)).fillRect(bx, by, Math.round(w * Math.max(0, s.hp / s.maxHp)), 2);
+      if (s.ward > 0) g.fillStyle(hex(PAL.cyan)).fillRect(bx, by + 2, Math.min(w, Math.round((s.ward / s.maxHp) * w)), 1);
+      for (let a = 0; a < s.armor; a++) g.fillStyle(hex(PAL.mist)).fillRect(bx + w + 2, by - 1 + a * 2, 2, 1.5);
+      f.label.setPosition(f.x, by - 1);
+      f.intent.setPosition(f.x, by - 7).setText(s.intent).setColor(s.charging ? PAL.orange : s.staggered ? PAL.mist : PAL.gold);
+    }
   }
 
   private next(): void {
@@ -158,33 +242,37 @@ export class RpgScene extends Phaser.Scene {
 
   private txt(x: number, y: number, s: string, size: number, color: string): Phaser.GameObjects.Text {
     const t = this.add.text(x, y, s, { fontFamily: FONT, fontSize: `${size}px`, color, stroke: PAL.ink, strokeThickness: Math.max(2, size / 3) });
-    t.setResolution(Math.max(2, Math.ceil(this.cameras.main.zoom)));
+    t.setResolution(Math.max(2, Math.ceil(this.cameras.main.zoom * 1.5)));
     this.labels.push(t);
     return t;
   }
 
   private banner(s: string, color: string, ms = 1200, size = 8): void {
-    const t = this.txt(W / 2, 36, s, size, color).setOrigin(0.5).setDepth(200).setScale(0.6).setAlpha(0);
+    const t = this.txt(W / 2, 30, s, size, color).setOrigin(0.5).setDepth(400).setScale(0.6).setAlpha(0);
     t.setWordWrapWidth(W * 1.6);
     t.setAlign('center');
     this.tweens.add({ targets: t, scale: 1, alpha: 1, duration: 180, ease: 'Back.out' });
-    this.tweens.add({ targets: t, alpha: 0, y: 30, delay: ms, duration: 300, onComplete: () => t.destroy() });
+    this.tweens.add({ targets: t, alpha: 0, y: 24, delay: ms, duration: 300, onComplete: () => t.destroy() });
   }
 
   private float(x: number, y: number, s: string, color: string, big = false): void {
-    const t = this.txt(x + Phaser.Math.Between(-5, 5), y, s, big ? 11 : 7, color).setOrigin(0.5).setDepth(150);
+    const t = this.txt(x + Phaser.Math.Between(-5, 5), y, s, big ? 11 : 7, color).setOrigin(0.5).setDepth(350);
     this.tweens.add({ targets: t, y: y - (big ? 24 : 16), duration: 700, ease: 'Cubic.out' });
     this.tweens.add({ targets: t, alpha: 0, delay: 600, duration: 300, onComplete: () => t.destroy() });
   }
 
   private burst(x: number, y: number, tint: number[], n: number, speed = 60): void {
-    const p = this.add.particles(x, y, 'px', { speed: { min: speed * 0.3, max: speed }, lifespan: 500, tint, emitting: false, scale: { start: 1.2, end: 0 }, gravityY: 60 }).setDepth(140);
+    const p = this.add.particles(x, y, 'px', { speed: { min: speed * 0.3, max: speed }, lifespan: 500, tint, emitting: false, scale: { start: 1.2, end: 0 }, gravityY: 60 }).setDepth(340);
     p.explode(n);
     this.time.delayedCall(700, () => p.destroy());
   }
 
   private foeTop(f: FoeSprite): number {
-    return FLOOR - f.fig.displayHeight * 0.6;
+    return f.y - f.fig.displayHeight * 0.6;
+  }
+
+  private heroTop(): number {
+    return HERO.y - this.hero.displayHeight * 0.6;
   }
 
   private play(fx: RpgFx): number {
@@ -193,12 +281,17 @@ export class RpgScene extends Phaser.Scene {
     switch (fx.kind) {
       case 'ability': {
         const color = FAMILY_COLOR[fx.family] ?? PAL.gold;
+        const target = [...this.foes.values()].find((f) => f.alive);
         this.aura.setTint(hex(color));
-        this.tweens.add({ targets: this.aura, scale: { from: 0.4, to: 2.4 }, alpha: { from: 0.8, to: 0 }, duration: 500 });
-        this.tweens.add({ targets: this.hero, x: HERO_X + 22, duration: 140, yoyo: true, ease: 'Quad.out' });
+        this.tweens.add({ targets: this.aura, scale: { from: 0.4, to: 2.6 }, alpha: { from: 0.8, to: 0 }, duration: 500 });
+        // Dash in to strike, then back to the mark.
+        if (target) {
+          this.focus((HERO.x + target.x) / 2, (HERO.y + target.y) / 2, 900);
+          this.tweens.add({ targets: this.hero, x: target.x - 22, y: target.y + 4, duration: 220, yoyo: true, hold: 260, ease: 'Quad.out' });
+        }
         this.banner(fx.partial ? `${fx.ability.toUpperCase()} · ${Math.round(fx.power * 100)}%` : fx.ability.toUpperCase(), color, 900, 7);
         audio.slash(fx.power);
-        return 450;
+        return 520;
       }
       case 'fizzle':
         this.banner('No reps counted — the ability rests', PAL.mist, 1400, 6);
@@ -244,15 +337,15 @@ export class RpgScene extends Phaser.Scene {
         return 300;
       case 'shield':
         this.bubble.setAlpha(Math.min(0.85, 0.25 + fx.total / this.maxHp));
-        this.tweens.add({ targets: this.bubble, scale: { from: 3, to: 1.9 }, duration: 250, ease: 'Back.out' });
-        this.float(HERO_X, FLOOR - 42, `+${fx.amount}`, PAL.sky);
+        this.tweens.add({ targets: this.bubble, scale: { from: 3.4, to: 2.3 }, duration: 250, ease: 'Back.out' });
+        this.float(HERO.x, this.heroTop() - 14, `+${fx.amount}`, PAL.sky);
         audio.shield();
         return 260;
       case 'heal': {
-        const p = this.add.particles(HERO_X, FLOOR - 12, 'spark', { speedY: { min: -40, max: -15 }, speedX: { min: -12, max: 12 }, lifespan: 700, tint: [0x7ee081, 0xa7f070], emitting: false }).setDepth(130);
+        const p = this.add.particles(HERO.x, HERO.y - 14, 'spark', { speedY: { min: -40, max: -15 }, speedX: { min: -12, max: 12 }, lifespan: 700, tint: [0x7ee081, 0xa7f070], emitting: false }).setDepth(330);
         p.explode(14);
         this.time.delayedCall(900, () => p.destroy());
-        this.float(HERO_X, FLOOR - 42, `+${fx.amount}`, PAL.lime);
+        this.float(HERO.x, this.heroTop() - 14, `+${fx.amount}`, PAL.lime);
         audio.heal();
         return 300;
       }
@@ -275,7 +368,8 @@ export class RpgScene extends Phaser.Scene {
         foe.idle?.stop();
         this.tweens.add({ targets: [foe.fig, foe.shadow, foe.ward], alpha: 0, duration: 600 });
         this.tweens.add({ targets: foe.fig, scaleY: foe.baseScale * 0.2, duration: 600, ease: 'Quad.in' });
-        this.burst(foe.x, FLOOR - 16, [0xffcd75, 0xffffff, 0xa7f070], 24, 100);
+        this.burst(foe.x, foe.y - 16, [0xffcd75, 0xffffff, 0xa7f070], 24, 100);
+        this.drawHud();
         return 450;
       case 'enemyAct':
         if (!foe) return 0;
@@ -295,17 +389,18 @@ export class RpgScene extends Phaser.Scene {
       case 'summon':
         return 200;
       case 'strike': {
+        const top = this.heroTop();
         if (fx.outcome === 'dodged') {
-          this.float(HERO_X, FLOOR - 50, 'DODGED!', PAL.lime, true);
+          this.float(HERO.x, top - 16, 'DODGED!', PAL.lime, true);
           audio.select();
         } else if (fx.outcome === 'unclear') {
-          this.float(HERO_X, FLOOR - 50, 'unseen — no damage', PAL.mist);
+          this.float(HERO.x, top - 16, 'unseen — no damage', PAL.mist);
         } else {
           this.hero.setTintFill(0xff4060);
           this.time.delayedCall(90, () => this.hero.clearTint());
-          this.tweens.add({ targets: this.hero, x: HERO_X - 6, duration: 60, yoyo: true, repeat: 1 });
-          if (fx.absorbed) this.float(HERO_X, FLOOR - 50, `BLOCK ${fx.absorbed}`, PAL.sky);
-          if (fx.damage) this.float(HERO_X, FLOOR - 40, `-${fx.damage}`, '#ff6b7a', fx.damage > 10);
+          this.tweens.add({ targets: this.hero, x: HERO.x - 6, duration: 60, yoyo: true, repeat: 1 });
+          if (fx.absorbed) this.float(HERO.x, top - 18, `BLOCK ${fx.absorbed}`, PAL.sky);
+          if (fx.damage) this.float(HERO.x, top - 8, `-${fx.damage}`, '#ff6b7a', fx.damage > 10);
           cam.shake(150, 0.006);
           audio.hurt();
         }
@@ -313,13 +408,15 @@ export class RpgScene extends Phaser.Scene {
         return 500;
       }
       case 'victory':
+        this.settle();
         this.banner('VICTORY!', PAL.gold, 2000, 14);
-        this.tweens.add({ targets: this.hero, y: FLOOR - 10, duration: 200, yoyo: true, repeat: 2, ease: 'Quad.out' });
+        this.tweens.add({ targets: this.hero, y: HERO.y - 10, duration: 200, yoyo: true, repeat: 2, ease: 'Quad.out' });
         audio.stopMusic();
         audio.victory();
         return 1600;
       case 'defeat':
-        this.tweens.add({ targets: this.hero, angle: -90, y: FLOOR - 4, alpha: 0.5, duration: 600 });
+        this.settle();
+        this.tweens.add({ targets: this.hero, angle: -90, y: HERO.y - 4, alpha: 0.5, duration: 600 });
         this.banner('Your form scatters into the Haze…', PAL.mist, 2200, 7);
         audio.stopMusic();
         audio.hurt();
@@ -328,10 +425,14 @@ export class RpgScene extends Phaser.Scene {
   }
 
   /**
-   * Wind-up and swing for one strike. The body language is always there —
-   * HIGH: the foe rears up and back, a glint above its head; LOW: it drops
-   * into a crouch and leans in, a glint at its feet. Clearer cue levels add
-   * a line at head/foot height and, at 'obvious', a big ▲ DUCK / ▼ HOP.
+   * One strike, in four beats:
+   *   telegraph  the foe winds up in place. Its body is the cue — HIGH: it
+   *              rears up and back, weapon glinting overhead; LOW: it drops
+   *              into a crouch and leans in, a glint at its feet. Clearer cue
+   *              levels add a line at head/foot height and (obvious) a ▲/▼.
+   *   approach   it charges across to the hero, landing at the moment of impact
+   *   swing      an overhead arc at head height, or a sweep along the floor
+   *   clear      it returns to its place
    */
   private strike(s: BusEvents['rpg:strike']): void {
     const f = this.foes.get(s.uid);
@@ -346,57 +447,70 @@ export class RpgScene extends Phaser.Scene {
     const reset = () => {
       this.tweens.killTweensOf(f.fig);
       f.fig.setAngle(0).setScale(base);
-      f.fig.y = FLOOR;
     };
+    const heroTop = HERO.y - this.hero.displayHeight * 0.8;
+    const lineY = high ? heroTop : HERO.y - 3;
     if (s.phase === 'clear') {
       reset();
-      this.tweens.add({ targets: f.fig, x: f.x, duration: 200, onComplete: () => f.alive && (f.idle = this.tweens.add({ targets: f.fig, y: FLOOR - 2, duration: 750, yoyo: true, repeat: -1, ease: 'Sine.inOut' })) });
+      this.settle();
+      this.tweens.add({ targets: f.fig, x: f.x, y: f.y, duration: 380, ease: 'Sine.inOut', onComplete: () => this.idle(f) });
       return;
     }
-    const y = high ? FLOOR - 40 : FLOOR - 4;
     f.idle?.stop();
-    reset();
     if (s.phase === 'telegraph') {
+      reset();
+      f.fig.setPosition(f.x, f.y);
       // Body language (every cue level).
-      if (high) this.tweens.add({ targets: f.fig, y: FLOOR - 8, angle: -14, scaleY: base * 1.12, scaleX: base * 0.95, x: f.x + 4, duration: 420, hold: 260, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-      else this.tweens.add({ targets: f.fig, y: FLOOR + 3, angle: 12, scaleY: base * 0.78, scaleX: base * 1.1, x: f.x - 6, duration: 420, hold: 260, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      if (high) this.tweens.add({ targets: f.fig, y: f.y - 8, angle: 14, scaleY: base * 1.14, scaleX: base * 0.94, x: f.x + 4, duration: 420, hold: 260, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      else this.tweens.add({ targets: f.fig, y: f.y + 3, angle: -12, scaleY: base * 0.76, scaleX: base * 1.1, x: f.x - 5, duration: 420, hold: 260, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
       const glint = this.add
-        .image(f.x - 6, high ? FLOOR - f.fig.displayHeight - 4 : FLOOR - 3, 'glow')
+        .image(f.x - 5, high ? f.y - f.fig.displayHeight - 3 : f.y - 2, 'glow')
         .setTint(high ? 0xef7d57 : 0xffcd75)
         .setBlendMode(Phaser.BlendModes.ADD)
         .setScale(0.5)
-        .setDepth(165);
+        .setDepth(f.y + 1);
       this.tweens.add({ targets: glint, scale: 1.1, alpha: { from: 0.4, to: 1 }, duration: 300, yoyo: true, repeat: -1 });
       this.cueObjs.push(glint);
       if (cues !== 'subtle') {
-        const g = this.add.graphics().setDepth(170);
+        const g = this.add.graphics().setDepth(320);
         this.telegraph = g;
         g.lineStyle(2, high ? 0xef7d57 : 0xffcd75, 0.9);
-        for (let x = HERO_X - 14; x < f.x - 10; x += 8) g.lineBetween(x, y, x + 4, y);
+        for (let x = HERO.x - 14; x < HERO.x + 22; x += 7) g.lineBetween(x, lineY, x + 4, lineY);
         this.tweens.add({ targets: g, alpha: { from: 0.3, to: 1 }, duration: 260, yoyo: true, repeat: -1 });
       }
       if (cues === 'obvious') {
-        const t = this.txt(HERO_X + 26, high ? FLOOR - 58 : FLOOR - 22, high ? '▲ DUCK' : '▼ HOP', 9, high ? PAL.orange : PAL.gold).setOrigin(0.5).setDepth(175);
+        const t = this.txt(HERO.x + 30, lineY - 2, high ? '▲' : '▼', 10, high ? PAL.orange : PAL.gold).setOrigin(0.5).setDepth(330);
         this.tweens.add({ targets: t, y: t.y + (high ? -3 : 3), duration: 300, yoyo: true, repeat: -1 });
         this.cueObjs.push(t);
       }
-    } else {
-      // The swing: an overhead arc at head height, or a low sweep along the floor.
-      this.tweens.add({ targets: f.fig, x: HERO_X + 30, angle: high ? -20 : 18, y: high ? FLOOR - 10 : FLOOR + 2, duration: 160, yoyo: true, ease: 'Quad.in' });
-      const g = this.add.graphics().setDepth(170);
-      this.telegraph = g;
-      g.lineStyle(4, 0xffffff, 1);
-      if (high) g.beginPath().arc(HERO_X + 6, y + 14, 26, -2.6, -0.5).strokePath();
-      else g.lineBetween(HERO_X + 34, y, HERO_X - 26, y);
-      this.tweens.add({ targets: g, alpha: 0, duration: 350, onComplete: () => g.destroy() });
-      audio.slash(0.5);
+      return;
     }
+    if (s.phase === 'approach') {
+      reset();
+      const ms = Math.max(200, s.ms ?? 600);
+      // Keep the stance while charging across, so the tell stays readable.
+      f.fig.setAngle(high ? 10 : -10).setScale(high ? base * 0.97 : base * 1.06, high ? base * 1.1 : base * 0.82);
+      this.tweens.add({ targets: f.fig, x: HERO.x + 26, y: HERO.y - 1, duration: ms, ease: 'Quad.in' });
+      this.focus(HERO.x + 16, HERO.y - 20, ms + 900);
+      return;
+    }
+    // Swing.
+    reset();
+    f.fig.setPosition(HERO.x + 26, HERO.y - 1);
+    this.tweens.add({ targets: f.fig, angle: high ? -24 : 20, y: high ? HERO.y - 8 : HERO.y + 1, duration: 120, yoyo: true, ease: 'Quad.out' });
+    const g = this.add.graphics().setDepth(320);
+    this.telegraph = g;
+    g.lineStyle(4, 0xffffff, 1);
+    if (high) g.beginPath().arc(HERO.x + 8, lineY + 16, 26, -2.7, -0.4).strokePath();
+    else g.lineBetween(HERO.x + 34, lineY, HERO.x - 26, lineY);
+    this.tweens.add({ targets: g, alpha: 0, duration: 380, onComplete: () => g.destroy() });
+    audio.slash(0.5);
   }
 
   /** Mirror the player's duck / hop on the hero figure. */
   private pose(p: BusEvents['rpg:pose']): void {
     const k = Math.max(0, Math.min(1, p.duck));
     this.hero.setScale(this.heroScale * (1 + 0.02 * k), this.heroScale * (1 - 0.35 * k));
-    this.hero.y = FLOOR - (p.airborne ? 10 : 0);
+    this.hero.y = HERO.y - (p.airborne ? 10 : 0);
   }
 }

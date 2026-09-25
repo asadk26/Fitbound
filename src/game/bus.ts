@@ -15,6 +15,29 @@ export interface DioramaState {
   /** Enemies already beaten (removed from the board). */
   defeated: string[];
   gateOpen: boolean;
+  /** Expedition mode: the route's encounters stand at trail stops instead of the trial's guardians. */
+  expedition?: ExpeditionBoard;
+}
+
+/** One stop on an expedition's march. */
+export interface BoardMarker {
+  id: string;
+  /** Trail node it stands at. */
+  node: string;
+  kind: 'enemy' | 'mirror' | 'haven';
+  /** Figurine key (fig-<sprite>) for enemies. */
+  sprite?: string;
+  tint?: number;
+  scale?: number;
+  count?: number;
+}
+
+export interface ExpeditionBoard {
+  markers: BoardMarker[];
+  /** Marching speed factor (legs should take a little while, not a few steps). */
+  pace: number;
+  /** Put the hero at this trail node when it changes (a new run, or a resumed one). */
+  startAt?: string;
 }
 
 /** Messages between React (UI, camera, rules) and Phaser (world, animation). */
@@ -51,10 +74,24 @@ export interface BusEvents {
   'rpg:start': { foes: RpgFoeView[]; heroHp: number; heroMaxHp: number; backdrop: 'meadow' | 'dungeon'; boss: boolean };
   'rpg:fx': { fx: RpgFx[]; foes?: RpgFoeView[] };
   /** A strike's telegraph (wind-up), its swing at impact, and clearing. */
-  'rpg:strike': { uid: number; height: 'high' | 'low'; phase: 'telegraph' | 'swing' | 'clear'; cues?: 'obvious' | 'clear' | 'subtle' };
+  'rpg:strike': { uid: number; height: 'high' | 'low'; phase: 'telegraph' | 'approach' | 'swing' | 'clear'; cues?: 'obvious' | 'clear' | 'subtle'; /** approach: time until impact. */ ms?: number };
+  /** Per-foe status for the in-world HUD (HP, ward, armour, intent). */
+  'rpg:foes': { foes: RpgFoeStatus[] };
   /** Hero pose while dodging (from the body reading), for feedback. */
   'rpg:pose': { duck: number; airborne: boolean };
   'rpg:end': undefined;
+}
+
+export interface RpgFoeStatus {
+  uid: number;
+  hp: number;
+  maxHp: number;
+  ward: number;
+  armor: number;
+  /** What it will do next — never whether a strike is high or low. */
+  intent: string;
+  charging: boolean;
+  staggered: boolean;
 }
 
 /** How to draw one expedition foe. */

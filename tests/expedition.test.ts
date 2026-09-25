@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { EXERCISES, FAMILIES, getExercise } from '../src/exercise/registry';
 import { defaultSave, loadSave, sanitize, writeSave } from '../src/game/save';
-import { abilityLoadout, atPhaseBoundary, currentNode, loadExpedition, newExpedition, ROUTES, saveExpedition, validateContent } from '../src/rpg/expedition';
+import { abilityLoadout, atPhaseBoundary, boardMarkers, currentNode, standingAt, loadExpedition, newExpedition, ROUTES, saveExpedition, validateContent } from '../src/rpg/expedition';
 import { alternatives, DEFAULT_PREFS, eligibility, generateLoadout, rerollAll, rerollSlot, setTarget, type Calibrations, type DayPrefs } from '../src/rpg/loadout';
-import { addSet, completion, toRecord, totals, type SetRecord } from '../src/rpg/workout';
+import { NODES } from '../src/phaser/diorama/trailGraph';
+import { addMarch, addSet, completion, toRecord, totals, type SetRecord } from '../src/rpg/workout';
 import { rng } from '../src/testing/poses';
 
 class Mem {
@@ -172,5 +173,35 @@ describe('workout records stay separate from the RPG', () => {
     expect(back.workouts).toHaveLength(1);
     expect(back.settings.voiceCommands).toBe(true);
     expect(sanitize({}).settings.voiceCommands).toBe(false);
+  });
+});
+
+describe('marching between encounters', () => {
+  it('every encounter sits at a real trail stop, in order along the trail', () => {
+    const ids = new Set(NODES.map((n) => n.id));
+    for (const r of ['standard', 'short'] as const) {
+      const at = ROUTES[r].nodes.filter((n) => n.kind !== 'blessing').map((n) => n.at);
+      for (const a of at) expect(a && ids.has(a)).toBe(true);
+      expect(new Set(at).size).toBe(at.length);
+    }
+  });
+
+  it('board markers match the route and the hero stands at the last visited stop', () => {
+    const m = boardMarkers('standard');
+    expect(m.length).toBe(ROUTES.standard.nodes.filter((n) => n.at).length);
+    expect(m.find((k) => k.kind === 'mirror')).toBeTruthy();
+    expect(m.find((k) => k.kind === 'haven')).toBeTruthy();
+    const x = newExpedition('standard', prefs(), generateLoadout(prefs(), allChecked, [], rng(3)), {});
+    expect(standingAt(x)).toBe('start');
+    x.index = 2;
+    expect(standingAt(x)).toBe(ROUTES.standard.nodes[1].at ?? ROUTES.standard.nodes[0].at);
+  });
+
+  it('marching is tallied with the workout, apart from sets', () => {
+    const x = newExpedition('short', prefs(), generateLoadout(prefs(), allChecked, [], rng(4)), {});
+    addMarch(x.workout, 40, 300, 0);
+    addMarch(x.workout, 10, 0, 120);
+    expect(x.workout.march).toEqual({ steps: 50, active: 300, assisted: 120 });
+    expect(x.workout.sets).toHaveLength(0);
   });
 });

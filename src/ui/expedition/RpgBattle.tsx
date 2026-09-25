@@ -63,12 +63,17 @@ export interface RpgBattleProps {
   dodgeInput: 'body' | 'controller';
   /** How plainly attacks announce themselves in this fight. */
   cues: Cues;
+  /** First fight of a run: explain how to read attacks (on screen, once). */
+  tutorial?: boolean;
   onDodgeInput: (d: 'body' | 'controller') => void;
   onSet: (r: SetResult) => void;
   onDodge: (o: 'dodged' | 'hit' | 'unclear') => void;
   onDone: (r: FightResult) => void;
   onLeave: () => void;
 }
+
+/** Foes charge across this long before impact (the stance is readable well before). */
+const APPROACH_MS = 650;
 
 interface StrikeView {
   i: number;
@@ -128,12 +133,19 @@ export function RpgBattle(p: RpgBattleProps) {
   const fx = (list: RpgFx[], foes?: RpgFoeView[]) => {
     if (list.length || foes?.length) bus.emit('rpg:fx', { fx: list, foes });
     for (const f of list) if (f.kind === 'enemyAct') setNote(f.text);
+    // The in-world HUD follows once the animations have played.
+    window.setTimeout(pushStatus, foes?.length ? 500 : 0);
     refresh();
   };
+  const pushStatus = () =>
+    bus.emit('rpg:foes', {
+      foes: engine.foes.map((f) => ({ uid: f.uid, hp: f.hp, maxHp: f.maxHp, ward: f.ward, armor: f.armor, intent: intentText(engine, f), charging: !!f.charging || engine.shownIntent(f).kind === 'charge', staggered: f.staggered })),
+    });
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
   useEffect(() => {
     startRpgBattle({ foes: engine.foes.map(view), heroHp: engine.hero.hp, heroMaxHp: engine.hero.maxHp, backdrop: p.boss ? 'dungeon' : 'meadow', boss: !!p.boss });
+    window.setTimeout(pushStatus, 900);
     input.setMode('menu');
     const first = engine.foes[0].def;
     setNote(first.tip);
@@ -246,9 +258,10 @@ export function RpgBattle(p: RpgBattleProps) {
     const st = new StrikeTimer(s.height, timing, controller);
     timer.current = st;
     const cues = props.current.cues;
+    // Purely visual: the foe's wind-up is the cue (no spoken calls).
     bus.emit('rpg:strike', { uid: s.from, height: s.height, phase: 'telegraph', cues });
-    audio.say(cues === 'obvious' ? (s.height === 'high' ? 'High! Duck!' : 'Low! Hop!') : cues === 'clear' ? (s.height === 'high' ? 'High!' : 'Low!') : 'Here it comes!', false);
     let swung = false;
+    let charging = false;
     if (strikeLoop.current !== null) clearInterval(strikeLoop.current);
     strikeLoop.current = window.setInterval(() => {
       if (pausedRef.current) return;
@@ -262,6 +275,10 @@ export function RpgBattle(p: RpgBattleProps) {
       }
       // Until a standing baseline exists nothing can count, so the clock holds.
       const res = !controller && smp && !smp.baseline && st.state !== 'window' ? null : st.update(now, controller ? null : smp ? { tracking: smp.tracking, ducking: smp.ducking, hops: smp.hops } : { tracking: 'lost', ducking: false, hops: 0 });
+      if (!charging && st.impactIn <= APPROACH_MS && st.state === 'window') {
+        charging = true;
+        bus.emit('rpg:strike', { uid: s.from, height: s.height, phase: 'approach', cues, ms: st.impactIn });
+      }
       if (!swung && st.impactIn <= 0) {
         swung = true;
         bus.emit('rpg:strike', { uid: s.from, height: s.height, phase: 'swing' });
@@ -399,44 +416,35 @@ export function RpgBattle(p: RpgBattleProps) {
 
   return (
     <div className="rpg">
-      <div className="rpg-top">
-        <div className="rpg-hero">
-          <b>{p.title}</b>
-          <div className="bar">
-            <i style={{ width: `${(h.hp / h.maxHp) * 100}%` }} />
-          </div>
-          <span className="rpg-stats">
-            ♥ {h.hp}/{h.maxHp}
-            {h.shield > 0 && <span className="rpg-shield"> ◆ {h.shield}</span>}
-            {h.charge > 0 && <span className="rpg-charge"> ⚡{'•'.repeat(h.charge)}</span>}
-            {h.counter > 0 && <span className="rpg-counter"> ↺ counter</span>}
-          </span>
-          {p.blessings.length > 0 && (
-            <span className="rpg-bless">
-              {p.blessings.map((b) => (
-                <img key={b} src={iconDataUrl(blessing(b).icon)} alt={blessing(b).name} title={`${blessing(b).name}: ${blessing(b).text}`} className="pix-icon" />
-              ))}
-            </span>
-          )}
+      <div className="rpg-party">
+        <small>{p.title}</small>
+        <b>Hero</b>
+        <div className="bar">
+          <i style={{ width: `${(h.hp / h.maxHp) * 100}%` }} />
         </div>
-        <div className="rpg-foes">
-          {engine.foes
-            .filter((f) => f.alive)
-            .map((f) => (
-              <FoeCard key={f.uid} f={f} engine={engine} />
+        <span className="rpg-stats">
+          ♥ {h.hp}/{h.maxHp}
+          {h.shield > 0 && <span className="rpg-shield"> ◆ {h.shield}</span>}
+          {h.charge > 0 && <span className="rpg-charge"> ⚡{'•'.repeat(h.charge)}</span>}
+          {h.counter > 0 && <span className="rpg-counter"> ↺</span>}
+        </span>
+        {p.blessings.length > 0 && (
+          <span className="rpg-bless">
+            {p.blessings.map((b) => (
+              <img key={b} src={iconDataUrl(blessing(b).icon)} alt={blessing(b).name} title={`${blessing(b).name}: ${blessing(b).text}`} className="pix-icon" />
             ))}
-        </div>
+          </span>
+        )}
       </div>
 
       {stage === 'choose' && !paused && (
-        <div className="rpg-cards">
+        <div className="rpg-cmd">
           {FAMILIES.map((fam, i) => {
             const slot = p.loadout[fam];
             if (!slot)
               return (
-                <div key={fam} className="rpg-card off">
-                  <small>{FAMILY_INFO[fam].name}</small>
-                  <b>Resting today</b>
+                <div key={fam} className="rpg-cmd-item off">
+                  <b>{FAMILY_INFO[fam].name} · resting</b>
                 </div>
               );
             const a = engine.abilityFor(fam);
@@ -444,23 +452,36 @@ export function RpgBattle(p: RpgBattleProps) {
             const ready = engine.available(fam);
             const hint = engine.hint(fam);
             return (
-              <button key={fam} className={`rpg-card ${i === sel ? 'sel' : ''} ${ready ? '' : 'cool'} hint-${hint.level}`} style={{ ['--fam' as string]: a.color }} onClick={() => pick(fam)} onPointerMove={(ev) => (ev.movementX || ev.movementY) && ready && ((selRef.current = i), setSel(i))}>
-                <small>{FAMILY_INFO[fam].name}</small>
-                <span className="rpg-card-ex">
-                  {targetLabel(e2, p.target(e2.id))} · {e2.name}
+              <button
+                key={fam}
+                className={`rpg-cmd-item ${i === sel ? 'sel' : ''} ${ready ? '' : 'cool'} hint-${hint.level}`}
+                style={{ ['--fam' as string]: a.color }}
+                onClick={() => pick(fam)}
+                onPointerMove={(ev) => (ev.movementX || ev.movementY) && ready && ((selRef.current = i), setSel(i))}
+              >
+                <span className="rpg-cmd-row">
+                  <img src={iconDataUrl(a.icon)} alt="" className="pix-icon" />
+                  <b>{a.name}</b>
+                  {ready && hint.level === 'strong' && <span className="rpg-cmd-star">★</span>}
+                  {!ready && <span className="rpg-cmd-cd">recharging</span>}
                 </span>
-                <b>
-                  <img src={iconDataUrl(a.icon)} alt="" className="pix-icon" /> {a.name}
-                </b>
-                <span className="rpg-card-role">{a.role}</span>
-                {!ready && <span className="rpg-card-cd">Recharging</span>}
-                {ready && hint.text && <span className={`rpg-card-hint ${hint.level}`}>{hint.level === 'strong' ? '★ ' : ''}{hint.text}</span>}
-                {slot.firstCheck && <span className="rpg-card-first">First-time check</span>}
+                {i === sel && (
+                  <>
+                    <span className="rpg-cmd-ex">
+                      {targetLabel(e2, p.target(e2.id))} · {e2.name}
+                      {slot.firstCheck ? ' · first-time check' : ''}
+                    </span>
+                    <span className="rpg-cmd-role">
+                      {a.role}
+                      {hint.text ? ` — ${hint.text}` : ''}
+                    </span>
+                  </>
+                )}
               </button>
             );
           })}
-          <div className="rpg-cards-hint">
-            <span className="hint-chip">Lean ◀ ▶ or d-pad to choose</span>
+          <div className="rpg-cmd-hint">
+            <span className="hint-chip">◀ ▶ / lean to choose</span>
             <HoldRing value={r?.hold.confirm ?? 0} label="use" hand="right" />
           </div>
         </div>
@@ -525,7 +546,7 @@ export function RpgBattle(p: RpgBattleProps) {
             <div>
               <small>Your foes ready themselves</small>
               <b>{floorRest ? 'Take your time getting up' : 'Stand tall, arms relaxed'}</b>
-              <span>Nothing attacks until you’re ready. Then: HIGH = duck, LOW = hop.</span>
+              <span>Nothing attacks until you’re ready. Then watch how they move.</span>
             </div>
           </div>
           <div className="xpbar">
@@ -537,31 +558,11 @@ export function RpgBattle(p: RpgBattleProps) {
         </div>
       )}
 
-      {stage === 'dodge' && strike && !paused && (
-        <div className={`rpg-strike ${p.cues === 'subtle' && !strike.result ? 'hidden-height' : strike.s.height} ${strike.result ?? ''}`}>
-          <small>
-            {strike.s.attack} · strike {strike.i + 1} of {strike.n}
-          </small>
-          <b>
-            {strike.result === 'dodged'
-              ? 'Dodged!'
-              : strike.result === 'hit'
-                ? `Hit — ${strike.s.damage}`
-                : strike.result === 'unclear'
-                  ? 'Couldn’t see you — no damage'
-                  : p.cues === 'obvious'
-                    ? strike.s.height === 'high'
-                      ? '▲ HIGH — DUCK!'
-                      : '▼ LOW — HOP!'
-                    : p.cues === 'clear'
-                      ? strike.s.height === 'high'
-                        ? '▲ HIGH'
-                        : '▼ LOW'
-                      : 'Read its stance…'}
-          </b>
-          {strike.result && p.cues !== 'obvious' && <span className="rpg-wait">It was {strike.s.height === 'high' ? 'HIGH (rearing up → duck)' : 'LOW (crouching → hop)'}</span>}
-          {!strike.result && (strike.waiting ? <span className="rpg-wait">{strike.waiting}</span> : <div className="rpg-strike-bar"><i style={{ width: `${Math.min(100, (strike.left / STRIKE_TIMING.telegraphMs) * 100)}%` }} /></div>)}
-          {p.dodgeInput === 'controller' && !strike.result && <span className="hint-chip">Controller: ▼ duck · ▲ / A hop</span>}
+      {stage === 'dodge' && strike && !paused && strike.waiting && !strike.result && <div className="rpg-waitchip">{strike.waiting}</div>}
+      {stage === 'dodge' && strike && !paused && p.tutorial && !strike.result && !strike.waiting && (
+        <div className="rpg-tip">
+          Watch the enemy. <b>Rearing up</b> → duck. <b>Crouching low</b> → a small hop.
+          {p.dodgeInput === 'controller' ? ' (Controller: ▼ duck · ▲ / A hop)' : ''}
         </div>
       )}
 
@@ -619,42 +620,22 @@ export function RpgBattle(p: RpgBattleProps) {
   );
 }
 
-function intentText(engine: RpgEngine, f: Foe): { icon: string; text: string } {
+/** What a foe will do next, for the in-world HUD. Never reveals high or low. */
+function intentText(engine: RpgEngine, f: Foe): string {
+  if (f.staggered) return 'STAGGERED';
   const i = engine.shownIntent(f);
-  if (f.staggered) return { icon: '💫', text: 'Staggered — loses its turn' };
   switch (i.kind) {
     case 'attack':
-      return { icon: '⚔', text: `${i.name}: ${i.strikes.map((s) => (s.height === 'high' ? 'HIGH' : 'LOW')).join(' · ')}` };
+      return f.charging ? 'CHARGED!' : i.strikes.length > 1 ? `ATTACK x${i.strikes.length}` : 'ATTACK';
     case 'charge':
-      return { icon: '⚠', text: `${i.name} (charging)` };
+      return 'WINDING UP';
     case 'ward':
-      return { icon: '🛡', text: i.name };
+      return 'WARD';
     case 'armor':
-      return { icon: '⛨', text: i.name };
+      return 'HARDEN';
     case 'summon':
-      return { icon: '✦', text: i.name };
+      return 'SUMMON';
     case 'rest':
-      return { icon: '…', text: i.name };
+      return '…';
   }
-}
-
-function FoeCard({ f, engine }: { f: Foe; engine: RpgEngine }) {
-  const it = intentText(engine, f);
-  return (
-    <div className={`rpg-foe ${f.charging ? 'charging' : ''}`}>
-      <div className="rpg-foe-name">
-        <b>{f.def.name}</b>
-        {f.armor > 0 && <span className="tag armor">⛨{f.armor}</span>}
-        {f.ward > 0 && <span className="tag ward">🛡{f.ward}</span>}
-        {f.burn > 0 && <span className="tag burn">🔥{f.burn}</span>}
-        {f.def.weak?.length ? <span className="tag weak">weak: {f.def.weak.join(', ')}</span> : null}
-      </div>
-      <div className="bar enemy">
-        <i style={{ width: `${(f.hp / f.maxHp) * 100}%` }} />
-      </div>
-      <span className="rpg-intent">
-        {it.icon} {it.text}
-      </span>
-    </div>
-  );
 }

@@ -60,6 +60,7 @@ export const NODES: TrailNode[] = [
   { id: 'forkC', x: 1680, y: 1040 },
   { id: 'golem', x: 1890, y: 820 },
   { id: 'mage', x: 1560, y: 520 },
+  { id: 'veil', x: 1700, y: 355 },
   { id: 'warden', x: 1880, y: 250 },
 ];
 
@@ -78,7 +79,8 @@ export const SEGS: TrailSeg[] = [
   { id: 'tower', a: 'forkC', b: 'mage', via: [{ x: 1640, y: 830 }, { x: 1590, y: 660 }] },
   { id: 'ridge', a: 'golem', b: 'mage', via: [{ x: 1760, y: 640 }] },
   { id: 'eastPass', a: 'golem', b: 'warden', via: [{ x: 1960, y: 600 }, { x: 1940, y: 420 }] },
-  { id: 'crystalPath', a: 'mage', b: 'warden', via: [{ x: 1660, y: 380 }] },
+  { id: 'crystalPath', a: 'mage', b: 'veil', via: [{ x: 1620, y: 420 }] },
+  { id: 'veilStair', a: 'veil', b: 'warden', via: [{ x: 1790, y: 300 }] },
 ];
 
 export const FORKS: Fork[] = [

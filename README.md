@@ -40,9 +40,14 @@ Phase 2  The Bone Field (Bone Charger) → the Mirror of Unlived Lives → Drift
 Phase 3  A Quiet Haven → The Veiled Stair (Hollow Acolyte) → a blessing → Before the Spark (Warden of the Haze)
 ```
 
-- Between nodes, **the path** shows where you are. Continue, or **Save and stop here**; phase boundaries are the natural places to stop.
+- **You march between encounters.** Each encounter stands at its own spot on the diorama trail: straw at the yard, the Husk by the signpost, the Charger past the ward-gate, the Mirror at the crossroads fork, the Wisps by the quarry, the Haven's campfire under the tower, the Acolyte on the new Veiled Stair, and the Warden at the end. Marching in place carries the hero there (the guided trail, at about a third of a Trial's pace so each leg is a short stretch), with a line of story as the leg begins. Walking into the marker starts the encounter.
+  - **Mossy Shrine:** the fork on the way to the Bone Field offers a detour that heals 30 HP once per run.
+  - The pause menu can switch to controller traversal (it doesn't count as activity), recalibrate, or save and stop.
+  - Out of view, the hero simply stops. There's no penalty.
+  - Blessings appear straight after the fight that earns them, so there's no march to them.
+- At a phase boundary, **the path** shows where you are first. Continue, or **Save and stop here**.
 - Resuming later restores your node, HP, loadout, blessings and the workout so far. Suspending isn't losing.
-- Enemy HP is sized so a full route is about 20 sets, not padded with travel or dialogue.
+- Enemy HP is sized so a full route is about 20 sets. The marches add a few minutes of low-intensity movement between them. They're tallied as steps in the summary and never count as sets.
 
 ### The four families and the loadout
 
@@ -71,11 +76,12 @@ Targets are yours (Sanctuary → *Rest a movement today · targets*), scaled onl
 
 The player turn and the enemy turn stay separate:
 
-1. **Choose an ability** from four cards. Each card shows:
+The battle is staged side-on, in the style of a turn-based JRPG. The hero stands front-left; foes stand on a diagonal back-right, each with its name, HP bar, ward and armour pips, and its **intent** (ATTACK, ATTACK ×2, WINDING UP, WARD, HARDEN, SUMMON, STAGGERED) in the scene above it. The party panel (bottom-left) shows your HP, shield and Storm Charge. The camera pushes in on each exchange: the hero dashes in to strike, and a foe charges across to swing.
+
+1. **Choose an ability** from the command menu (bottom-right). Each line shows the ability, ★ when it's especially effective right now, or *recharging*. The selected line also shows:
    - the movement and target;
    - the ability's role;
-   - whether it's recharging;
-   - a hint when it's especially effective right now, e.g. *★ Breaks armour*, *★ Cancels the charge*, *★ Hits all foes*, *★ Overloads the ward*.
+   - the hint, e.g. *Breaks armour*, *Cancels the charge*, *Hits all foes*, *Overloads the ward*.
 
    Choose with the gamepad d-pad and A, the arrow keys and Enter, a lean and a raised right hand, or a click. No body tracking is needed to choose.
 2. **Do the set.** Counting starts when the camera sees you in position ("Step into view when ready"); floor movements have no countdown. **Enemies never act during a set.**
@@ -121,16 +127,16 @@ Say **"Finish set"**, press **F** or gamepad **Y**, tap *Finish set* on the TV o
 
 Pausing, hesitating or losing tracking never ends a set by itself. Reaching the target still completes it automatically. Nothing invents reps. Exhaustion never costs HP; only missed dodges do.
 
-### Dodging (HIGH duck, LOW hop)
+### Dodging (read the attack: duck or hop)
 
-- **HIGH (▲, orange): duck** — a quick squat. **LOW (▼, gold): a small hop.**
-- **Reading the attack.** Foes always show it in their body: **rearing up and back (a glint above the head) = HIGH**, **dropping into a crouch and leaning in (a glint at the feet) = LOW**. How much *else* announces it depends on the fight:
-  - *obvious* (Training Yard, Iron Husk): a line at head or foot height, a big ▲ DUCK or ▼ HOP, and "High! Duck!";
-  - *clear* (Bone Charger, Wisps): the line plus "High!" or "Low!";
-  - *subtle* (Acolyte, Warden): only the stance, with "Read its stance…" on screen; the call is revealed after you move.
+- **Fights are read visually. Nothing is spoken and no text names the height.** A HIGH swing means **duck** (a quick squat); a LOW sweep means **a small hop**.
+- **Reading the attack.** Foes always show it in their body: **rearing up and back, with a glint above the head = HIGH**, and **dropping into a crouch and leaning in, with a glint at the feet = LOW**. The foe holds that stance as it charges across to you, then swings: an arc at head height, or a sweep along the floor. How much *else* shows it depends on the fight:
+  - *obvious* (Training Yard, Iron Husk): a dashed line at head or foot height, plus a ▲ or ▼ marker;
+  - *clear* (Bone Charger, Wisps): the dashed line only;
+  - *subtle* (Acolyte, Warden): only the stance and the glint.
 
-  The Sanctuary's **Attack cues** setting switches between *Learn as you go* (the default) and *Always obvious*. The call appears at the bottom of the screen so it never covers the figures.
-- Each strike has a 2.6 s wind-up with a countdown bar, a spoken "High! Duck!" or "Low! Hop!", and an attack line drawn at head or foot height.
+  The Training Yard adds one tip line: "Rearing up → duck. Crouching low → a small hop." The Sanctuary's **Attack cues** setting switches between *Learn as you go* (the default) and *Always obvious*.
+- Each strike has a 2.6 s wind-up. The foe charges across during the last 0.65 s before impact.
 - A correct move counts from 1 s before impact to 0.4 s after. Sequences (e.g. the Warden's LOW–HIGH–LOW) pause about a second between strikes.
 - **Nothing counts until the phone has a still, standing baseline.** Standing up after push-ups can never be a dodge.
 - **Out of view, the attack waits** ("Step into view — the attack waits for you"). If the camera loses you during the swing itself, the result is *unclear*: no damage. It is never counted as a failed dodge.
@@ -192,7 +198,7 @@ These are separate outcomes:
 
 Nothing physical is ever lost: every set is saved the moment it ends, through defeat, rerolls, quitting or reloading. The summary shows the two side by side:
 
-- **Workout:** camera-verified reps per movement (left and right for sided movements), hold seconds, manual reps labelled separately, sets, Haven time, and time spent moving versus session time.
+- **Workout:** camera-verified reps per movement (left and right for sided movements), hold seconds, manual reps labelled separately, sets, Haven time, time spent moving versus session time, and steps marched between fights (controller travel isn't counted).
 - **Expedition:** result, dodges (dodged, hit, unseen), loadout and blessings.
 
 The last 20 sessions are kept (per-movement sets and volume) so the loadout director can vary your workout.
@@ -684,6 +690,18 @@ Already in place and reusable:
 
 ## Testing done
 
+- **Marching between fights and visual battles (this round):**
+  - **Automated:** `npm test`, **280 passing**. New tests check that:
+    - every encounter on both routes sits at a real trail stop, in order and not shared;
+    - board markers match the route;
+    - the hero resumes from the last visited stop;
+    - marching is tallied apart from sets.
+  - **Headless Chromium, PC + phone through the real relay** (a scripted synthetic body):
+    - **full standard route, start to finish:** the marched legs to all eight encounters, with the Mossy Shrine detour taken at the fork; 19 sets; strikes read from the foes' stance (7 of 9 dodged; the harness reacted late to the first two); victory; the march tally in the summary; no page errors;
+    - **short route:** victory in 11 sets.
+  - Screenshots were checked for the command menu (no longer covering foes), wind-ups, approaches and a leg's objective card.
+  - **Not tested with a real person.** In particular: whether the stances read at TV distance, and how long a leg feels to march (about 40–90 s with the synthetic marcher).
+
 - **Heart of Haze milestone (this round):**
   - **Automated:** `npm test`, **275 passing** (20 files), 73 of them new:
     - **Movements** (`tests/movements.test.ts`):
@@ -906,7 +924,8 @@ Already in place and reusable:
    - pause and recalibrate mid-fight;
    - save and stop at a phase boundary, close the browser, then resume from the title screen;
    - check that the summary's workout numbers match what you did.
-5. **Couch check:** in the tutorial trial with *Gamepad or keyboard* traversal, sit out of view. There should be no tracking warnings while exploring.
+5. **Marching and reading foes:** do the legs between fights feel like pacing or like padding? Can you tell rearing (duck) from crouching (hop) on the *subtle* fights without any text?
+6. **Couch check:** in the tutorial trial with *Gamepad or keyboard* traversal, sit out of view. There should be no tracking warnings while exploring.
 
 ## Needs physical testing (earlier rounds; still not verified)
 

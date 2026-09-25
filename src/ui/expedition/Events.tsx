@@ -308,7 +308,7 @@ export function Summary({ x, onAgain, onExit }: { x: ExpeditionState; onAgain: (
           <div>
             <h3>Workout</h3>
             <p>
-              {workingSets(w)} of ~{w.plannedSets} planned sets ({Math.round(completion(w) * 100)}%) · about {mins(act.activeMs)} min moving of {mins(act.sessionMs)} min
+              {workingSets(w)} of ~{w.plannedSets} planned sets ({Math.round(completion(w) * 100)}%) · about {mins(act.activeMs)} min in sets and recovery of {mins(act.sessionMs)} min
             </p>
             <table className="sum-table">
               <tbody>
@@ -328,6 +328,13 @@ export function Summary({ x, onAgain, onExit }: { x: ExpeditionState; onAgain: (
                 {!rows.length && (
                   <tr>
                     <td>No sets yet.</td>
+                  </tr>
+                )}
+                {w.march && w.march.steps > 0 && (
+                  <tr>
+                    <th>Marching between fights</th>
+                    <td>{w.march.steps} steps</td>
+                    <td>≈ {Math.round(w.march.active * (1.7 / 104))} m of trail</td>
                   </tr>
                 )}
                 {w.recoveryMs > 0 && (

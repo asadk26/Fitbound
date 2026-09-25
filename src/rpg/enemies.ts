@@ -74,7 +74,7 @@ export const RPG_ENEMIES: Record<string, RpgEnemyDef> = {
       { kind: 'attack', name: 'Clumsy Sweep', strikes: [lo(3)] },
     ],
     intro: 'A straw figure stirs — an echo of your old training yard.',
-    tip: 'A warm-up. Attack cards deal damage; core cards defend. When it swings: HIGH means duck, LOW means hop.',
+    tip: 'A warm-up. Attack cards deal damage; core cards defend. Watch it move: rearing up means duck, crouching low means a small hop.',
   },
   iron_husk: {
     id: 'iron_husk',

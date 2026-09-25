@@ -47,6 +47,15 @@ export interface WorkoutData {
   rpgDefeats: number;
   /** Planned sets for the session, for "workout complete" (not the RPG result). */
   plannedSets: number;
+  /** Marching between encounters: steps, and board distance marched vs moved with a controller. */
+  march?: { steps: number; active: number; assisted: number };
+}
+
+export function addMarch(w: WorkoutData, steps: number, active: number, assisted: number): void {
+  const m = (w.march ??= { steps: 0, active: 0, assisted: 0 });
+  m.steps += steps;
+  m.active += active;
+  m.assisted += assisted;
 }
 
 export interface ExerciseTotal {

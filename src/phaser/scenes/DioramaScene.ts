@@ -8,7 +8,7 @@ import { EDGE, GROUND_SCALE } from '../diorama/ground';
 import { getDioramaState } from '../game';
 import { BOARD, FENCE_X, GATE_GAP, scatter, SPOTS, START, type Placed } from '../diorama/layout';
 import { angleDelta, headingVector, resolveMove, turnHeading, type Obstacle } from '../diorama/steering';
-import { GOAL_NODE, nearestOnTrail, TrailWalker, type Fork } from '../diorama/trailGraph';
+import { GOAL_NODE, nearestOnTrail, node as trailNode, SEGS, SAMPLED, TrailWalker, type Fork } from '../diorama/trailGraph';
 import { travel } from '../diorama/travel';
 
 /**
@@ -49,6 +49,10 @@ export class DioramaScene extends Phaser.Scene {
   private tilt!: Phaser.GameObjects.Image;
   private obstacles: Obstacle[] = [];
   private actors = new Map<string, Actor>();
+  /** Expedition stops (figures, the mirror, havens), keyed by marker id. */
+  private markers = new Map<string, { at: { x: number; y: number }; objs: Phaser.GameObjects.GameObject[]; node: string }>();
+  private markerKey = '';
+  private startAt: string | null = null;
   /** Authoritative heading on the turn grid; `shown` eases toward it. */
   private heading = 0;
   private shown = 0;
@@ -82,6 +86,9 @@ export class DioramaScene extends Phaser.Scene {
     this.reached.clear();
     this.encounterLock = false;
     this.actors.clear();
+    this.markers.clear();
+    this.markerKey = '';
+    this.startAt = null;
     this.obstacles = [];
     this.walker = new TrailWalker();
     this.onTrail = true;
@@ -229,6 +236,7 @@ export class DioramaScene extends Phaser.Scene {
 
   private applyState(s: DioramaState): void {
     this.state = s;
+    this.applyExpedition(s);
     // Remove defeated enemies with a flourish.
     for (const id of ['skeleton', 'golem', 'mage', 'warden']) {
       const a = this.actors.get(id);
@@ -245,13 +253,85 @@ export class DioramaScene extends Phaser.Scene {
       this.burst(FENCE_X, (GATE_GAP.y0 + GATE_GAP.y1) / 2, [0x73eff7, 0xffffff]);
       audio.phaseBreak();
     }
-    const t = s.target ? (SPOTS as Record<string, { x: number; y: number }>)[s.target] : null;
+    const t = this.spot(s.target);
     this.beacon.setVisible(!!t && !this.attract);
     this.ring.setVisible(!!t && !this.attract);
     if (t) {
       this.beacon.setPosition(t.x, t.y + 10);
       this.ring.setPosition(t.x, t.y);
     }
+  }
+
+  /** Where a target / interaction id is on the board (expedition markers first). */
+  private spot(id: string | null | undefined): { x: number; y: number } | null {
+    if (!id) return null;
+    return this.markers.get(id)?.at ?? (SPOTS as Record<string, { x: number; y: number }>)[id] ?? null;
+  }
+
+  /**
+   * Expedition mode: hide the trial's guardians and stand the route's
+   * encounters at their trail stops. Rebuilt only when the route changes.
+   */
+  private applyExpedition(s: DioramaState): void {
+    const ex = s.expedition;
+    for (const id of ['dummy', 'skeleton', 'golem', 'mage', 'warden']) {
+      const a = this.actors.get(id);
+      if (!a) continue;
+      a.sprite.setVisible(!ex && !s.defeated.includes(id));
+      a.shadow.setVisible(!ex && !s.defeated.includes(id));
+      a.mark?.setVisible(!ex);
+    }
+    if (!ex) return;
+    const key = JSON.stringify(ex.markers);
+    if (key !== this.markerKey) {
+      this.markerKey = key;
+      for (const m of this.markers.values()) m.objs.forEach((o) => o.destroy());
+      this.markers.clear();
+      for (const m of ex.markers) {
+        const n = trailNode(m.node);
+        const at = { x: n.x + 60, y: n.y - 20 };
+        const objs: Phaser.GameObjects.GameObject[] = [];
+        if (m.kind === 'enemy') {
+          const count = m.count ?? 1;
+          for (let i = 0; i < count; i++) {
+            const x = at.x + (i - (count - 1) / 2) * 70;
+            const y = at.y + (i % 2) * 24;
+            objs.push(this.add.image(x, y, 'dshadow').setScale(0.6 * (m.scale ?? 1), 0.45).setDepth(y - 1));
+            const fig = this.add.image(x, y, `fig-${m.sprite}`).setOrigin(0.5, FIG_ORIGIN_Y).setScale((HERO_UNITS / FIG_H) * 1.15 * (m.scale ?? 1)).setDepth(y).setFlipX(true);
+            if (m.tint) fig.setTint(m.tint);
+            this.tweens.add({ targets: fig, y: y - 5, duration: 900 + i * 150, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+            objs.push(fig);
+          }
+        } else {
+          const glow = this.add.image(at.x, at.y - 40, 'glow').setScale(m.kind === 'mirror' ? 4 : 3).setTint(m.kind === 'mirror' ? 0xc77dff : 0x73eff7).setAlpha(0.4).setBlendMode(Phaser.BlendModes.ADD).setDepth(at.y - 2);
+          this.tweens.add({ targets: glow, alpha: 0.7, duration: 1100, yoyo: true, repeat: -1 });
+          objs.push(glow, this.add.image(at.x, at.y, m.kind === 'mirror' ? 'prop-crystal' : 'prop-campfire').setOrigin(0.5, 0.92).setScale(m.kind === 'mirror' ? 1.5 : 1.1).setDepth(at.y));
+        }
+        this.markers.set(m.id, { at, objs, node: m.node });
+      }
+    }
+    // Encounters already behind you fade away.
+    for (const [id, m] of this.markers) {
+      if (!s.defeated.includes(id) || !(m.objs[0] as Phaser.GameObjects.Image).visible) continue;
+      this.tweens.add({ targets: m.objs, alpha: 0, duration: 500, onComplete: () => m.objs.forEach((o) => (o as Phaser.GameObjects.Image).setVisible(false)) });
+    }
+    if (ex.startAt && ex.startAt !== this.startAt) {
+      this.startAt = ex.startAt;
+      this.placeAt(ex.startAt);
+    }
+  }
+
+  /** Stand the hero on a trail node. */
+  private placeAt(nodeId: string): void {
+    const seg = SEGS.find((g) => g.a === nodeId) ?? SEGS.find((g) => g.b === nodeId);
+    if (!seg) return;
+    const s = seg.a === nodeId ? 0 : SAMPLED.get(seg.id)!.len;
+    this.walker = new TrailWalker(seg.id, s);
+    this.onTrail = true;
+    this.rejoin = null;
+    const p = this.walker.position;
+    this.hero?.setPosition(p.x, p.y);
+    this.cameras.main.centerOn(p.x, p.y - 120);
   }
 
   private burst(x: number, y: number, tint: number[]): void {
@@ -368,7 +448,7 @@ export class DioramaScene extends Phaser.Scene {
     input.takeTurns();
     const v = input.freeMove();
     const mag = Math.min(1, Math.hypot(v.x, v.y));
-    this.accelerate(mag * SPEED, dt);
+    this.accelerate(mag * SPEED * (this.state.expedition ? 0.75 : 1), dt);
     if (mag > 0.05) {
       this.heading = Math.atan2(v.x, -v.y);
       this.shown = this.heading;
@@ -435,7 +515,7 @@ export class DioramaScene extends Phaser.Scene {
       this.setChoice(w.choice);
       return;
     }
-    this.accelerate(w.halted(goals, now) ? 0 : input.intent().forward * SPEED, dt);
+    this.accelerate(w.halted(goals, now) ? 0 : input.intent().forward * SPEED * (this.state.expedition?.pace ?? 1), dt);
     const st = w.advance(this.speed * dt, goals, gateOpen, now);
     if (st.halted) this.speed = 0;
     this.setChoice(st.choice);
@@ -447,7 +527,7 @@ export class DioramaScene extends Phaser.Scene {
   private goals(): string[] {
     const s = this.state;
     const ids = [s.target, ...(s.alt ?? [])].filter((x): x is string => !!x && !s.defeated.includes(x));
-    return [...new Set(ids.map((id) => GOAL_NODE[id]).filter(Boolean))];
+    return [...new Set(ids.map((id) => this.markers.get(id)?.node ?? GOAL_NODE[id]).filter(Boolean))];
   }
 
   private setChoice(f: Fork | null): void {
@@ -469,8 +549,8 @@ export class DioramaScene extends Phaser.Scene {
 
   private checkSpots(x: number, y: number): void {
     const d = (id: string) => {
-      const p = (SPOTS as Record<string, { x: number; y: number }>)[id];
-      return Math.hypot(p.x - x, p.y - y);
+      const p = this.spot(id);
+      return p ? Math.hypot(p.x - x, p.y - y) : Infinity;
     };
     const s = this.state;
     if (s.target && !this.reached.has(s.target) && !s.interact.includes(s.target) && !s.enemies.includes(s.target) && d(s.target) < REACH_R) {
@@ -499,8 +579,7 @@ export class DioramaScene extends Phaser.Scene {
 
   /** An edge-of-screen arrow toward the objective when it's out of view. */
   private updatePointer(view: Phaser.Geom.Rectangle): void {
-    const id = this.state.target;
-    const t = id ? (SPOTS as Record<string, { x: number; y: number }>)[id] : null;
+    const t = this.spot(this.state.target);
     if (!t || Phaser.Geom.Rectangle.Contains(view, t.x, t.y - 60)) {
       this.pointer.setVisible(false);
       return;
