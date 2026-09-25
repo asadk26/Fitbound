@@ -20,7 +20,10 @@ export class BootScene extends Phaser.Scene {
     this.textures.addCanvas('tiles', paintTileset())!.setFilter(NEAREST);
 
     // Diorama art: smooth-filtered, painted once.
-    for (const k of Object.keys(FIGURES)) this.textures.addCanvas(`fig-${k}`, paintFigure(k));
+    for (const k of Object.keys(FIGURES)) {
+      this.textures.addCanvas(`fig-${k}`, paintFigure(k));
+      this.textures.addCanvas(`fig-${k}-free`, paintFigure(k, false));
+    }
     for (const [k, p] of Object.entries(paintProps())) {
       this.textures.addCanvas(`prop-${k}`, p.canvas);
       this.registry.set(`prop-${k}`, { originY: p.originY, radius: p.radius, shadow: p.shadow });

@@ -2,7 +2,8 @@ import { canvas, darken, ellipse, glint, lighten, roundRect, shade, type Ctx } f
 
 /**
  * Tabletop-miniature figures: chunky chibi proportions, glossy toy shading,
- * each standing on a round painted base. Drawn at 160×200 so they stay crisp
+ * each standing on a round painted base (on the board; battles use them
+ * without it). Drawn at 160×200 so they stay crisp
  * when a mirrored TV blows them up.
  */
 export const FIG_W = 160;
@@ -10,7 +11,10 @@ export const FIG_H = 200;
 /** Where the figure's base sits, as an origin for Phaser. */
 export const FIG_ORIGIN_Y = 176 / FIG_H;
 
+let withBase = true;
+
 function base(ctx: Ctx, top = '#5fae5a', side = '#4a3526', rx = 52): void {
+  if (!withBase) return;
   const cx = 80;
   const cy = 176;
   ctx.beginPath();
@@ -314,8 +318,14 @@ function dummy(ctx: Ctx): void {
 
 export const FIGURES: Record<string, (ctx: Ctx) => void> = { hero, skeleton, golem, mage, warden, dummy };
 
-export function paintFigure(name: string): HTMLCanvasElement {
+/** A figure, on its round base or (for battles) standing free. */
+export function paintFigure(name: string, onBase = true): HTMLCanvasElement {
   const [c, ctx] = canvas(FIG_W, FIG_H);
-  (FIGURES[name] ?? hero)(ctx);
+  withBase = onBase;
+  try {
+    (FIGURES[name] ?? hero)(ctx);
+  } finally {
+    withBase = true;
+  }
   return c;
 }

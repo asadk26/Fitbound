@@ -24,6 +24,8 @@ type Step = () => number;
 export class BattleScene extends Phaser.Scene {
   private data0!: BusEvents['battle:start'];
   private hero!: Phaser.GameObjects.Sprite;
+  private heroShadow!: Phaser.GameObjects.Image;
+  private enemyShadow!: Phaser.GameObjects.Image;
   private enemy!: Phaser.GameObjects.Sprite;
   private enemyBaseScale = 2;
   private shieldBubble!: Phaser.GameObjects.Image;
@@ -64,17 +66,17 @@ export class BattleScene extends Phaser.Scene {
 
     // Hero figurine
     const figScale = FIG_UNITS / FIG_H;
-    this.add.image(HERO_X, FLOOR + 1, 'dshadow').setScale(0.28, 0.22).setAlpha(0.8);
+    this.heroShadow = this.add.image(HERO_X, FLOOR + 1, 'dshadow').setScale(0.28, 0.22).setAlpha(0.8);
     this.aura = this.add.image(HERO_X, FLOOR - 20, 'glow').setScale(0).setBlendMode(Phaser.BlendModes.ADD).setTint(0xc77dff);
-    this.hero = this.add.sprite(HERO_X, FLOOR, 'fig-hero').setOrigin(0.5, FIG_ORIGIN_Y).setScale(figScale);
+    this.hero = this.add.sprite(HERO_X, FLOOR, 'fig-hero-free').setOrigin(0.5, FIG_ORIGIN_Y).setScale(figScale);
     this.tweens.add({ targets: this.hero, scaleY: figScale * 1.03, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.shieldBubble = this.add.image(HERO_X, FLOOR - 22, 'glow').setTint(0x41a6f6).setBlendMode(Phaser.BlendModes.ADD).setScale(2.2).setAlpha(0);
 
     // Enemy figurine
     const big = def.sprite === 'golem' || def.sprite === 'warden';
     this.enemyBaseScale = figScale * (def.sprite === 'warden' ? 1.3 : big ? 1.2 : 1);
-    this.add.image(ENEMY_X, FLOOR + 1, 'dshadow').setScale(big ? 0.4 : 0.3, 0.24).setAlpha(0.8);
-    this.enemy = this.add.sprite(ENEMY_X, FLOOR, `fig-${def.sprite}`).setOrigin(0.5, FIG_ORIGIN_Y).setScale(this.enemyBaseScale);
+    this.enemyShadow = this.add.image(ENEMY_X, FLOOR + 1, 'dshadow').setScale(big ? 0.4 : 0.3, 0.24).setAlpha(0.8);
+    this.enemy = this.add.sprite(ENEMY_X, FLOOR, `fig-${def.sprite}-free`).setOrigin(0.5, FIG_ORIGIN_Y).setScale(this.enemyBaseScale);
     this.enemyIdleTween = this.tweens.add({ targets: this.enemy, y: FLOOR - 2, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     if (def.id === 'warden') {
       const g = this.add.image(ENEMY_X, FLOOR - 24, 'glow').setTint(0xb13e53).setBlendMode(Phaser.BlendModes.ADD).setScale(3).setAlpha(0.25).setDepth(-1);
@@ -112,6 +114,9 @@ export class BattleScene extends Phaser.Scene {
   }
 
   update(): void {
+    // No bases in battle: the shadows stay under the figures' feet.
+    this.heroShadow.x = this.hero.x;
+    this.enemyShadow.x = this.enemy.x;
     // Smoothly animate bars towards their targets.
     const lerp = (a: number, b: number) => (Math.abs(b - a) < 0.3 ? b : a + (b - a) * 0.15);
     const np = lerp(this.shown.p, this.hp.p);

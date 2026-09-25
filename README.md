@@ -512,7 +512,7 @@ Audio cues: exercise start chord, a rep blip that climbs in pitch, set-complete 
 
 The trial and all battles now use a toy-miniature style, painted procedurally at runtime with no external assets:
 
-- **Figures:** glossy chibi figurines on round painted bases (hero, skeleton, stone golem, shadow mage, warden, training dummy).
+- **Figures:** glossy chibi figurines (hero, skeleton, stone golem, shadow mage, warden, training dummy). On the board they stand on round painted bases like game pieces. In battles they stand free, with a soft shadow that stays on the ground as they rear up, hop or charge.
 - **World:** a felt-flocked meadow board with a cut-away soil edge sitting on a wooden table. It has a dirt trail, a pond with lily pads, a cottage, a campfire and a flagstone arena.
 - **Props:** shaded trees, pines, bushes, rocks, mushrooms and crystals, each with a soft contact shadow.
 - **Tilt-shift cues:** a warm haze at the top of the screen, darker foreground, and a vignette.

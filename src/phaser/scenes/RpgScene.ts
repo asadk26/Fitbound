@@ -60,6 +60,9 @@ export class RpgScene extends Phaser.Scene {
   private start0!: BusEvents['rpg:start'];
   private hero!: Phaser.GameObjects.Sprite;
   private heroScale = 1;
+  private heroShadow!: Phaser.GameObjects.Image;
+  /** Where the hero is dashing to, so its shadow can stay on the ground. */
+  private heroDest = { x: HERO.x, y: HERO.y };
   private bubble!: Phaser.GameObjects.Image;
   private aura!: Phaser.GameObjects.Image;
   private hud!: Phaser.GameObjects.Graphics;
@@ -96,9 +99,9 @@ export class RpgScene extends Phaser.Scene {
       .setScale(1 / BG.ppu)
       .setDepth(-10);
     this.heroScale = (FIG_UNITS / FIG_H) * HERO.scale;
-    this.add.image(HERO.x, HERO.y + 1, 'dshadow').setScale(0.34, 0.26).setAlpha(0.8).setDepth(HERO.y - 1);
+    this.heroShadow = this.add.image(HERO.x, HERO.y + 1, 'dshadow').setScale(0.34, 0.26).setAlpha(0.8).setDepth(HERO.y - 1);
     this.aura = this.add.image(HERO.x, HERO.y - 24, 'glow').setScale(0).setBlendMode(Phaser.BlendModes.ADD).setTint(0xc77dff).setDepth(HERO.y - 0.5);
-    this.hero = this.add.sprite(HERO.x, HERO.y, 'fig-hero').setOrigin(0.5, FIG_ORIGIN_Y).setScale(this.heroScale).setDepth(HERO.y);
+    this.hero = this.add.sprite(HERO.x, HERO.y, 'fig-hero-free').setOrigin(0.5, FIG_ORIGIN_Y).setScale(this.heroScale).setDepth(HERO.y);
     this.tweens.add({ targets: this.hero, scaleY: this.heroScale * 1.03, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.bubble = this.add.image(HERO.x, HERO.y - 26, 'glow').setTint(0x41a6f6).setBlendMode(Phaser.BlendModes.ADD).setScale(2.6).setAlpha(0).setDepth(HERO.y + 1);
     this.hud = this.add.graphics().setDepth(300);
@@ -140,6 +143,27 @@ export class RpgScene extends Phaser.Scene {
     for (const t of this.labels) if (t.active) t.setResolution(Math.max(1, Math.ceil(this.baseZoom)));
   }
 
+  /**
+   * Figures have no bases in battle, so each shadow tracks its figure along
+   * the ground: it follows x, and takes y from the straight line between the
+   * figure's spot and where it dashes to, so a jump or a stance leaves the
+   * shadow on the floor.
+   */
+  update(): void {
+    const ground = (x: number, from: { x: number; y: number }, to: { x: number; y: number }) => {
+      if (Math.abs(to.x - from.x) < 1) return from.y;
+      const t = Math.min(1, Math.max(0, (x - from.x) / (to.x - from.x)));
+      return from.y + (to.y - from.y) * t;
+    };
+    if (this.hero) this.heroShadow.setPosition(this.hero.x, ground(this.hero.x, HERO, this.heroDest) + 1);
+    const lunge = { x: HERO.x + 26, y: HERO.y - 1 };
+    for (const f of this.foes.values()) {
+      if (!f.alive) continue;
+      const gy = ground(f.fig.x, f, lunge);
+      f.shadow.setPosition(f.fig.x, gy + 1).setDepth(gy - 1);
+    }
+  }
+
   /** Lean the camera toward an exchange, then settle back. */
   private focus(x: number, y: number, ms = 700): void {
     const cam = this.cameras.main;
@@ -167,7 +191,7 @@ export class RpgScene extends Phaser.Scene {
     for (const v of add) {
       const baseScale = (FIG_UNITS / FIG_H) * (v.scale ?? 1);
       const shadow = this.add.image(0, 0, 'dshadow').setScale(0.3 * (v.scale ?? 1), 0.22).setAlpha(0.8);
-      const fig = this.add.sprite(W + 30, 88, `fig-${v.sprite}`).setOrigin(0.5, FIG_ORIGIN_Y).setScale(baseScale).setFlipX(true);
+      const fig = this.add.sprite(W + 30, 88, `fig-${v.sprite}-free`).setOrigin(0.5, FIG_ORIGIN_Y).setScale(baseScale).setFlipX(true);
       if (v.tint) fig.setTint(v.tint);
       const ward = this.add.image(0, 0, 'glow').setTint(0x73eff7).setBlendMode(Phaser.BlendModes.ADD).setScale(2.4 * (v.scale ?? 1)).setAlpha(0);
       const label = this.txt(0, 0, v.name.toUpperCase(), 4, PAL.white).setOrigin(0.5, 1).setDepth(301);
@@ -287,6 +311,7 @@ export class RpgScene extends Phaser.Scene {
         // Dash in to strike, then back to the mark.
         if (target) {
           this.focus((HERO.x + target.x) / 2, (HERO.y + target.y) / 2, 900);
+          this.heroDest = { x: target.x - 22, y: target.y + 4 };
           this.tweens.add({ targets: this.hero, x: target.x - 22, y: target.y + 4, duration: 220, yoyo: true, hold: 260, ease: 'Quad.out' });
         }
         this.banner(fx.partial ? `${fx.ability.toUpperCase()} · ${Math.round(fx.power * 100)}%` : fx.ability.toUpperCase(), color, 900, 7);
