@@ -12,7 +12,7 @@ import type { Beat, Line, Script } from './cinema';
  */
 
 const elara = (n: number, text: string, offscreen = false): Line => ({ id: `opening.elara.${String(n).padStart(2, '0')}`, who: 'elara', text, offscreen });
-const hero = (n: number, text: string): Line => ({ id: `opening.hero.${String(n).padStart(2, '0')}`, who: 'hero', text });
+const hero = (n: number, text: string, mood?: Line['mood']): Line => ({ id: `opening.hero.${String(n).padStart(2, '0')}`, who: 'hero', text, mood });
 
 export const OPENING: Script = {
   id: 'opening',
@@ -44,7 +44,7 @@ export const OPENING: Script = {
     { line: elara(6, 'How much do you remember?') },
     { line: hero(1, '…A sword. A road. The Spark.') },
     { line: elara(7, 'That’s enough to start with.') },
-    { line: hero(2, 'Did I reach it?') },
+    { line: hero(2, 'Did I reach it?', 'wonder') },
     { cues: ['elara-look-away'], ms: 1100 },
     { line: elara(8, 'Not yet.') },
     { cues: ['elara-look-back'], ms: 500 },

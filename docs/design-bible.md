@@ -1381,9 +1381,17 @@ Since then, the following have also been implemented (not yet physically playtes
   - **The ritual:** about 10 s, skippable, with a context-sensitive line from Elara.
   - **Rain motif:** the Sanctuary rains until the first restoration, then is dry and sunlit. This is not explained on screen.
 
+- **The refined hero (first version).**
+  - **Proportions:** still chibi, with a slightly smaller head.
+  - **Hair and face:** tousled brown hair with an asymmetric fringe, and a curious neutral face; the rosy cheeks and permanent smile are gone.
+  - **Outfit:** muted burgundy, deep teal, weathered leather and brass; a mantle over a linen collar; a slimmer sword.
+  - **The Heart's crystal:** a small amber crystal at his collar, the shared motif with Elara. It glows in cinematics and flares during reconstruction.
+  - **Faces:** blinks, plus wince, soft, wonder and blink expressions, used in gameplay, cinematics and portraits.
+  - **Fallback:** the original design is kept as `heroClassic`.
+
 Validation to date:
 
-- **Automated:** 296 passing unit tests. These include the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
+- **Automated:** 298 passing unit tests. These include the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
 - **Headless browser:** the full opening (every line in order), the ritual on the next launch (the opening does not repeat), skip, the Sanctuary screen over the garden, and the dry garden after restoration. Screenshots were reviewed; the visuals are a first version for the creator to evaluate.
 - **Headless browser runs through the local relay with a scripted synthetic body:**
   - a full standard expedition (19 sets, all march legs, the shrine detour, and victory);
@@ -1496,7 +1504,7 @@ They should be resolved through implementation and playtesting.
 ### Presentation
 
 - Elara’s finalized visual identity. A first version exists (§32); it is open to refinement.
-- The protagonist’s final character design.
+- The protagonist’s final character design. A refined first version exists (§32); it is open to refinement.
 - Character voice casting and production.
 - Exact cutscene scripts.
 - Final soundtrack and audio direction.
@@ -1564,3 +1572,4 @@ That is the experience every major design decision should serve.
   - **§34:** navigation added to the open questions.
 - **2026-09-25 (later):** §32 updated with the playtest aids.
 - **2026-09-25 (later):** §32 updated with the opening cinematic, the ritual, Elara's first visual identity, and the Sanctuary rain motif. §34 notes that Elara's look has a first version.
+- **2026-09-25 (later):** §32 updated with the refined hero; §34 notes his design has a first version.

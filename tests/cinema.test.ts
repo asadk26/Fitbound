@@ -172,3 +172,22 @@ describe('story progress in the save', () => {
     expect(sanitize({}).story.openingSeen).toBe(false);
   });
 });
+
+describe('the refined hero', () => {
+  it('keeps the classic figure as a fallback and paints every face', async () => {
+    const { FIGURES, EXPRESSIVE, HERO_STYLE } = await import('../src/phaser/diorama/figures');
+    const { faceKey } = await import('../src/phaser/faces');
+    expect(HERO_STYLE).toBe('refined');
+    expect(FIGURES.heroClassic).toBeTypeOf('function');
+    expect(FIGURES.hero).not.toBe(FIGURES.heroClassic);
+    expect(EXPRESSIVE.hero).toEqual(['neutral', 'blink', 'soft', 'wonder', 'wince']);
+    expect(faceKey('hero')).toBe('fig-hero');
+    expect(faceKey('hero', 'wince', true)).toBe('fig-hero-wince-free');
+    expect(faceKey('elara', 'blink', true)).toBe('fig-elara-blink-free');
+  });
+
+  it('his question in the opening is asked with wonder', () => {
+    const q = OPENING.beats.find((b) => b.line?.text === 'Did I reach it?')!;
+    expect(q.line!.mood).toBe('wonder');
+  });
+});

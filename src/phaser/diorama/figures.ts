@@ -45,7 +45,8 @@ function eyes(ctx: Ctx, cx: number, cy: number, gap: number, r: number, color = 
   }
 }
 
-function hero(ctx: Ctx): void {
+/** The original, brighter mascot hero: kept as a fallback (see HERO_STYLE). */
+function heroClassic(ctx: Ctx): void {
   base(ctx);
   // Cape
   ctx.beginPath();
@@ -316,8 +317,259 @@ function dummy(ctx: Ctx): void {
   ctx.stroke();
 }
 
-/** Eyes closed, for blinking (Elara only for now). */
+/** A face for the hero (the refined design) and Elara's blink. */
+export type Expression = 'neutral' | 'blink' | 'soft' | 'wonder' | 'wince';
+export const EXPRESSIONS: readonly Expression[] = ['neutral', 'blink', 'soft', 'wonder', 'wince'];
+let expression: Expression = 'neutral';
+/** Eyes closed, for blinking. */
 let blinking = false;
+
+/**
+ * Which hero the game paints. 'refined' is the current design; 'classic' is
+ * the original bright mascot, kept as a fallback.
+ */
+export const HERO_STYLE = 'refined' as 'refined' | 'classic';
+
+const H = {
+  skin: '#eec39e',
+  hair: '#5b3b27',
+  tunic: '#7a3441',
+  teal: '#2c5a60',
+  leather: '#6a4a33',
+  brass: '#b8914a',
+  linen: '#d9ccb0',
+};
+
+/**
+ * The refined hero: still a chibi miniature (big head, compact body), but a
+ * quieter, more curious adventurer. A tousled brown fringe swept to one side,
+ * a neutral, attentive face, muted burgundy and deep teal, weathered leather
+ * and warm brass, a short mantle — and at his collar a small amber crystal:
+ * the Heart's light, the motif he shares with Elara.
+ */
+function hero(ctx: Ctx): void {
+  base(ctx);
+  // Cloak behind, deep teal, a little worn at the hem.
+  ctx.beginPath();
+  ctx.moveTo(58, 100);
+  ctx.quadraticCurveTo(38, 136, 40, 168);
+  ctx.lineTo(52, 164);
+  ctx.lineTo(64, 170);
+  ctx.lineTo(80, 165);
+  ctx.lineTo(96, 170);
+  ctx.lineTo(108, 164);
+  ctx.lineTo(120, 168);
+  ctx.quadraticCurveTo(122, 136, 102, 100);
+  ctx.closePath();
+  shade(ctx, darken(H.teal, 0.15), { x: 38, y: 100, w: 84, h: 70 }, 3, 0.3);
+  // Boots: weathered leather with folded cuffs.
+  for (const x of [62, 83]) {
+    roundRect(ctx, x, 146, 16, 24, 6, H.leather, 2.5, 0.3);
+    roundRect(ctx, x - 1, 145, 18, 6, 3, darken(H.leather, 0.2), 2, 0.25);
+  }
+  // Tunic: muted burgundy with a darker, notched hem.
+  ctx.beginPath();
+  ctx.moveTo(60, 104);
+  ctx.quadraticCurveTo(55, 132, 57, 152);
+  ctx.lineTo(66, 148);
+  ctx.lineTo(74, 153);
+  ctx.lineTo(86, 148);
+  ctx.lineTo(95, 153);
+  ctx.lineTo(103, 148);
+  ctx.quadraticCurveTo(105, 132, 100, 104);
+  ctx.quadraticCurveTo(80, 96, 60, 104);
+  ctx.closePath();
+  shade(ctx, H.tunic, { x: 55, y: 96, w: 50, h: 58 }, 3, 0.3);
+  // Belt, brass buckle, a small pouch.
+  roundRect(ctx, 57, 128, 46, 7, 3, darken(H.leather, 0.1), 2, 0.3);
+  roundRect(ctx, 75, 127, 10, 9, 2, H.brass, 2, 0.5);
+  roundRect(ctx, 90, 131, 10, 11, 3, H.leather, 2, 0.3);
+  // Arms: burgundy sleeves, bare hands.
+  ellipse(ctx, 54, 119, 8.5, 12, darken(H.tunic, 0.08), 2.5, 0.3);
+  ellipse(ctx, 106, 119, 8.5, 12, darken(H.tunic, 0.08), 2.5, 0.3);
+  ellipse(ctx, 53, 131, 6.5, 6.5, H.skin, 2, 0.35);
+  ellipse(ctx, 107, 131, 6.5, 6.5, H.skin, 2, 0.35);
+  // A short mantle over the shoulders, linen collar underneath.
+  ctx.beginPath();
+  ctx.moveTo(64, 99);
+  ctx.quadraticCurveTo(80, 108, 96, 99);
+  ctx.lineTo(94, 104);
+  ctx.quadraticCurveTo(80, 112, 66, 104);
+  ctx.closePath();
+  shade(ctx, H.linen, { x: 64, y: 98, w: 32, h: 14 }, 2, 0.4);
+  ctx.beginPath();
+  ctx.moveTo(52, 110);
+  ctx.quadraticCurveTo(54, 98, 66, 97);
+  ctx.quadraticCurveTo(80, 104, 94, 97);
+  ctx.quadraticCurveTo(106, 98, 108, 110);
+  ctx.lineTo(100, 118);
+  ctx.lineTo(90, 113);
+  ctx.lineTo(80, 118);
+  ctx.lineTo(70, 113);
+  ctx.lineTo(60, 118);
+  ctx.closePath();
+  shade(ctx, H.teal, { x: 52, y: 96, w: 56, h: 22 }, 2.5, 0.4);
+  // The Heart's crystal at the collar: amber, faintly glowing, set in brass.
+  ellipse(ctx, 80, 108, 6, 6, H.brass, 2, 0.5);
+  ctx.save();
+  ctx.shadowColor = HEART;
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.moveTo(80, 101.5);
+  ctx.lineTo(84.5, 108);
+  ctx.lineTo(80, 114.5);
+  ctx.lineTo(75.5, 108);
+  ctx.closePath();
+  const cg = ctx.createLinearGradient(76, 102, 84, 114);
+  cg.addColorStop(0, '#ffe7b0');
+  cg.addColorStop(0.5, HEART);
+  cg.addColorStop(1, '#c86a2a');
+  ctx.fillStyle = cg;
+  ctx.fill();
+  ctx.restore();
+  glint(ctx, 78.6, 105, 1.2, 1.8, 0.9);
+  // Sword in the figure's right hand (viewer's left): slimmer tapered blade,
+  // a shallow brass guard, a leather-wrapped grip and a round pommel.
+  ctx.save();
+  ctx.translate(47, 131);
+  ctx.rotate(-0.3);
+  ctx.beginPath();
+  ctx.moveTo(-4.4, -4);
+  ctx.lineTo(-4, -52);
+  ctx.lineTo(0, -63);
+  ctx.lineTo(4, -52);
+  ctx.lineTo(4.4, -4);
+  ctx.closePath();
+  shade(ctx, '#d9dee6', { x: -5, y: -63, w: 10, h: 59 }, 2.4, 0.55);
+  glint(ctx, -1.6, -36, 1, 12, 0.6);
+  ctx.beginPath();
+  ctx.moveTo(-11, -7);
+  ctx.quadraticCurveTo(0, -3, 11, -7);
+  ctx.lineTo(11, -3);
+  ctx.quadraticCurveTo(0, 1, -11, -3);
+  ctx.closePath();
+  shade(ctx, H.brass, { x: -11, y: -8, w: 22, h: 9 }, 2, 0.5);
+  roundRect(ctx, -2.8, -2, 5.6, 12, 2, H.leather, 1.8, 0.3);
+  ellipse(ctx, 0, 12, 3.4, 3.4, H.brass, 1.8, 0.6);
+  ctx.restore();
+  // Hair behind the head.
+  ellipse(ctx, 80, 58, 33, 24, darken(H.hair, 0.12), 3, 0.3);
+  // Head: a little smaller than the old mascot's.
+  ellipse(ctx, 80, 68, 30, 28, H.skin, 3, 0.35);
+  heroFace(ctx);
+  // Tousled fringe, swept to his left (viewer's right), longer on that side.
+  ctx.beginPath();
+  ctx.moveTo(50, 66);
+  ctx.quadraticCurveTo(46, 44, 58, 38);
+  ctx.lineTo(60, 30);
+  ctx.lineTo(68, 36);
+  ctx.quadraticCurveTo(74, 28, 82, 30);
+  ctx.lineTo(86, 25);
+  ctx.lineTo(92, 32);
+  ctx.quadraticCurveTo(104, 30, 108, 38);
+  ctx.lineTo(115, 40);
+  ctx.quadraticCurveTo(114, 58, 110, 72);
+  ctx.lineTo(106, 62);
+  ctx.quadraticCurveTo(100, 58, 96, 60);
+  ctx.lineTo(90, 52);
+  ctx.quadraticCurveTo(84, 56, 78, 55);
+  ctx.lineTo(72, 50);
+  ctx.quadraticCurveTo(64, 56, 58, 54);
+  ctx.quadraticCurveTo(52, 58, 50, 66);
+  ctx.closePath();
+  shade(ctx, H.hair, { x: 46, y: 25, w: 70, h: 47 }, 3, 0.45);
+  ctx.strokeStyle = 'rgba(40,24,16,0.45)';
+  ctx.lineWidth = 1.4;
+  for (const [x0, y0, cx, cy, x1, y1] of [
+    [62, 40, 66, 46, 64, 53],
+    [78, 34, 84, 42, 86, 52],
+    [96, 36, 104, 44, 106, 58],
+  ]) {
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.quadraticCurveTo(cx, cy, x1, y1);
+    ctx.stroke();
+  }
+}
+
+/** The hero's face: neutral and attentive by default. */
+function heroFace(ctx: Ctx): void {
+  const ex = [69, 91];
+  const ey = 72;
+  const e = blinking ? 'blink' : expression;
+  // Brows: one a touch higher — curious rather than cheerful.
+  ctx.strokeStyle = '#4a3020';
+  ctx.lineWidth = 2.2;
+  const lift = e === 'wonder' ? 3 : e === 'wince' ? -1.5 : 0;
+  for (const [i, x] of ex.entries()) {
+    const raise = (i === 1 ? 1.5 : 0) + lift;
+    ctx.beginPath();
+    if (e === 'wince') {
+      ctx.moveTo(x - 5, ey - 10 + (i === 0 ? 2 : 0));
+      ctx.lineTo(x + 5, ey - 10 + (i === 0 ? 0 : 2));
+    } else {
+      ctx.moveTo(x - 5, ey - 9 - raise);
+      ctx.quadraticCurveTo(x, ey - 12 - raise, x + 5, ey - 9.5 - raise);
+    }
+    ctx.stroke();
+  }
+  for (const x of ex) {
+    if (e === 'blink') {
+      ctx.strokeStyle = '#3a2a22';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(x, ey - 2.5, 4.5, 0.25 * Math.PI, 0.75 * Math.PI);
+      ctx.stroke();
+      continue;
+    }
+    if (e === 'wince') {
+      ctx.strokeStyle = '#3a2a22';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(x - 4, ey - 2);
+      ctx.lineTo(x + 1, ey + 1);
+      ctx.lineTo(x - 4, ey + 3);
+      ctx.stroke();
+      continue;
+    }
+    const ry = e === 'wonder' ? 6 : 5.4;
+    ctx.beginPath();
+    ctx.ellipse(x, ey, 4.4, ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#3d2a20';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(x, ey + 1, 3, ry - 1.8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#6b4a30';
+    ctx.fill();
+    glint(ctx, x - 1.4, ey - 2, 1.3, 1.3, 0.95);
+    // Upper lid: attentive (soft = a little lowered).
+    ctx.strokeStyle = '#3a2a22';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(x, ey + (e === 'soft' ? 1.2 : 0.4), 5, ry + 0.6, 0, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.stroke();
+  }
+  // The faintest warmth in the cheeks.
+  ctx.fillStyle = 'rgba(220,130,110,0.12)';
+  ctx.beginPath();
+  ctx.ellipse(60, 82, 5, 2.6, 0, 0, Math.PI * 2);
+  ctx.ellipse(100, 82, 5, 2.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Mouth: small and neutral; a slight smile (soft), a little "o" (wonder), pressed (wince).
+  ctx.strokeStyle = '#6a3a30';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (e === 'soft') ctx.arc(80, 83, 3.4, 0.25 * Math.PI, 0.75 * Math.PI);
+  else if (e === 'wonder') ctx.ellipse(80, 86, 1.8, 2.2, 0, 0, Math.PI * 2);
+  else if (e === 'wince') {
+    ctx.moveTo(76, 87);
+    ctx.lineTo(84, 86);
+  } else {
+    ctx.moveTo(77, 86);
+    ctx.quadraticCurveTo(80, 86.8, 83, 85.6);
+  }
+  ctx.stroke();
+}
 
 const SILVER = '#c4c7d4';
 const IVORY = '#efe7d6';
@@ -559,20 +811,30 @@ export const FIGURES: Record<string, (ctx: Ctx) => void> = {
   warden,
   dummy,
   elara,
+  heroClassic,
 };
+if (HERO_STYLE === 'classic') FIGURES.hero = heroClassic;
+
+/** Figures that have faces to change (blinks and expressions). */
+export const EXPRESSIVE: Record<string, readonly Expression[]> = { hero: EXPRESSIONS, elara: ['neutral', 'blink'] };
 
 /** A figure, on its round base or (for battles and scenes) standing free. */
-export function paintFigure(name: string, onBase = true, blink = false): HTMLCanvasElement {
+export function paintFigure(name: string, onBase = true, face: Expression | boolean = 'neutral'): HTMLCanvasElement {
   const [c, ctx] = canvas(FIG_W, FIG_H);
   withBase = onBase;
-  blinking = blink;
+  setFace(face);
   try {
     (FIGURES[name] ?? hero)(ctx);
   } finally {
     withBase = true;
-    blinking = false;
+    setFace('neutral');
   }
   return c;
+}
+
+function setFace(face: Expression | boolean): void {
+  expression = face === true ? 'blink' : face === false ? 'neutral' : face;
+  blinking = expression === 'blink';
 }
 
 /**
@@ -580,19 +842,19 @@ export function paintFigure(name: string, onBase = true, blink = false): HTMLCan
  * to head and shoulders, so a character looks the same in the scene and in
  * conversation.
  */
-export function paintPortrait(name: string, blink = false): HTMLCanvasElement {
+export function paintPortrait(name: string, face: Expression | boolean = 'neutral'): HTMLCanvasElement {
   const size = 256;
   const k = 2.5;
   const [c, ctx] = canvas(size, size);
   withBase = false;
-  blinking = blink;
+  setFace(face);
   try {
     ctx.translate(size / 2 - 80 * k, size * 0.47 - 72 * k);
     ctx.scale(k, k);
     (FIGURES[name] ?? hero)(ctx);
   } finally {
     withBase = true;
-    blinking = false;
+    setFace('neutral');
   }
   return c;
 }

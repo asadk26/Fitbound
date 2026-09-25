@@ -4,6 +4,7 @@ import { bus, type DioramaState } from '../../game/bus';
 import { getSave } from '../../game/store';
 import { input } from '../../input/InputHub';
 import { FIG_H, FIG_ORIGIN_Y } from '../diorama/figures';
+import { lifelike } from '../faces';
 import { EDGE, GROUND_SCALE } from '../diorama/ground';
 import { getDioramaState } from '../game';
 import { BOARD, FENCE_X, GATE_GAP, scatter, SPOTS, START, type Placed } from '../diorama/layout';
@@ -156,6 +157,7 @@ export class DioramaScene extends Phaser.Scene {
     // when the hero faces up the board and would hide a ground marker).
     this.arrow = this.add.image(START.x, START.y, 'prop-heading').setAlpha(0.95).setDepth(5200);
     this.hero = this.add.image(START.x, START.y, 'fig-hero').setOrigin(0.5, FIG_ORIGIN_Y).setScale(HERO_UNITS / FIG_H);
+    lifelike(this, this.hero, 'hero', false);
 
     this.pointer = this.add.text(0, 0, '▲', { fontFamily: 'sans-serif', fontSize: '64px', color: '#ffe38a', stroke: '#1a1c2c', strokeThickness: 10 }).setOrigin(0.5).setDepth(9000).setVisible(false);
 

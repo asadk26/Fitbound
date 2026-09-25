@@ -5,6 +5,7 @@ import type { RpgFx } from '../../rpg/engine';
 import { PAL } from '../art';
 import { BG } from '../diorama/backdrops';
 import { FIG_H, FIG_ORIGIN_Y } from '../diorama/figures';
+import { lifelike, type Face } from '../faces';
 
 /**
  * Expedition battles, staged like a (much simpler) console turn-based RPG:
@@ -59,6 +60,7 @@ const FAMILY_COLOR: Record<string, string> = { upper: '#f2c14e', legs: '#a7f070'
 export class RpgScene extends Phaser.Scene {
   private start0!: BusEvents['rpg:start'];
   private hero!: Phaser.GameObjects.Sprite;
+  private face!: Face;
   private heroScale = 1;
   private heroShadow!: Phaser.GameObjects.Image;
   /** Where the hero is dashing to, so its shadow can stay on the ground. */
@@ -102,6 +104,7 @@ export class RpgScene extends Phaser.Scene {
     this.heroShadow = this.add.image(HERO.x, HERO.y + 1, 'dshadow').setScale(0.34, 0.26).setAlpha(0.8).setDepth(HERO.y - 1);
     this.aura = this.add.image(HERO.x, HERO.y - 24, 'glow').setScale(0).setBlendMode(Phaser.BlendModes.ADD).setTint(0xc77dff).setDepth(HERO.y - 0.5);
     this.hero = this.add.sprite(HERO.x, HERO.y, 'fig-hero-free').setOrigin(0.5, FIG_ORIGIN_Y).setScale(this.heroScale).setDepth(HERO.y);
+    this.face = lifelike(this, this.hero, 'hero', true);
     this.tweens.add({ targets: this.hero, scaleY: this.heroScale * 1.03, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.bubble = this.add.image(HERO.x, HERO.y - 26, 'glow').setTint(0x41a6f6).setBlendMode(Phaser.BlendModes.ADD).setScale(2.6).setAlpha(0).setDepth(HERO.y + 1);
     this.hud = this.add.graphics().setDepth(300);
@@ -427,6 +430,7 @@ export class RpgScene extends Phaser.Scene {
           if (fx.absorbed) this.float(HERO.x, top - 18, `BLOCK ${fx.absorbed}`, PAL.sky);
           if (fx.damage) this.float(HERO.x, top - 8, `-${fx.damage}`, '#ff6b7a', fx.damage > 10);
           cam.shake(150, 0.006);
+          this.face.express('wince', 700);
           audio.hurt();
         }
         this.bubble.setAlpha(fx.shield > 0 ? Math.min(0.85, 0.25 + fx.shield / this.maxHp) : 0);
@@ -435,12 +439,14 @@ export class RpgScene extends Phaser.Scene {
       case 'victory':
         this.settle();
         this.banner('VICTORY!', PAL.gold, 2000, 14);
+        this.face.express('soft', 0);
         this.tweens.add({ targets: this.hero, y: HERO.y - 10, duration: 200, yoyo: true, repeat: 2, ease: 'Quad.out' });
         audio.stopMusic();
         audio.victory();
         return 1600;
       case 'defeat':
         this.settle();
+        this.face.express('blink', 0);
         this.tweens.add({ targets: this.hero, angle: -90, y: HERO.y - 4, alpha: 0.5, duration: 600 });
         this.banner('Your form scatters into the Haze…', PAL.mist, 2200, 7);
         audio.stopMusic();

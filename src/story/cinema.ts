@@ -8,6 +8,8 @@
  * fixed clock and reading speed is the player's own.
  */
 
+import type { Expression } from '../phaser/diorama/figures';
+
 /** The stage a beat shows. */
 export type SetId = 'dark' | 'memory' | 'heart' | 'sanctuary';
 
@@ -20,6 +22,8 @@ export interface Line {
   text: string;
   /** Heard, not seen: shown as a caption without a portrait. */
   offscreen?: boolean;
+  /** The speaker's expression in the portrait (neutral if not given). */
+  mood?: Expression;
 }
 
 /** What the player hears. Beats change only the parts they name. */

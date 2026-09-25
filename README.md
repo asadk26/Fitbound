@@ -560,7 +560,13 @@ Audio cues: exercise start chord, a rep blip that climbs in pitch, set-complete 
 
 The trial and all battles now use a toy-miniature style, painted procedurally at runtime with no external assets:
 
-- **Figures:** glossy chibi figurines (hero, skeleton, stone golem, shadow mage, warden, training dummy). On the board they stand on round painted bases like game pieces. In battles they stand free, with a soft shadow that stays on the ground as they rear up, hop or charge.
+- **Figures:** glossy chibi figurines (hero, Elara, skeleton, stone golem, shadow mage, warden, training dummy).
+  - **The hero** is a quiet, curious miniature adventurer: a big head (a little smaller than before), a tousled brown fringe swept to one side, and a neutral, attentive face with the faintest cheek colour.
+  - His outfit is a muted burgundy tunic, a deep-teal cloak and short mantle over a linen collar, weathered leather and warm brass, and a slim sword with a brass guard.
+  - At his collar is a small amber crystal, the Heart's light, which he shares with Elara's thread. In cinematics it glows softly, flares as he is reconstructed, and pulses with the heartbeat.
+  - He blinks everywhere (trail, battles, cinematics), winces when hit, smiles a little on victory, and shows wonder at key story moments; his dialogue portrait uses the same faces.
+  - The original bright mascot is kept as `heroClassic`; set `HERO_STYLE = 'classic'` in `src/phaser/diorama/figures.ts` to switch back.
+  - Figures are separate sprites, never painted into backgrounds, so one design serves gameplay and cinematics. On the board they stand on round painted bases like game pieces. In battles they stand free, with a soft shadow that stays on the ground as they rear up, hop or charge.
 - **World:** a felt-flocked meadow board with a cut-away soil edge sitting on a wooden table. It has a dirt trail, a pond with lily pads, a cottage, a campfire and a flagstone arena.
 - **Props:** shaded trees, pines, bushes, rocks, mushrooms and crystals, each with a soft contact shadow.
 - **Tilt-shift cues:** a warm haze at the top of the screen, darker foreground, and a vignette.

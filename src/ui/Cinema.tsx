@@ -3,7 +3,7 @@ import { audio } from '../game/audio';
 import { bus } from '../game/bus';
 import { GamepadInput } from '../input/gamepad';
 import { input } from '../input/InputHub';
-import { paintPortrait } from '../phaser/diorama/figures';
+import { paintPortrait, type Expression } from '../phaser/diorama/figures';
 import { showCinema } from '../phaser/game';
 import { CinemaRunner, VOICE_LINES, type Line, type Script } from '../story/cinema';
 import { useInputEvents } from './motionUi';
@@ -11,9 +11,9 @@ import { useInputEvents } from './motionUi';
 const NAMES: Record<Line['who'], string> = { elara: 'Elara', hero: 'You' };
 
 const portraits: Record<string, string> = {};
-function portrait(who: Line['who'], blink = false): string {
-  const key = `${who}${blink ? '-blink' : ''}`;
-  return (portraits[key] ??= paintPortrait(who, blink).toDataURL());
+function portrait(who: Line['who'], face: Expression): string {
+  const key = `${who}-${face}`;
+  return (portraits[key] ??= paintPortrait(who, face).toDataURL());
 }
 
 /**
@@ -80,7 +80,7 @@ export function CinemaPlayer({ script, restored = false, ownInput = false, onDon
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Elara blinks in her portrait now and then.
+  // Portraits blink now and then.
   useEffect(() => {
     let t = 0;
     const next = () => {
@@ -127,7 +127,7 @@ export function CinemaPlayer({ script, restored = false, ownInput = false, onDon
       )}
       {line && !line.offscreen && (
         <div className={`cine-dialogue who-${line.who}`} key={line.id}>
-          <img className="cine-portrait" src={portrait(line.who, line.who === 'elara' && blink)} alt="" />
+          <img className="cine-portrait" src={portrait(line.who, blink ? 'blink' : (line.mood ?? 'neutral'))} alt="" />
           <div className="cine-text">
             <b>{NAMES[line.who]}</b>
             <p>

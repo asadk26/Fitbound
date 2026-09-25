@@ -3,7 +3,8 @@ import { audio } from '../../game/audio';
 import { bus } from '../../game/bus';
 import type { SetId, Soundscape } from '../../story/cinema';
 import { paintCavern, paintFragments, paintHeart, paintMemories, paintSanctuary, paintSlab, paintWeather, paintWell, SANCT, SANCT_SPOTS } from '../diorama/cinemaArt';
-import { FIG_H, FIG_ORIGIN_Y, paintFigure } from '../diorama/figures';
+import { FIG_H, FIG_ORIGIN_Y } from '../diorama/figures';
+import { lifelike, type Face } from '../faces';
 
 /**
  * In-engine cinematics, in the diorama style. Four stages live side by side
@@ -43,6 +44,9 @@ export class CinemaScene extends Phaser.Scene {
   private beat = { bpm: 0, vol: 0, t: 0 };
   private hero!: Phaser.GameObjects.Sprite;
   private elara!: Phaser.GameObjects.Sprite;
+  private heroFace!: Face;
+  /** The Heart's crystal at his collar, glowing softly: brighter as he forms, pulsing with the heartbeat. */
+  private clasp!: Phaser.GameObjects.Image;
   private wellGlow!: Phaser.GameObjects.Image;
   private puddleGlows: Phaser.GameObjects.Image[] = [];
   private spark!: Phaser.GameObjects.Image;
@@ -110,7 +114,6 @@ export class CinemaScene extends Phaser.Scene {
     const t = this.textures;
     if (t.exists('cine-heart')) return;
     const add = (key: string, c: HTMLCanvasElement) => t.addCanvas(key, c);
-    add('fig-elara-blink-free', paintFigure('elara', false, true));
     add('cine-sanct', paintSanctuary(false));
     add('cine-sanct-dry', paintSanctuary(true));
     add('cine-well', paintWell(false));
@@ -241,13 +244,9 @@ export class CinemaScene extends Phaser.Scene {
     this.tweens.add({ targets: this.elara, scaleY: k * 1.04 * 1.012, duration: 1900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.tweens.add({ targets: this.elara, angle: { from: -0.8, to: 0.8 }, duration: 3200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.tweens.add({ targets: this.hero, scaleY: k * 1.015, duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-    const blink = () => {
-      if (!this.elara.active) return;
-      this.elara.setTexture('fig-elara-blink-free');
-      this.time.delayedCall(130, () => this.elara.active && this.elara.setTexture('fig-elara-free'));
-      this.time.delayedCall(2800 + Math.random() * 3500, blink);
-    };
-    this.time.delayedCall(2200, blink);
+    this.heroFace = lifelike(this, this.hero, 'hero', true);
+    lifelike(this, this.elara, 'elara', true);
+    this.clasp = this.add.image(0, 0, 'glow').setTint(0xffb45a).setBlendMode(Phaser.BlendModes.ADD).setScale(0.12).setAlpha(0.55);
     if (restored) {
       for (let i = 0; i < 4; i++) {
         const b = this.add
@@ -418,7 +417,10 @@ export class CinemaScene extends Phaser.Scene {
         this.look(92, 66, 1.08, 8000);
         break;
       case 'hero-form':
-        this.gather(S.slab.x, S.slab.y - 6, () => this.tweens.add({ targets: this.hero, alpha: 1, duration: 900 }));
+        this.gather(S.slab.x, S.slab.y - 6, () => {
+          this.tweens.add({ targets: this.hero, alpha: 1, duration: 900 });
+          this.claspFlare();
+        });
         break;
       case 'hero-rise':
         this.tweens.add({
@@ -430,6 +432,8 @@ export class CinemaScene extends Phaser.Scene {
           onComplete: () => {
             this.tweens.add({ targets: this.hero, x: S.heroStand.x, y: S.heroStand.y, duration: 700, ease: 'Sine.easeInOut', onComplete: () => this.hero.setDepth(S.heroStand.y) });
             this.tweens.add({ targets: this.hero, scaleY: k * 0.94, duration: 160, delay: 700, yoyo: true });
+            // He looks at his hands, then around: wonder, not alarm.
+            this.heroFace.express('wonder', 2400);
           },
         });
         break;
@@ -454,6 +458,7 @@ export class CinemaScene extends Phaser.Scene {
         this.elara.setFlipX(true);
         this.tweens.add({ targets: this.elara, x: S.edge.x, y: S.edge.y, duration: 2600, ease: 'Sine.easeInOut', onUpdate: () => this.elara.setDepth(this.elara.y) });
         this.look(224, 66, 1, 3800);
+        this.heroFace.express('wonder', 3600);
         this.tweens.add({ targets: this.spark, scale: 0.7, duration: 3800 });
         break;
       case 'from-spark':
@@ -475,7 +480,11 @@ export class CinemaScene extends Phaser.Scene {
         this.look(IDLE.x + 6, 82, 1.35, 5500);
         break;
       case 'ritual-form':
-        this.gather(S.heroStand.x, S.heroStand.y - 12, () => this.tweens.add({ targets: this.hero, alpha: 1, duration: 700 }));
+        this.gather(S.heroStand.x, S.heroStand.y - 12, () => {
+          this.tweens.add({ targets: this.hero, alpha: 1, duration: 700 });
+          this.heroFace.express('neutral', 0);
+          this.claspFlare();
+        });
         break;
       case 'elara-glance':
         this.elara.setFlipX(false);
@@ -484,6 +493,11 @@ export class CinemaScene extends Phaser.Scene {
       case 'flash':
         break;
     }
+  }
+
+  /** The crystal flares as the Heart finishes gathering him, then settles to a soft glow. */
+  private claspFlare(): void {
+    this.tweens.add({ targets: this.clasp, scale: 0.5, alpha: 1, duration: 250, yoyo: true, hold: 500, ease: 'Quad.out' });
   }
 
   /** Light gathers into a point, then a figure: the Heart's reconstruction. */
@@ -516,6 +530,13 @@ export class CinemaScene extends Phaser.Scene {
 
   update(_t: number, dt: number): void {
     bus.emit('cine:tick', { dt });
+    // Keep the clasp's glow on his collar, however he's lying or standing.
+    const h = this.hero;
+    const up = (FIG_ORIGIN_Y * FIG_H - 108) * h.scaleX;
+    this.clasp
+      .setPosition(h.x + up * Math.sin(h.rotation), h.y - up * Math.cos(h.rotation))
+      .setDepth(h.depth + 0.1)
+      .setVisible(h.visible && h.alpha > 0.05);
     if (this.beat.bpm > 0) {
       this.beat.t += dt;
       if (this.beat.t >= 60000 / this.beat.bpm) {
@@ -540,6 +561,7 @@ export class CinemaScene extends Phaser.Scene {
       bump(this.heartGlow, 1.12);
     } else if (this.set === 'sanctuary') {
       bump(this.wellGlow, 1.1);
+      if (this.clasp.scale < 0.2) bump(this.clasp, 1.4);
       for (const g of this.puddleGlows) bump(g, 1.08);
     }
   }

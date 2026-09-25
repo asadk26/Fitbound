@@ -6,6 +6,7 @@ import { bus, type BusEvents } from '../../game/bus';
 import { PAL } from '../art';
 import { BG } from '../diorama/backdrops';
 import { FIG_ORIGIN_Y, FIG_H } from '../diorama/figures';
+import { lifelike } from '../faces';
 
 /** Logical stage size; the camera zooms this to fit, keeping pixels crisp. */
 const W = 200;
@@ -69,6 +70,7 @@ export class BattleScene extends Phaser.Scene {
     this.heroShadow = this.add.image(HERO_X, FLOOR + 1, 'dshadow').setScale(0.28, 0.22).setAlpha(0.8);
     this.aura = this.add.image(HERO_X, FLOOR - 20, 'glow').setScale(0).setBlendMode(Phaser.BlendModes.ADD).setTint(0xc77dff);
     this.hero = this.add.sprite(HERO_X, FLOOR, 'fig-hero-free').setOrigin(0.5, FIG_ORIGIN_Y).setScale(figScale);
+    lifelike(this, this.hero, 'hero', true);
     this.tweens.add({ targets: this.hero, scaleY: figScale * 1.03, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.shieldBubble = this.add.image(HERO_X, FLOOR - 22, 'glow').setTint(0x41a6f6).setBlendMode(Phaser.BlendModes.ADD).setScale(2.2).setAlpha(0);
 

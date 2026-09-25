@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { CHARACTERS, ENEMY_ART, ICON_ART, paintSprite, PAL, spriteSize, type PixelSprite } from '../art';
 import { paintTileset } from '../tiles';
 import { bus } from '../../game/bus';
-import { FIGURES, paintFigure } from '../diorama/figures';
+import { EXPRESSIVE, FIGURES, paintFigure } from '../diorama/figures';
+import { faceKey } from '../faces';
 import { paintGround, paintTable } from '../diorama/ground';
 import { shadowBlob } from '../diorama/paint';
 import { paintProps } from '../diorama/props';
@@ -24,6 +25,13 @@ export class BootScene extends Phaser.Scene {
       this.textures.addCanvas(`fig-${k}`, paintFigure(k));
       this.textures.addCanvas(`fig-${k}-free`, paintFigure(k, false));
     }
+    // Faces: blinks and expressions, for the figures that have them.
+    for (const [k, faces] of Object.entries(EXPRESSIVE))
+      for (const f of faces) {
+        if (f === 'neutral') continue;
+        this.textures.addCanvas(faceKey(k, f), paintFigure(k, true, f));
+        this.textures.addCanvas(faceKey(k, f, true), paintFigure(k, false, f));
+      }
     for (const [k, p] of Object.entries(paintProps())) {
       this.textures.addCanvas(`prop-${k}`, p.canvas);
       this.registry.set(`prop-${k}`, { originY: p.originY, radius: p.radius, shadow: p.shadow });
