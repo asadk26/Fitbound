@@ -2,6 +2,8 @@
 
 A fitness roguelite you play with real exercises. A phone camera watches you through MediaPipe Pose, and each set you do powers one of four magical abilities. You choose the ability, do the movement, watch it land, then duck or hop when the enemy strikes back.
 
+The design vision, story canon and roadmap are in the **[design bible](docs/design-bible.md)**. This README covers how to run, play and test the game.
+
 Ways to play:
 
 | Mode | Screen | Controller | When to use it |
