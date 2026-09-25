@@ -52,6 +52,7 @@ export class RpgScene extends Phaser.Scene {
   private offBus: (() => void)[] = [];
   private labels: Phaser.GameObjects.Text[] = [];
   private telegraph: Phaser.GameObjects.Graphics | null = null;
+  private cueObjs: Phaser.GameObjects.GameObject[] = [];
   private maxHp = 100;
 
   constructor() {
@@ -326,27 +327,67 @@ export class RpgScene extends Phaser.Scene {
     }
   }
 
-  /** Wind-up and swing indicators for one strike. */
+  /**
+   * Wind-up and swing for one strike. The body language is always there —
+   * HIGH: the foe rears up and back, a glint above its head; LOW: it drops
+   * into a crouch and leans in, a glint at its feet. Clearer cue levels add
+   * a line at head/foot height and, at 'obvious', a big ▲ DUCK / ▼ HOP.
+   */
   private strike(s: BusEvents['rpg:strike']): void {
     const f = this.foes.get(s.uid);
     this.telegraph?.destroy();
     this.telegraph = null;
-    if (s.phase === 'clear' || !f) {
-      if (f) this.tweens.add({ targets: f.fig, x: f.x, duration: 200 });
+    this.cueObjs.forEach((o) => o.destroy());
+    this.cueObjs = [];
+    if (!f) return;
+    const base = f.baseScale;
+    const high = s.height === 'high';
+    const cues = s.cues ?? 'obvious';
+    const reset = () => {
+      this.tweens.killTweensOf(f.fig);
+      f.fig.setAngle(0).setScale(base);
+      f.fig.y = FLOOR;
+    };
+    if (s.phase === 'clear') {
+      reset();
+      this.tweens.add({ targets: f.fig, x: f.x, duration: 200, onComplete: () => f.alive && (f.idle = this.tweens.add({ targets: f.fig, y: FLOOR - 2, duration: 750, yoyo: true, repeat: -1, ease: 'Sine.inOut' })) });
       return;
     }
-    const y = s.height === 'high' ? FLOOR - 40 : FLOOR - 4;
-    const g = this.add.graphics().setDepth(170);
-    this.telegraph = g;
+    const y = high ? FLOOR - 40 : FLOOR - 4;
+    f.idle?.stop();
+    reset();
     if (s.phase === 'telegraph') {
-      g.lineStyle(2, s.height === 'high' ? 0xef7d57 : 0xffcd75, 0.9);
-      for (let x = HERO_X - 14; x < f.x - 10; x += 8) g.lineBetween(x, y, x + 4, y);
-      this.tweens.add({ targets: g, alpha: { from: 0.3, to: 1 }, duration: 260, yoyo: true, repeat: -1 });
-      this.tweens.add({ targets: f.fig, x: f.x - 8, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      // Body language (every cue level).
+      if (high) this.tweens.add({ targets: f.fig, y: FLOOR - 8, angle: -14, scaleY: base * 1.12, scaleX: base * 0.95, x: f.x + 4, duration: 420, hold: 260, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      else this.tweens.add({ targets: f.fig, y: FLOOR + 3, angle: 12, scaleY: base * 0.78, scaleX: base * 1.1, x: f.x - 6, duration: 420, hold: 260, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      const glint = this.add
+        .image(f.x - 6, high ? FLOOR - f.fig.displayHeight - 4 : FLOOR - 3, 'glow')
+        .setTint(high ? 0xef7d57 : 0xffcd75)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setScale(0.5)
+        .setDepth(165);
+      this.tweens.add({ targets: glint, scale: 1.1, alpha: { from: 0.4, to: 1 }, duration: 300, yoyo: true, repeat: -1 });
+      this.cueObjs.push(glint);
+      if (cues !== 'subtle') {
+        const g = this.add.graphics().setDepth(170);
+        this.telegraph = g;
+        g.lineStyle(2, high ? 0xef7d57 : 0xffcd75, 0.9);
+        for (let x = HERO_X - 14; x < f.x - 10; x += 8) g.lineBetween(x, y, x + 4, y);
+        this.tweens.add({ targets: g, alpha: { from: 0.3, to: 1 }, duration: 260, yoyo: true, repeat: -1 });
+      }
+      if (cues === 'obvious') {
+        const t = this.txt(HERO_X + 26, high ? FLOOR - 58 : FLOOR - 22, high ? '▲ DUCK' : '▼ HOP', 9, high ? PAL.orange : PAL.gold).setOrigin(0.5).setDepth(175);
+        this.tweens.add({ targets: t, y: t.y + (high ? -3 : 3), duration: 300, yoyo: true, repeat: -1 });
+        this.cueObjs.push(t);
+      }
     } else {
-      this.tweens.killTweensOf(f.fig);
-      this.tweens.add({ targets: f.fig, x: HERO_X + 30, duration: 160, yoyo: true, ease: 'Quad.in' });
-      g.lineStyle(4, 0xffffff, 1).lineBetween(HERO_X + 30, y - 3, HERO_X - 24, y + 3);
+      // The swing: an overhead arc at head height, or a low sweep along the floor.
+      this.tweens.add({ targets: f.fig, x: HERO_X + 30, angle: high ? -20 : 18, y: high ? FLOOR - 10 : FLOOR + 2, duration: 160, yoyo: true, ease: 'Quad.in' });
+      const g = this.add.graphics().setDepth(170);
+      this.telegraph = g;
+      g.lineStyle(4, 0xffffff, 1);
+      if (high) g.beginPath().arc(HERO_X + 6, y + 14, 26, -2.6, -0.5).strokePath();
+      else g.lineBetween(HERO_X + 34, y, HERO_X - 26, y);
       this.tweens.add({ targets: g, alpha: 0, duration: 350, onComplete: () => g.destroy() });
       audio.slash(0.5);
     }

@@ -13,6 +13,7 @@ import { endRpgBattle, startRpgBattle } from '../../phaser/game';
 import { blessing } from '../../rpg/blessings';
 import { STRIKE_TIMING, StrikeTimer } from '../../rpg/dodge';
 import { RpgEngine, type Foe, type PendingStrike, type RpgFx, type SetWork } from '../../rpg/engine';
+import type { Cues } from '../../rpg/enemies';
 import { abilityLoadout } from '../../rpg/expedition';
 import type { ExLoadout } from '../../rpg/loadout';
 import { Calibration } from '../Calibration';
@@ -60,6 +61,8 @@ export interface RpgBattleProps {
   connected: boolean;
   difficulty: Difficulty;
   dodgeInput: 'body' | 'controller';
+  /** How plainly attacks announce themselves in this fight. */
+  cues: Cues;
   onDodgeInput: (d: 'body' | 'controller') => void;
   onSet: (r: SetResult) => void;
   onDodge: (o: 'dodged' | 'hit' | 'unclear') => void;
@@ -242,8 +245,9 @@ export function RpgBattle(p: RpgBattleProps) {
     const timing = { ...STRIKE_TIMING, telegraphMs: STRIKE_TIMING.telegraphMs + (i === 0 && lastSetFloor.current ? 1200 : 0) };
     const st = new StrikeTimer(s.height, timing, controller);
     timer.current = st;
-    bus.emit('rpg:strike', { uid: s.from, height: s.height, phase: 'telegraph' });
-    audio.say(s.height === 'high' ? 'High! Duck!' : 'Low! Hop!', false);
+    const cues = props.current.cues;
+    bus.emit('rpg:strike', { uid: s.from, height: s.height, phase: 'telegraph', cues });
+    audio.say(cues === 'obvious' ? (s.height === 'high' ? 'High! Duck!' : 'Low! Hop!') : cues === 'clear' ? (s.height === 'high' ? 'High!' : 'Low!') : 'Here it comes!', false);
     let swung = false;
     if (strikeLoop.current !== null) clearInterval(strikeLoop.current);
     strikeLoop.current = window.setInterval(() => {
@@ -534,11 +538,28 @@ export function RpgBattle(p: RpgBattleProps) {
       )}
 
       {stage === 'dodge' && strike && !paused && (
-        <div className={`rpg-strike ${strike.s.height} ${strike.result ?? ''}`}>
+        <div className={`rpg-strike ${p.cues === 'subtle' && !strike.result ? 'hidden-height' : strike.s.height} ${strike.result ?? ''}`}>
           <small>
             {strike.s.attack} · strike {strike.i + 1} of {strike.n}
           </small>
-          <b>{strike.result === 'dodged' ? 'Dodged!' : strike.result === 'hit' ? `Hit — ${strike.s.damage}` : strike.result === 'unclear' ? 'Couldn’t see you — no damage' : strike.s.height === 'high' ? '▲ HIGH — DUCK!' : '▼ LOW — HOP!'}</b>
+          <b>
+            {strike.result === 'dodged'
+              ? 'Dodged!'
+              : strike.result === 'hit'
+                ? `Hit — ${strike.s.damage}`
+                : strike.result === 'unclear'
+                  ? 'Couldn’t see you — no damage'
+                  : p.cues === 'obvious'
+                    ? strike.s.height === 'high'
+                      ? '▲ HIGH — DUCK!'
+                      : '▼ LOW — HOP!'
+                    : p.cues === 'clear'
+                      ? strike.s.height === 'high'
+                        ? '▲ HIGH'
+                        : '▼ LOW'
+                      : 'Read its stance…'}
+          </b>
+          {strike.result && p.cues !== 'obvious' && <span className="rpg-wait">It was {strike.s.height === 'high' ? 'HIGH (rearing up → duck)' : 'LOW (crouching → hop)'}</span>}
           {!strike.result && (strike.waiting ? <span className="rpg-wait">{strike.waiting}</span> : <div className="rpg-strike-bar"><i style={{ width: `${Math.min(100, (strike.left / STRIKE_TIMING.telegraphMs) * 100)}%` }} /></div>)}
           {p.dodgeInput === 'controller' && !strike.result && <span className="hint-chip">Controller: ▼ duck · ▲ / A hop</span>}
         </div>

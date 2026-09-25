@@ -2818,3 +2818,26 @@ details summary {
   width: max(24px, 5vh);
   height: max(24px, 5vh);
 }
+.rpg-strike.hidden-height {
+  border-color: var(--mist);
+}
+.rpg-strike.hidden-height b {
+  color: var(--white);
+}
+/* Keep the strike call clear of the figures: their stance is the cue. */
+.rpg .rpg-strike {
+  top: auto;
+  bottom: calc(1.5vh + var(--safe-b));
+  transform: translateX(-50%);
+  min-width: 40vw;
+  max-width: 64vw;
+  gap: 0.6vh;
+  padding: 1vh 2vw;
+}
+.rpg .rpg-strike b {
+  font-size: max(14px, 4.4vh);
+}
+.rpg .rpg-strike small,
+.rpg .rpg-strike .rpg-wait {
+  font-size: max(10px, 2.2vh);
+}

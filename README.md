@@ -94,7 +94,7 @@ The player turn and the enemy turn stay separate:
 
 | Enemy | Mechanic | Answer |
 |---|---|---|
-| Straw Echo | Training: one gentle HIGH or LOW swing | Anything; learn to dodge |
+| Straw Echo | Warm-up (26 HP): one gentle HIGH or LOW swing | Any two attacks (one set of push-ups); core cards defend and deal no damage |
 | Iron Husk | Armour (each stack −18% damage) and *Harden* | Upper body breaks armour; stagger cracks it |
 | Bone Charger | Winds up a two-strike *Horn Charge* | Disrupt it (Reaping Hook) or stagger it before it lands |
 | Haze Wisps ×3 | A pack; weak to lightning and wind | Area (legs) and chains (cardio) |
@@ -124,6 +124,12 @@ Pausing, hesitating or losing tracking never ends a set by itself. Reaching the 
 ### Dodging (HIGH duck, LOW hop)
 
 - **HIGH (▲, orange): duck** — a quick squat. **LOW (▼, gold): a small hop.**
+- **Reading the attack.** Foes always show it in their body: **rearing up and back (a glint above the head) = HIGH**, **dropping into a crouch and leaning in (a glint at the feet) = LOW**. How much *else* announces it depends on the fight:
+  - *obvious* (Training Yard, Iron Husk): a line at head or foot height, a big ▲ DUCK or ▼ HOP, and "High! Duck!";
+  - *clear* (Bone Charger, Wisps): the line plus "High!" or "Low!";
+  - *subtle* (Acolyte, Warden): only the stance, with "Read its stance…" on screen; the call is revealed after you move.
+
+  The Sanctuary's **Attack cues** setting switches between *Learn as you go* (the default) and *Always obvious*. The call appears at the bottom of the screen so it never covers the figures.
 - Each strike has a 2.6 s wind-up with a countdown bar, a spoken "High! Duck!" or "Low! Hop!", and an attack line drawn at head or foot height.
 - A correct move counts from 1 s before impact to 0.4 s after. Sequences (e.g. the Warden's LOW–HIGH–LOW) pause about a second between strikes.
 - **Nothing counts until the phone has a still, standing baseline.** Standing up after push-ups can never be a dodge.

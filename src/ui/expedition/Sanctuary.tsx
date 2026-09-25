@@ -114,6 +114,10 @@ export function Sanctuary({ connected, onBegin, onLab, onBack }: { connected: bo
             {seg(prefs.intensity, [['easy', 'Take it easy'], ['normal', 'Normal'], ['strong', 'Strong']], (v) => setPrefs((p) => void (p.intensity = v)))}
           </div>
           <div className="toggle-row">
+            <span>Attack cues</span>
+            {seg(save.settings.attackCues, [['adaptive', 'Learn as you go'], ['obvious', 'Always obvious']], (v) => updateSave((s) => void (s.settings.attackCues = v)))}
+          </div>
+          <div className="toggle-row">
             <span>Route</span>
             {seg(route, [['standard', 'Full (~20–25 min)'], ['short', 'Short (~12–15 min)']], setRoute)}
           </div>

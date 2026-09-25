@@ -270,6 +270,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
           connected={connected}
           difficulty={getSave().settings.difficulty}
           dodgeInput={x.dodgeInput}
+          cues={getSave().settings.attackCues === 'obvious' ? 'obvious' : (node.cues ?? ROUTES.standard.nodes.find((n) => n.enemies?.join() === node.enemies!.join())?.cues ?? 'obvious')}
           onDodgeInput={(d) => mutate((s) => void (s.dodgeInput = d))}
           onSet={onSet}
           onDodge={(o) => mutate((d) => addDodge(d.workout, o))}

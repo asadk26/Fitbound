@@ -298,3 +298,26 @@ describe('strike timing', () => {
     expect(r2).toBe('hit');
   });
 });
+
+describe('learning curve', () => {
+  it('the training dummy falls to one set of push-ups plus one more attack', async () => {
+    const e = new RpgEngine(['echo_dummy'], { hp: 100, maxHp: 100 }, LOADOUT);
+    e.useAbility('upper', full());
+    enemyTurn(e, 'dodged');
+    e.useAbility('legs', full());
+    expect(e.outcome).toBe('victory');
+    const d = new RpgEngine(['echo_dummy'], { hp: 100, maxHp: 100 }, LOADOUT);
+    expect(d.hint('core').text).toMatch(/no damage/);
+  });
+
+  it('attack cues fade from obvious to body language along each route', async () => {
+    const { ROUTES } = await import('../src/rpg/expedition');
+    const order = { obvious: 0, clear: 1, subtle: 2 } as const;
+    for (const r of Object.values(ROUTES)) {
+      const cues = r.nodes.filter((n) => n.enemies).map((n) => n.cues!);
+      expect(cues[0]).toBe('obvious');
+      expect(cues.at(-1)).toBe('subtle');
+      for (let i = 1; i < cues.length; i++) expect(order[cues[i]]).toBeGreaterThanOrEqual(order[cues[i - 1]]);
+    }
+  });
+});

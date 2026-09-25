@@ -11,6 +11,16 @@ import type { Element } from './abilities';
  */
 export type Height = 'high' | 'low';
 
+/**
+ * How plainly an attack announces itself. Early fights spell it out; later
+ * ones rely on the enemy's body language (rearing up = HIGH, crouching = LOW),
+ * so the player learns to read the movement itself.
+ *   obvious  body wind-up + a line at head/foot height + ▲/▼ DUCK/HOP + spoken "Duck!/Hop!"
+ *   clear    body wind-up + the line + "High!/Low!"
+ *   subtle   body wind-up only; the call comes after, with the result
+ */
+export type Cues = 'obvious' | 'clear' | 'subtle';
+
 export interface Strike {
   height: Height;
   damage: number;
@@ -56,14 +66,15 @@ export const RPG_ENEMIES: Record<string, RpgEnemyDef> = {
     id: 'echo_dummy',
     name: 'Straw Echo',
     sprite: 'dummy',
-    maxHp: 44,
+    // A warm-up: two full sets of anything that deals damage (or one of push-ups).
+    maxHp: 26,
     staggerAt: 3,
     pattern: [
-      { kind: 'attack', name: 'Wobbling Swipe', strikes: [hi(4)] },
-      { kind: 'attack', name: 'Clumsy Sweep', strikes: [lo(4)] },
+      { kind: 'attack', name: 'Wobbling Swipe', strikes: [hi(3)] },
+      { kind: 'attack', name: 'Clumsy Sweep', strikes: [lo(3)] },
     ],
     intro: 'A straw figure stirs — an echo of your old training yard.',
-    tip: 'Try any ability. When it swings: HIGH means duck, LOW means hop.',
+    tip: 'A warm-up. Attack cards deal damage; core cards defend. When it swings: HIGH means duck, LOW means hop.',
   },
   iron_husk: {
     id: 'iron_husk',

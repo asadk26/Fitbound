@@ -51,7 +51,7 @@ export interface BusEvents {
   'rpg:start': { foes: RpgFoeView[]; heroHp: number; heroMaxHp: number; backdrop: 'meadow' | 'dungeon'; boss: boolean };
   'rpg:fx': { fx: RpgFx[]; foes?: RpgFoeView[] };
   /** A strike's telegraph (wind-up), its swing at impact, and clearing. */
-  'rpg:strike': { uid: number; height: 'high' | 'low'; phase: 'telegraph' | 'swing' | 'clear' };
+  'rpg:strike': { uid: number; height: 'high' | 'low'; phase: 'telegraph' | 'swing' | 'clear'; cues?: 'obvious' | 'clear' | 'subtle' };
   /** Hero pose while dodging (from the body reading), for feedback. */
   'rpg:pose': { duck: number; airborne: boolean };
   'rpg:end': undefined;

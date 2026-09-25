@@ -185,6 +185,7 @@ export class RpgEngine {
     if (a.damage && foes.every((f) => f.def.resist?.includes(a.element))) return { level: 'weak', text: `Resisted` };
     if (a.damage && !a.armorBreak && foes.every((f) => f.armor >= 2)) return { level: 'weak', text: 'Armour blunts it' };
     if (!a.damage && this.hero.hp < this.hero.maxHp * 0.5 && a.heal) return { level: 'strong', text: 'Heals you' };
+    if (!a.damage) return { level: 'normal', text: 'Defensive — no damage' };
     return { level: 'normal', text: '' };
   }
 

@@ -26,6 +26,8 @@ export interface Settings {
   motion: MotionSettings;
   /** Voice commands through this computer's microphone. */
   voiceCommands: boolean;
+  /** Attack cues: 'adaptive' fades from obvious to body language over a run; 'obvious' always spells it out. */
+  attackCues: 'adaptive' | 'obvious';
 }
 
 export interface MotionSettings {
@@ -90,6 +92,7 @@ export function defaultSave(): SaveData {
       cameraFacing: 'user',
       motion: { turnStep: 45, lean: 'normal', march: 'normal', navigation: 'guided', traversal: 'active', diagnostics: true },
       voiceCommands: false,
+      attackCues: 'adaptive',
     },
     totals: { cameraReps: 0, manualReps: 0, holdSeconds: 0, battlesWon: 0 },
     expeditionPrefs: { ...DEFAULT_PREFS },
@@ -185,6 +188,7 @@ export function sanitize(input: unknown): SaveData {
     workouts: Array.isArray(o.workouts) ? o.workouts.filter((w) => w && typeof w.id === 'string' && typeof w.at === 'number' && w.volume && typeof w.volume === 'object').slice(-20) : [],
   };
   if (typeof out.settings.voiceCommands !== 'boolean') out.settings.voiceCommands = false;
+  if (out.settings.attackCues !== 'obvious') out.settings.attackCues = 'adaptive';
   if (!['beginner', 'intermediate', 'advanced'].includes(out.settings.difficulty)) out.settings.difficulty = 'beginner';
   if (out.settings.model !== 'lite' && out.settings.model !== 'full') out.settings.model = 'full';
   if (out.settings.cameraFacing !== 'environment') out.settings.cameraFacing = 'user';
