@@ -55,7 +55,7 @@ export function trialSessionOptions(exerciseId: string): Partial<SessionOptions>
 }
 
 /** Floor movements start the moment you're in position (nobody should hold a plank through a 3-2-1). */
-const FLOOR_EXERCISES = new Set(['pushup', 'plank', 'mountain_climber', 'dead_bug']);
+const FLOOR_EXERCISES = new Set(['pushup', 'plank', 'mountain_climber', 'dead_bug', 'glute_bridge', 'russian_twist']);
 
 export interface SessionSnapshot {
   stage: SessionStage;

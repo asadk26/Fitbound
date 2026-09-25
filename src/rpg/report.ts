@@ -8,7 +8,7 @@ import { pacing, totals, type Feedback, type SetRecord } from './workout';
  * where the time went, how each strike went, and the player's check-in. It
  * stays on this computer unless the player copies or saves it.
  */
-export function playtestReport(x: ExpeditionState, fb: Feedback | undefined, ctx: { travel: string; cues: string; when?: Date }): string {
+export function playtestReport(x: ExpeditionState, fb: Feedback | undefined, ctx: { travel: string; cues: string; when?: Date; next?: string[]; latency?: string }): string {
   const w = x.workout;
   const p = pacing(w);
   const min = (ms: number) => `${(ms / 60000).toFixed(1)} min`;
@@ -39,6 +39,10 @@ export function playtestReport(x: ExpeditionState, fb: Feedback | undefined, ctx
   if (x.blessings.length) out.push(`Blessings: ${x.blessings.map(blessingName).join(', ')}`);
   out.push('');
   out.push(`Check-in: effort ${fb?.effort ?? '—'} · fun ${fb?.fun ?? '—'} · pacing ${fb?.pacing ?? '—'}`);
+  if (ctx.next?.length) out.push(`Next time: ${ctx.next.join(' · ')}`);
+  const sore = Object.entries(x.prefs.sore ?? {});
+  if (sore.length) out.push(`Sore today: ${sore.map(([a, v]) => `${a} (${v})`).join(', ')}`);
+  if (ctx.latency) out.push(`Connection: ${ctx.latency}`);
   out.push('Notes:');
   return out.join('\n');
 }

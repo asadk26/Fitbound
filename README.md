@@ -249,7 +249,42 @@ After a finished run, a quick **check-in** asks how the workout felt (too easy, 
 
 **Playtest report** (on the summary) shows a plain-text account of the run: every set with reps against target, whether it was full or finished early, and how long it took; the time breakdown; each strike by height and cue level; the loadout; blessings; and the check-in. **Copy** or **Save .txt** it. It stays on this computer unless you do.
 
-The last 20 sessions are kept (per-movement sets and volume) so the loadout director can vary your workout.
+The last 60 sessions are kept (per-movement sets and volume, minutes, soreness, the check-in) so the loadout director can vary your workout and the Journal can show your training.
+
+### Sore days, targets that adapt, and the Journal
+
+**Sore today?** (Sanctuary) For upper body, legs and core, choose No, *Go gentle* or *Rest it*:
+
+- *Go gentle* drops that family's targets to about 60% for the day.
+- *Rest it* sits the family out; its ability rests and the other three carry the fights.
+- Sore legs also ease cardio to 80%, since cardio is mostly legs.
+- It's forgotten after a day.
+
+**Targets adapt, without surveys.** Your per-set targets change slowly, between sessions, from what you actually did:
+
+- **Up one step** after two sessions in a row where every set of that movement was full and your pace held. One session is enough if you answered "too easy" in the check-in.
+- **Down one step** after a session where half or more of a movement's sets ended early or short, or you said "too hard" and it showed.
+- **Otherwise it holds.**
+- Sore days and *Take it easy* days never raise a target, and *Strong* days never lower one.
+
+A step is one rep (two above 12), or 5 s for holds, always within the movement's range. The summary lists any changes under **Next time**, each with a one-tap *Keep*, and there's a *Keep my targets as they are* option for the gamepad. The only explicit question is the optional end-of-run check-in. Targets can still be set by hand in the Sanctuary.
+
+*Sets per session* aren't scaled yet: they come from the route (about 12 short, 20 full). That belongs to the future workout director, once the playtests say how long runs really take.
+
+**Journal** (Sanctuary) shows:
+
+- the days you played in the last two weeks;
+- sets per family over the last two weeks;
+- each movement's current target and its last change, with the reason;
+- recent sessions: outcome, sets, minutes, steps, how it felt, and soreness.
+
+It's read-only.
+
+**Phone lag, measured.**
+
+- Every few seconds the PC pings the phone, and the phone timestamps its dodge readings and reps.
+- From that, the playtest report states the real round trip and how long movements take to arrive over your Wi-Fi.
+- This is a measurement only: dodge timing is unchanged.
 
 ### Movement Lab
 
@@ -643,8 +678,26 @@ If detection keeps failing (12 s stuck in setup, 15 s without a counted rep, 3 t
 | Plank (hold) | Core | — | side-on, floor | beta | `PlankDetector`: straight, horizontal, supported line; now also over Connected Play |
 | Dead bugs | Core | — | side-on, lying | **experimental** | `DeadBugDetector`: leg extension from tabletop, arms up |
 | Standing cross crunches | Core | — | facing | beta | `CrossCrunchDetector`: knee drive plus the opposite elbow within 0.55 torso of the knee |
+| Overhead press | Upper | dumbbells | facing | beta | `OverheadPressDetector`: both wrists from shoulder height to ≥ 1.75 upper arms above the shoulders (the lower hand counts). Mid-set pause needs a 3 s still hold, since the press itself ends hands-up |
+| Lateral raises | Upper | dumbbells | facing | beta | `LateralRaiseDetector`: both arms from hanging (≤ 30°) out to about shoulder height (≥ 72°) |
+| Goblet squats | Legs | dumbbells | facing | beta | `SquatDetector`, holding a dumbbell at the chest |
+| Sumo squats | Legs | — | facing | beta | `SquatDetector`, wide stance |
+| Glute bridges | Legs | — | side-on, lying | beta | `GluteBridgeDetector`: shoulder–hip–knee from ≤ 145° to a line (≥ 162°), lying with knees bent |
+| Skaters | Cardio | — | facing | beta | `SkaterDetector`: hips bound ≥ 0.8 shoulder widths from your average centre, per side (anatomical axis, so mirroring can't swap sides) |
+| Butt kicks | Cardio | — | facing | **experimental** | `ButtKickDetector`: heel to within 0.3 shin of the knee while the knee stays low (a high knee doesn't count). Experimental: the heel is behind the leg |
+| Russian twists | Core | — | seated, facing | beta | `TwistDetector`: hands together travel ≥ 1.1 hip widths to each side, per side |
+| Punch test (facing / side-on) | — | — | both | Lab only | `PunchDetector`: see *Punch test* below |
 
-**Sided movements** (rows, curls, lunges, cross crunches) count each side separately. The target is per side, and a set completes only when both sides reach it; unbalanced work never completes a set. Both arms curling together count once per arm.
+All the new movements start as **beta** (or experimental): they're eligible for random loadouts once you've checked them in the Movement Lab, and each has its own ability (Skyfall Hammer, Wingclip, Bastion Stomp, Rootbreaker, Upheaval, Slipstream, Cinder Kick, Whirling Ward).
+
+**Punch test** (Movement Lab, not in fights). This checks whether one phone can read straight punches and tell left from right before Punch Away or the Unbound are designed around it. There are two stances:
+
+- **Side-on, like push-ups.** The punch is a big, clear movement across the image. The catch is that the far arm is half-hidden, so left and right depend on the pose model keeping the labels straight.
+- **Facing the phone.** Both arms stay visible, but the punch goes *toward* the camera, so it's read from the model's rough depth plus the elbow rising to shoulder height.
+
+A punch counts for the arm that threw it, only once that fist comes back toward guard. To try it, throw a known sequence and compare the left and right counts.
+
+**Sided movements** (rows, curls, lunges, cross crunches, skaters, Russian twists) count each side separately. The target is per side, and a set completes only when both sides reach it; unbalanced work never completes a set. Both arms curling together count once per arm.
 
 **Why some are experimental**, with practical alternates:
 
@@ -954,6 +1007,14 @@ Already in place and reusable:
 - **Regressions:** the phone-only Motion Trial and the classic touch adventure (all four fights, level-ups, save and reload) were re-run end to end in the browser and still work.
 
 ## Physical playtest checklist (Heart of Haze)
+
+**New this round:**
+
+- **Movement Lab:** try the new movements (overhead press, lateral raises, goblet and sumo squats, glute bridges, skaters, butt kicks, Russian twists) and answer *Did the count match?*.
+- **Punch test, both stances:** do the left and right counts match what you threw?
+- **Sore today?** Use it the next time you're sore.
+- **After a couple of expeditions:** do the *Next time* changes feel right? Check the Journal.
+- **Playtest report:** read the *Connection* line.
 
 **The opening (new).** Watch it on the TV from the couch:
 - Are the lines readable at your distance?

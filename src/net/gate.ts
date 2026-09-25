@@ -63,6 +63,8 @@ export class ControllerGate {
     switch (msg.type) {
       case 'HELLO':
       case 'HEARTBEAT':
+      // Timing only: echoes the PC's ping, changes nothing in the game.
+      case 'PONG':
       case 'STATUS':
       case 'TELEMETRY':
       // Display-only: matched to the set by id, never awards anything.

@@ -445,3 +445,156 @@ export function deadBugPose(extL: number, extR: number, t: number): PoseFrame {
   };
   return frameFrom(pts, 4 / 3, t);
 }
+
+// ── More movements ───────────────────────────────────────────────────────
+
+type Pts = Partial<Record<number, P>>;
+const lerp = (a: P, b: P, k: number): P => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+
+/** Standing, facing the phone, with the arms placed explicitly (player's left = image right). */
+function standingWith(t: number, arms: Pts, shift = 0): PoseFrame {
+  const base = standPose(t);
+  const pts: Pts = {};
+  for (const i of [LM.NOSE, LM.L_SHOULDER, LM.R_SHOULDER, LM.L_ELBOW, LM.R_ELBOW, LM.L_WRIST, LM.R_WRIST, LM.L_HIP, LM.R_HIP, LM.L_KNEE, LM.R_KNEE, LM.L_ANKLE, LM.R_ANKLE]) pts[i] = arms[i] ?? [base.landmarks[i].x, base.landmarks[i].y];
+  if (shift) for (const k of Object.keys(pts)) pts[+k] = [pts[+k]![0] + shift, pts[+k]![1]];
+  return frameFrom(pts, 1, t);
+}
+
+const SH_L: P = [0.58, 0.3];
+const SH_R: P = [0.42, 0.3];
+
+/** Dumbbell overhead press, facing: k 0 (hands at the shoulders) .. 1 (arms overhead). */
+export function pressPose(k: number, t: number, lag = 0): PoseFrame {
+  // The elbow swings on an arc (upper arm length constant); the wrist rises over it.
+  const arm = (S: P, side: 1 | -1, kk: number) => {
+    const th = rad(-40 + 110 * kk);
+    const e: P = [S[0] + side * Math.cos(th) * 0.11, S[1] - Math.sin(th) * 0.11];
+    return { e, w: lerp([e[0], e[1] - 0.11], [S[0] + side * 0.02, S[1] - 0.23], kk) };
+  };
+  const L = arm(SH_L, 1, k);
+  const R = arm(SH_R, -1, Math.max(0, k - lag));
+  return standingWith(t, { [LM.L_ELBOW]: L.e, [LM.L_WRIST]: L.w, [LM.R_ELBOW]: R.e, [LM.R_WRIST]: R.w });
+}
+
+/** Dumbbell lateral raise, facing: k 0 (arms hanging) .. 1 (out to shoulder height). */
+export function lateralPose(k: number, t: number): PoseFrame {
+  const arm = (S: P, side: 1 | -1) => {
+    const th = rad(88 * k);
+    return { e: [S[0] + side * Math.sin(th) * 0.12, S[1] + Math.cos(th) * 0.12] as P, w: [S[0] + side * Math.sin(th) * 0.24, S[1] + Math.cos(th) * 0.24] as P };
+  };
+  const L = arm(SH_L, 1);
+  const R = arm(SH_R, -1);
+  return standingWith(t, { [LM.L_ELBOW]: L.e, [LM.L_WRIST]: L.w, [LM.R_ELBOW]: R.e, [LM.R_WRIST]: R.w });
+}
+
+/** Skaters: standing, shifted toward the player's own left by `shift` shoulder widths (negative = right). */
+export function skaterPose(shift: number, t: number): PoseFrame {
+  return standingWith(t, {}, shift * 0.16);
+}
+
+/** Butt kicks, facing: each heel 0 (down) .. 1 (kicked up behind); `kneeUp` lifts the knee instead (a high knee). */
+export function kickPose(kL: number, kR: number, t: number, o: { kneeUp?: number } = {}): PoseFrame {
+  const leg = (x: number, k: number) => {
+    const knee: P = [x, 0.75 - 0.18 * (o.kneeUp ?? 0) * k];
+    return { k: knee, a: [x + 0.01, lerp([0, 0.95], [0, knee[1] - 0.04], k)[1]] as P };
+  };
+  const L = leg(0.55, kL);
+  const R = leg(0.45, kR);
+  return standingWith(t, { [LM.L_KNEE]: L.k, [LM.L_ANKLE]: L.a, [LM.R_KNEE]: R.k, [LM.R_ANKLE]: R.a });
+}
+
+/** Russian twist, seated facing the phone: hands turned toward the player's left by k (−1 .. 1). */
+export function twistPose(k: number, t: number): PoseFrame {
+  const w: P = [0.5 + 0.13 * k, 0.58];
+  const pts: Pts = {
+    [LM.NOSE]: [0.5 + 0.02 * k, 0.33],
+    [LM.L_SHOULDER]: [0.57 + 0.01 * k, 0.45],
+    [LM.R_SHOULDER]: [0.43 + 0.01 * k, 0.45],
+    [LM.L_ELBOW]: [0.56 + 0.07 * k, 0.55],
+    [LM.R_ELBOW]: [0.44 + 0.07 * k, 0.55],
+    [LM.L_WRIST]: [w[0] + 0.015, w[1]],
+    [LM.R_WRIST]: [w[0] - 0.015, w[1]],
+    [LM.L_HIP]: [0.55, 0.7],
+    [LM.R_HIP]: [0.45, 0.7],
+    [LM.L_KNEE]: [0.56, 0.6],
+    [LM.R_KNEE]: [0.44, 0.6],
+    [LM.L_ANKLE]: [0.57, 0.8],
+    [LM.R_ANKLE]: [0.43, 0.8],
+  };
+  return frameFrom(pts, 1, t);
+}
+
+/** Glute bridge, lying side-on: hips 0 (down) .. 1 (lifted into a line). */
+export function bridgePose(k: number, t: number): PoseFrame {
+  const S: P = [0.3, 0.8];
+  const H: P = [0.55, 0.8 - 0.1 * k];
+  const K: P = [0.7, 0.66];
+  const A: P = [0.78, 0.8];
+  const pts: Pts = {
+    [LM.NOSE]: [0.2, 0.78],
+    [LM.L_SHOULDER]: S,
+    [LM.R_SHOULDER]: [S[0] + 0.005, S[1]],
+    [LM.L_ELBOW]: [0.4, 0.82],
+    [LM.R_ELBOW]: [0.41, 0.82],
+    [LM.L_WRIST]: [0.5, 0.82],
+    [LM.R_WRIST]: [0.51, 0.82],
+    [LM.L_HIP]: H,
+    [LM.R_HIP]: H,
+    [LM.L_KNEE]: K,
+    [LM.R_KNEE]: K,
+    [LM.L_ANKLE]: A,
+    [LM.R_ANKLE]: A,
+  };
+  return frameFrom(pts, 4 / 3, t);
+}
+
+/**
+ * Straight punches. `side`: turned side-on facing image-right, punching along
+ * the image (the far arm less visible). `front`: facing the phone, punching
+ * toward it (depth in z, the elbow rising to shoulder height). ext 0 (guard) .. 1.
+ */
+export function punchPose(stance: 'front' | 'side', extL: number, extR: number, t: number): PoseFrame {
+  const z: Record<number, number> = {};
+  const vis: Record<number, number> = {};
+  let pts: Pts;
+  if (stance === 'side') {
+    const arm = (S: P, k: number) => ({ e: lerp([S[0] + 0.02, S[1] + 0.1], [S[0] + 0.13, S[1]], k), w: lerp([S[0] + 0.05, S[1] - 0.08], [S[0] + 0.26, S[1]], k) });
+    const SL: P = [0.5, 0.35];
+    const SR: P = [0.51, 0.35];
+    const L = arm(SL, extL);
+    const R = arm(SR, extR);
+    pts = {
+      [LM.NOSE]: [0.55, 0.25],
+      [LM.L_SHOULDER]: SL,
+      [LM.R_SHOULDER]: SR,
+      [LM.L_ELBOW]: L.e,
+      [LM.R_ELBOW]: R.e,
+      [LM.L_WRIST]: L.w,
+      [LM.R_WRIST]: R.w,
+      [LM.L_HIP]: [0.5, 0.6],
+      [LM.R_HIP]: [0.51, 0.6],
+      [LM.L_KNEE]: [0.52, 0.78],
+      [LM.R_KNEE]: [0.48, 0.78],
+      [LM.L_ANKLE]: [0.53, 0.95],
+      [LM.R_ANKLE]: [0.46, 0.95],
+    };
+    // The far (right) arm is partly behind the body.
+    for (const i of [LM.R_ELBOW, LM.R_WRIST]) vis[i] = 0.6;
+  } else {
+    const arm = (S: P, side: 1 | -1, k: number, ei: number, wi: number) => {
+      z[ei] = -0.13 * k;
+      z[wi] = -0.05 - 0.21 * k;
+      return { e: lerp([S[0] + side * 0.02, S[1] + 0.12], [S[0], S[1] + 0.01], k), w: lerp([S[0] - side * 0.03, S[1] - 0.06], [S[0] - side * 0.01, S[1]], k) };
+    };
+    const L = arm(SH_L, 1, extL, LM.L_ELBOW, LM.L_WRIST);
+    const R = arm(SH_R, -1, extR, LM.R_ELBOW, LM.R_WRIST);
+    return withZ(standingWith(t, { [LM.L_ELBOW]: L.e, [LM.L_WRIST]: L.w, [LM.R_ELBOW]: R.e, [LM.R_WRIST]: R.w }), z, vis);
+  }
+  return withZ(frameFrom(pts, 1, t), z, vis);
+}
+
+function withZ(f: PoseFrame, z: Record<number, number>, vis: Record<number, number>): PoseFrame {
+  for (const [i, v] of Object.entries(z)) f.landmarks[+i].z = v;
+  for (const [i, v] of Object.entries(vis)) f.landmarks[+i].visibility = v;
+  return f;
+}

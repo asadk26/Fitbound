@@ -154,25 +154,36 @@ function Moves({ connected }: { connected: boolean }) {
       </div>
     );
 
+  const row = (e: ExerciseDefinition) => (
+    <div key={e.id} className="lab-ex">
+      <b>{e.name}</b>
+      <span className={`rel rel-${e.reliability}`}>{e.reliability}</span>
+      {e.equipment.length > 0 && <span className="rel">dumbbells</span>}
+      {(e.reliability === 'stable' || save.calibrations[e.id]) && <span className="rel rel-ok">✓ checked</span>}
+      <span className="muted small">
+        {targetLabel(e, save.exerciseTargets[e.id] ?? e.range.default)} per set · {e.camera.view === 'side' ? 'side-on' : 'facing the phone'}
+      </span>
+      {e.createDetector && (
+        <button className="btn btn-sm" onClick={() => start(e)}>
+          Try it
+        </button>
+      )}
+    </div>
+  );
   return (
     <div className="lab-list">
+      <div className="lab-family lab-punch">
+        <h3>Punch test · for future boxing encounters</h3>
+        <p className="muted small">
+          Can one phone read straight punches, and tell your left from your right? Try both stances. Throw a sequence you know — say 5 left, then 5 right, then alternating — returning
+          to guard each time, and compare the left and right counts. Nothing here affects fights.
+        </p>
+        {EXERCISES.filter((e) => !e.eligible.includes('combat')).map(row)}
+      </div>
       {FAMILIES.map((f) => (
         <div key={f} className="lab-family">
           <h3 style={{ color: FAMILY_INFO[f].color }}>{FAMILY_INFO[f].name}</h3>
-          {EXERCISES.filter((e) => e.family === f).map((e) => (
-            <div key={e.id} className="lab-ex">
-              <b>{e.name}</b>
-              <span className={`rel rel-${e.reliability}`}>{e.reliability}</span>
-              {e.equipment.length > 0 && <span className="rel">dumbbells</span>}
-              {(e.reliability === 'stable' || save.calibrations[e.id]) && <span className="rel rel-ok">✓ checked</span>}
-              <span className="muted small">{targetLabel(e, save.exerciseTargets[e.id] ?? e.range.default)} per set · {e.camera.view === 'side' ? 'side-on' : 'facing the phone'}</span>
-              {e.createDetector && (
-                <button className="btn btn-sm" onClick={() => start(e)}>
-                  Try it
-                </button>
-              )}
-            </div>
-          ))}
+          {EXERCISES.filter((e) => e.family === f && e.eligible.includes('combat')).map(row)}
         </div>
       ))}
     </div>

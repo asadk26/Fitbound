@@ -65,7 +65,9 @@ export type CtrlPayload =
   | { type: 'MOVE_STOP' }
   | { type: 'TURN_LEFT' | 'TURN_RIGHT' | 'INTERACT' | 'BACK' | 'PAUSE' | 'STEP' | 'READY' | 'DUCK' | 'HOP'; via: 'motion' | 'touch' }
   /** Dodge mode: the phone's duck/hop reading, ~15 times a second. */
-  | { type: 'DODGE_STATUS'; tracking: TrackingQuality; baseline: boolean; ducking: boolean; duck: number; hops: number }
+  | { type: 'DODGE_STATUS'; tracking: TrackingQuality; baseline: boolean; ducking: boolean; duck: number; hops: number; at?: number }
+  /** Echo of the PC's PING, with the phone's clock (for measuring delay only). */
+  | { type: 'PONG'; id: number; t: number; at: number }
   | { type: 'NAV'; dir: -1 | 1; via: 'motion' | 'touch' }
   | { type: 'CALIBRATION'; step: CalStep; progress: number; hint: string | null; floorOk: boolean }
   | {
@@ -84,7 +86,7 @@ export type CtrlPayload =
       pauseProgress?: number;
     }
   | { type: 'EXERCISE_DIAG'; setId: string; summary: DiagSummary }
-  | { type: 'EXERCISE_REP'; setId: string; exerciseId: string; index: number; source: RepSource; side?: Side }
+  | { type: 'EXERCISE_REP'; setId: string; exerciseId: string; index: number; source: RepSource; side?: Side; at?: number }
   /** Hold exercises: total valid hold time so far in this set (never decreases). */
   | { type: 'EXERCISE_HOLD'; setId: string; heldMs: number }
   /** The player asked to finish the set now (phone button). */
@@ -104,6 +106,7 @@ export type GameMsg =
   | { type: 'EXERCISE_CONTROL'; setId: string; action: 'pause' | 'resume' | 'manual' }
   | { type: 'EXERCISE_END'; setId: string }
   | { type: 'ACK'; seq: number }
+  | { type: 'PING'; id: number; t: number }
   | { type: 'GAME'; title: string; hint: string; exercise: string | null; paused: boolean; notice: string | null }
   | { type: 'HEARTBEAT' };
 
@@ -112,6 +115,8 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
 const num = (v: unknown, lo: number, hi: number): v is number => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
 const int = (v: unknown, lo: number, hi: number): v is number => num(v, lo, hi) && Number.isInteger(v);
+/** An optional send-time stamp (phone clock, ms); dropped if malformed. */
+const stamp = (at: unknown): { at?: number } => (num(at, 0, 1e12) ? { at } : {});
 const oneOf = <T extends string | number | null>(v: unknown, list: readonly T[]): v is T => list.includes(v as T);
 const str = (v: unknown, max: number, re = /^[A-Za-z0-9_-]+$/): v is string => typeof v === 'string' && v.length > 0 && v.length <= max && re.test(v);
 const text = (v: unknown, max: number): v is string => typeof v === 'string' && v.length <= max;
@@ -250,8 +255,10 @@ export function parseCtrlMsg(v: unknown): CtrlMsg | null {
       return oneOf(v.via, VIA) ? { ...base, type: v.type, via: v.via } : null;
     case 'DODGE_STATUS':
       return oneOf(v.tracking, TRACKING) && typeof v.baseline === 'boolean' && typeof v.ducking === 'boolean' && num(v.duck, 0, 1) && int(v.hops, 0, 100_000)
-        ? { ...base, type: 'DODGE_STATUS', tracking: v.tracking, baseline: v.baseline, ducking: v.ducking, duck: v.duck, hops: v.hops }
+        ? { ...base, type: 'DODGE_STATUS', tracking: v.tracking, baseline: v.baseline, ducking: v.ducking, duck: v.duck, hops: v.hops, ...stamp(v.at) }
         : null;
+    case 'PONG':
+      return int(v.id, 0, 1e9) && num(v.t, 0, 1e12) && num(v.at, 0, 1e12) ? { ...base, type: 'PONG', id: v.id, t: v.t, at: v.at } : null;
     case 'NAV':
       return oneOf(v.dir, [-1, 1] as const) && oneOf(v.via, VIA) ? { ...base, type: 'NAV', dir: v.dir, via: v.via } : null;
     case 'CALIBRATION':
@@ -283,7 +290,7 @@ export function parseCtrlMsg(v: unknown): CtrlMsg | null {
     case 'EXERCISE_REP':
       if (v.side !== undefined && !oneOf(v.side, ['left', 'right'] as const)) return null;
       return str(v.setId, 40) && str(v.exerciseId, 32) && int(v.index, 1, 10_000) && oneOf(v.source, ['camera', 'manual'] as const)
-        ? { ...base, type: 'EXERCISE_REP', setId: v.setId, exerciseId: v.exerciseId, index: v.index, source: v.source, ...(v.side ? { side: v.side as Side } : {}) }
+        ? { ...base, type: 'EXERCISE_REP', setId: v.setId, exerciseId: v.exerciseId, index: v.index, source: v.source, ...(v.side ? { side: v.side as Side } : {}), ...stamp(v.at) }
         : null;
     case 'EXERCISE_HOLD':
       return str(v.setId, 40) && int(v.heldMs, 0, 3_600_000) ? { ...base, type: 'EXERCISE_HOLD', setId: v.setId, heldMs: v.heldMs } : null;
@@ -335,6 +342,8 @@ export function parseGameMsg(v: unknown): GameMsg | null {
       return str(v.setId, 40) ? { type: 'EXERCISE_END', setId: v.setId } : null;
     case 'ACK':
       return int(v.seq, 1, Number.MAX_SAFE_INTEGER) ? { type: 'ACK', seq: v.seq } : null;
+    case 'PING':
+      return int(v.id, 0, 1e9) && num(v.t, 0, 1e12) ? { type: 'PING', id: v.id, t: v.t } : null;
     case 'GAME':
       return text(v.title, 120) && text(v.hint, 240) && (v.exercise === null || text(v.exercise, 60)) && typeof v.paused === 'boolean' && (v.notice === null || text(v.notice, 200))
         ? { type: 'GAME', title: v.title, hint: v.hint, exercise: v.exercise as string | null, paused: v.paused, notice: v.notice as string | null }

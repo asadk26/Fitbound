@@ -6,7 +6,7 @@ import { input } from '../../input/InputHub';
 import { iconDataUrl } from '../../phaser/art';
 import { ability } from '../../rpg/abilities';
 import { ROUTES, type RouteId } from '../../rpg/expedition';
-import { alternatives, eligibility, generateLoadout, rerollAll, setTarget, type DayPrefs, type ExLoadout } from '../../rpg/loadout';
+import { alternatives, eligibility, generateLoadout, rerollAll, restingSore, setTarget, SORE_AREAS, type DayPrefs, type ExLoadout, type Soreness } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
 import { useInputEvents } from '../motionUi';
 import { useSave } from '../useSave';
@@ -18,7 +18,7 @@ import { VoiceToggle } from '../VoiceUi';
  * rolled for you, reroll or swap, then set off. Couch-friendly: nothing here
  * needs the camera.
  */
-export function Sanctuary({ connected, onBegin, onLab, onBack }: { connected: boolean; onBegin: (prefs: DayPrefs, loadout: ExLoadout, route: RouteId) => void; onLab: () => void; onBack: () => void }) {
+export function Sanctuary({ connected, onBegin, onLab, onJournal, onBack }: { connected: boolean; onBegin: (prefs: DayPrefs, loadout: ExLoadout, route: RouteId) => void; onLab: () => void; onJournal: () => void; onBack: () => void }) {
   const save = useSave();
   const prefs = save.expeditionPrefs;
   const [route, setRoute] = useState<RouteId>('standard');
@@ -50,6 +50,7 @@ export function Sanctuary({ connected, onBegin, onLab, onBack }: { connected: bo
       { id: 'begin', run: () => onBegin(getSave().expeditionPrefs, loadout, route) },
       { id: 'reroll', run: () => reroll() },
       { id: 'lab', run: onLab },
+      { id: 'journal', run: onJournal },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [loadout, route],
@@ -112,6 +113,30 @@ export function Sanctuary({ connected, onBegin, onLab, onBack }: { connected: bo
             <span>How do you feel?</span>
             {seg(prefs.intensity, [['easy', 'Take it easy'], ['normal', 'Normal'], ['strong', 'Strong']], (v) => setPrefs((p) => void (p.intensity = v)))}
           </div>
+          <div className="toggle-row sore-row">
+            <span>Sore today?</span>
+            <div className="sore-grid">
+              {SORE_AREAS.map((a) => (
+                <div key={a} className="sore-area">
+                  <small>{FAMILY_INFO[a].name}</small>
+                  {seg<'no' | Soreness>(prefs.sore?.[a] ?? 'no', [['no', 'No'], ['gentle', 'Go gentle'], ['rest', 'Rest it']], (v) =>
+                    setPrefs((p) => {
+                      const sore = { ...(p.sore ?? {}) };
+                      if (v === 'no') delete sore[a];
+                      else sore[a] = v;
+                      p.sore = sore;
+                      p.soreAt = Date.now();
+                    }),
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          {Object.keys(prefs.sore ?? {}).length > 0 && (
+            <p className="muted small sore-note">
+              Go gentle: that family's targets drop to about 60% today. Rest it: its ability sits out and the other three carry you.{prefs.sore?.legs ? ' Sore legs ease cardio a little too.' : ''} It's forgotten by tomorrow.
+            </p>
+          )}
           <div className="toggle-row">
             <span>Attack cues</span>
             {seg(save.settings.attackCues, [['adaptive', 'Learn as you go'], ['obvious', 'Always obvious']], (v) => updateSave((s) => void (s.settings.attackCues = v)))}
@@ -152,7 +177,7 @@ export function Sanctuary({ connected, onBegin, onLab, onBack }: { connected: bo
                 ) : (
                   <>
                     <b>Resting today</b>
-                    <span className="lo-role">Nothing eligible — the other three abilities carry you.</span>
+                    <span className="lo-role">{restingSore(f, prefs) ? 'Sore — resting it. The other three abilities carry you.' : 'Nothing eligible — the other three abilities carry you.'}</span>
                   </>
                 )}
               </div>
@@ -204,6 +229,9 @@ export function Sanctuary({ connected, onBegin, onLab, onBack }: { connected: bo
         <div className="row">
           <button className="btn btn-ghost" onClick={onBack}>
             Back
+          </button>
+          <button className={`btn ${focus === 3 ? 'focus' : 'btn-ghost'}`} onClick={onJournal}>
+            Journal
           </button>
           <button className={`btn ${focus === 2 ? 'focus' : 'btn-ghost'}`} onClick={onLab}>
             Movement Lab

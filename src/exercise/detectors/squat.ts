@@ -63,7 +63,7 @@ type Phase = 'SETUP' | 'STANDING' | 'LOWERING' | 'BOTTOM_POSITION' | 'RISING';
 const LEG_IDX = [LM.L_HIP, LM.R_HIP, LM.L_KNEE, LM.R_KNEE, LM.L_ANKLE, LM.R_ANKLE];
 
 export class SquatDetector implements ExerciseDetector {
-  readonly exerciseId = 'squat';
+
   readonly kind = 'reps' as const;
   private phase: Phase = 'SETUP';
   private readonly gate: TrackingGate;
@@ -75,7 +75,11 @@ export class SquatDetector implements ExerciseDetector {
   private repStart = 0;
   private cue: { code: GuidanceCode; until: number } | null = null;
 
-  constructor(private readonly cfg: SquatConfig = SQUAT_DEFAULTS) {
+  constructor(
+    private readonly cfg: SquatConfig = SQUAT_DEFAULTS,
+    /** Squat variants (goblet, sumo) share this detector under their own id. */
+    readonly exerciseId: string = 'squat',
+  ) {
     this.gate = new TrackingGate(cfg.lostGraceMs);
     this.ready = new StableCounter(cfg.readyFrames);
     this.rise = new Ema(cfg.smoothing);

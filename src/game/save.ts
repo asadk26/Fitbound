@@ -3,8 +3,9 @@ import type { Difficulty } from '../exercise/types';
 import { levelForXp, type Upgrades } from './progression';
 import { DEFAULT_TARGETS, type TrialTargets } from '../trial/config';
 import type { Sensitivity } from '../input/motion';
-import { DEFAULT_PREFS, type Calibrations, type DayPrefs } from '../rpg/loadout';
+import { DEFAULT_PREFS, SORE_AREAS, SORE_TTL_MS, type Calibrations, type DayPrefs } from '../rpg/loadout';
 import type { WorkoutRecord } from '../rpg/workout';
+import type { ProgressState } from '../rpg/progression';
 
 export const SAVE_KEY = 'fitbound.save.v1';
 export const SAVE_VERSION = 1;
@@ -68,6 +69,8 @@ export interface SaveData {
   workouts: WorkoutRecord[];
   /** Story progress that outlives any one run. */
   story: StoryState;
+  /** Per-movement target progression: streaks and past changes. */
+  progress: Record<string, ProgressState>;
 }
 
 export interface StoryState {
@@ -115,6 +118,7 @@ export function defaultSave(): SaveData {
     calibrations: {},
     workouts: [],
     story: { ...DEFAULT_STORY },
+    progress: {},
   };
 }
 
@@ -201,7 +205,8 @@ export function sanitize(input: unknown): SaveData {
     expeditionPrefs: sanitizePrefs(o.expeditionPrefs, known),
     exerciseTargets: Object.fromEntries(Object.entries(o.exerciseTargets ?? {}).filter(([k, v]) => known.has(k) && typeof v === 'number' && Number.isFinite(v) && v >= 1 && v <= 600).map(([k, v]) => [k, Math.round(v as number)])),
     calibrations: Object.fromEntries(Object.entries(o.calibrations ?? {}).filter(([k, v]) => known.has(k) && v && typeof v.at === 'number' && typeof v.reps === 'number')),
-    workouts: Array.isArray(o.workouts) ? o.workouts.filter((w) => w && typeof w.id === 'string' && typeof w.at === 'number' && w.volume && typeof w.volume === 'object').slice(-20) : [],
+    workouts: Array.isArray(o.workouts) ? o.workouts.filter((w) => w && typeof w.id === 'string' && typeof w.at === 'number' && w.volume && typeof w.volume === 'object').slice(-60) : [],
+    progress: sanitizeProgress(o.progress, known),
     story: {
       openingSeen: !!o.story?.openingSeen,
       restored: !!o.story?.restored,
@@ -237,7 +242,34 @@ function sanitizePrefs(v: unknown, known: Set<string>): DayPrefs {
     exclude: Array.isArray(p.exclude) ? p.exclude.filter((x): x is string => typeof x === 'string' && known.has(x)) : [],
     intensity: p.intensity === 'easy' || p.intensity === 'strong' ? p.intensity : 'normal',
     experimental: p.experimental === true,
+    ...sanitizeSore(p),
   };
+}
+
+function sanitizeProgress(v: unknown, known: Set<string>): Record<string, ProgressState> {
+  const out: Record<string, ProgressState> = {};
+  if (!v || typeof v !== 'object') return out;
+  for (const [id, raw] of Object.entries(v as Record<string, unknown>)) {
+    if (!known.has(id) || !raw || typeof raw !== 'object') continue;
+    const r = raw as Partial<ProgressState>;
+    const history = Array.isArray(r.history)
+      ? r.history.filter((h) => h && typeof h.at === 'number' && typeof h.from === 'number' && typeof h.to === 'number' && typeof h.why === 'string').slice(-12)
+      : [];
+    out[id] = { streak: Number.isInteger(r.streak) && r.streak! >= 0 && r.streak! < 10 ? r.streak! : 0, history };
+  }
+  return out;
+}
+
+/** Soreness is about today: an old answer is dropped. */
+function sanitizeSore(p: Partial<DayPrefs>): Pick<DayPrefs, 'sore' | 'soreAt'> {
+  const at = typeof p.soreAt === 'number' && Number.isFinite(p.soreAt) ? p.soreAt : 0;
+  if (!p.sore || typeof p.sore !== 'object' || Date.now() - at > SORE_TTL_MS) return { sore: {} };
+  const sore: DayPrefs['sore'] = {};
+  for (const a of SORE_AREAS) {
+    const v = (p.sore as Record<string, unknown>)[a];
+    if (v === 'gentle' || v === 'rest') sore[a] = v;
+  }
+  return { sore, soreAt: at };
 }
 
 /** Ensure unlocks match the level and the loadout holds only playable, unlocked exercises. */

@@ -1,4 +1,5 @@
 import { getSave, subscribeSave } from '../game/store';
+import { LatencyStats } from './latency';
 import type { CalState } from '../input/calibration';
 import { input as defaultHub, type InputHub } from '../input/InputHub';
 import type { MotionReading } from '../input/motion';
@@ -72,6 +73,10 @@ export class HostLink {
   dodge: { tracking: 'good' | 'partial' | 'lost'; baseline: boolean; ducking: boolean; duck: number; hops: number; at: number } | null = null;
   /** Rejected messages, by reason (shown in the debug hook and logged). */
   readonly rejected: Record<string, number> = {};
+  /** How long the phone's messages take to arrive (measured only; see latency.ts). */
+  readonly latency = new LatencyStats();
+  private pingId = 0;
+  private ticks = 0;
 
   constructor(private readonly hub: InputHub = defaultHub) {}
 
@@ -242,6 +247,9 @@ export class HostLink {
       case 'HELLO':
       case 'HEARTBEAT':
         return;
+      case 'PONG':
+        this.latency.pong(msg.t, msg.at, now);
+        return;
       case 'STATUS': {
         const { camera, model, calibrated, tracking, error, moved, cameraLabel } = msg;
         this.set({ status: { camera, model, calibrated, tracking, error, moved, cameraLabel } });
@@ -270,6 +278,7 @@ export class HostLink {
         return;
       case 'EXERCISE_REP': {
         const verdict = this.activeSet ? this.activeSet.rep(msg, now) : 'wrong-set';
+        if (verdict === 'accepted' && msg.at !== undefined) this.latency.event('rep', msg.at, now);
         if (verdict !== 'accepted') this.rejected[`rep:${verdict}`] = (this.rejected[`rep:${verdict}`] ?? 0) + 1;
         return;
       }
@@ -279,6 +288,7 @@ export class HostLink {
       case 'DODGE_STATUS': {
         const { tracking, baseline, ducking, duck, hops } = msg;
         this.dodge = { tracking, baseline, ducking, duck, hops, at: now };
+        if (msg.at !== undefined) this.latency.event('dodge', msg.at, now);
         return;
       }
       case 'EXERCISE_HOLD':
@@ -293,6 +303,8 @@ export class HostLink {
   }
 
   private tick(): void {
+    // Every few seconds, ping the phone to measure the delay (nothing else uses it).
+    if (++this.ticks % 6 === 0 && this.state.controller === 'connected') this.send({ type: 'PING', id: ++this.pingId, t: performance.now() });
     if (this.state.controller === 'connected' && performance.now() - this.lastHeard > STALE_MS) this.lost();
     // Pairing offers are short-lived; show a fresh one when it runs out.
     const p = this.state.pairing;

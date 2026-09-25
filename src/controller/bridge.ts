@@ -131,6 +131,10 @@ export class ControllerBridge {
   // ── Messages from the game ──────────────────────────────────────────────
   handle(msg: GameMsg): void {
     switch (msg.type) {
+      case 'PING':
+        // Echo with our clock so the PC can measure the delay (nothing else changes).
+        this.out({ type: 'PONG', id: msg.id, t: msg.t, at: this.clock() });
+        return;
       case 'MODE':
         if (msg.calibration) this.calKind = msg.calibration;
         this.applyMode(msg.mode, msg.epoch);
@@ -255,7 +259,7 @@ export class ControllerBridge {
       if (key !== this.dodgeKey || now - this.dodgeAt >= 66) {
         this.dodgeKey = key;
         this.dodgeAt = now;
-        this.out({ type: 'DODGE_STATUS', tracking: r.tracking, baseline: r.baseline, ducking: r.ducking, duck: Math.round(r.duck * 100) / 100, hops: r.hops });
+        this.out({ type: 'DODGE_STATUS', tracking: r.tracking, baseline: r.baseline, ducking: r.ducking, duck: Math.round(r.duck * 100) / 100, hops: r.hops, at: this.clock() });
       }
     } else if (d.march || d.lean || d.gestures) {
       const r = this.hub.feed(frame, now);
@@ -467,7 +471,7 @@ export class ControllerBridge {
 
   private onExerciseEvent(setId: string, e: ExerciseEvent): void {
     if (e.type !== 'rep' || this.set?.id !== setId) return;
-    this.out({ type: 'EXERCISE_REP', setId, exerciseId: e.exerciseId, index: e.index, source: e.source, ...(e.side ? { side: e.side } : {}) });
+    this.out({ type: 'EXERCISE_REP', setId, exerciseId: e.exerciseId, index: e.index, source: e.source, ...(e.side ? { side: e.side } : {}), at: this.clock() });
     this.note(e.source === 'manual' ? '+1 rep (manual)' : '+1 rep');
   }
 }

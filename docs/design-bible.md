@@ -1389,9 +1389,17 @@ Since then, the following have also been implemented (not yet physically playtes
   - **Faces:** blinks, plus wince, soft, wonder and blink expressions, used in gameplay, cinematics and portraits.
   - **Fallback:** the original design is kept as `heroClassic`.
 
+- **Training features (first version).**
+  - **Sore today?** in the Sanctuary: go gentle (about 60% targets) or rest a family (§12, §19).
+  - **Target progression:** learned from full, early and short sets and pace, plus the optional check-in. Slow to go up, quick to come down, applied between sessions, with a one-tap "keep".
+  - **A read-only Journal.**
+  - **Passive phone-to-PC lag measurement** in the playtest report.
+  - **Eight new movements**, all beta or experimental, each with its own ability: overhead press, lateral raises, goblet squats, sumo squats, glute bridges, skaters, butt kicks and Russian twists.
+  - **A Lab-only punch test**, facing the phone and side-on, as a feasibility check for Punch Away and the Unbound (§22–§23).
+
 Validation to date:
 
-- **Automated:** 298 passing unit tests. These include the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
+- **Automated:** 326 passing unit tests. These include the new detectors, soreness, progression, the Journal, the lag measurement, the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
 - **Headless browser:** the full opening (every line in order), the ritual on the next launch (the opening does not repeat), skip, the Sanctuary screen over the garden, and the dry garden after restoration. Screenshots were reviewed; the visuals are a first version for the creator to evaluate.
 - **Headless browser runs through the local relay with a scripted synthetic body:**
   - a full standard expedition (19 sets, all march legs, the shrine detour, and victory);
@@ -1489,7 +1497,9 @@ They should be resolved through implementation and playtesting.
 
 ### Gameplay
 
-- Final exercise targets and progression rates.
+- Final exercise targets and progression rates. A first set of rules exists (§32); tune them after a few weeks of real sessions.
+- How sets per session should scale (currently fixed by route), which belongs to the Workout Director (§19).
+- Whether straight punches read reliably, facing the phone or side-on (the Lab punch test), before Punch Away and the Unbound are designed around them.
 - Precise full-run encounter count.
 - Final HP, damage, and cooldown balance.
 - Ideal timing windows for dodging.
@@ -1573,3 +1583,4 @@ That is the experience every major design decision should serve.
 - **2026-09-25 (later):** §32 updated with the playtest aids.
 - **2026-09-25 (later):** §32 updated with the opening cinematic, the ritual, Elara's first visual identity, and the Sanctuary rain motif. §34 notes that Elara's look has a first version.
 - **2026-09-25 (later):** §32 updated with the refined hero; §34 notes his design has a first version.
+- **2026-09-25 (later):** §32 updated with soreness, target progression, the Journal, the lag measurement, eight new movements and the punch test. §34 adds sets scaling and punch readability as open questions.

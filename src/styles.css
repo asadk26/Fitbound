@@ -3146,3 +3146,137 @@ details summary {
 .title-screen.in-garden {
   background: radial-gradient(ellipse at center, rgba(20, 22, 34, 0.35), rgba(20, 22, 34, 0.7));
 }
+
+/* Sanctuary: soreness */
+.sore-row {
+  align-items: flex-start;
+}
+.sore-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.sore-area {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sore-area small {
+  color: var(--mist);
+  font-size: 12px;
+}
+.sore-note {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* Summary: next time's targets */
+.next-time {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  justify-content: center;
+  margin: 1vh 0;
+  font-size: max(12px, 2.2vh);
+}
+.nt-item {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.nt-item.up {
+  border-left: 4px solid var(--lime);
+}
+.nt-item.down {
+  border-left: 4px solid var(--orange);
+}
+.nt-item.kept {
+  border-left: 4px solid var(--mist);
+  opacity: 0.8;
+}
+.nt-item small {
+  color: var(--mist);
+}
+
+/* Journal */
+.journal {
+  width: min(1000px, 100%);
+  text-align: left;
+}
+.journal h3 {
+  margin: 18px 0 8px;
+  font-size: 14px;
+  color: var(--gold);
+}
+.jr-days {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 6px;
+  margin: 8px 0;
+}
+.jr-day {
+  height: 26px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+.jr-day.on {
+  background: #ffb45a;
+  color: #2a1a10;
+  box-shadow: 0 0 8px rgba(255, 180, 90, 0.5);
+}
+.jr-fams {
+  display: grid;
+  gap: 6px;
+}
+.jr-fam {
+  display: grid;
+  grid-template-columns: 110px 1fr 80px;
+  align-items: center;
+  gap: 10px;
+}
+.jr-bar {
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.jr-bar i {
+  display: block;
+  height: 100%;
+  background: var(--fam);
+}
+.jr-moves td,
+.jr-sessions td {
+  font-size: 13px;
+}
+/* Four summary options fit on one row without scrolling the panel sideways. */
+.exp-summary {
+  overflow-x: hidden;
+}
+.exp-summary .gmenu-opt {
+  min-width: 12vw;
+}
+/* Journal tables: plain and compact (not the summary's large type). */
+.journal .sum-table th,
+.journal .sum-table td {
+  font-family: var(--sans);
+  font-size: 13px;
+  padding: 3px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.journal .sum-table th {
+  color: var(--white);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.journal .sum-table {
+  width: 100%;
+}

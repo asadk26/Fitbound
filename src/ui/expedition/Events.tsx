@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { FAMILIES, FAMILY_INFO, getExercise, targetLabel, type Family } from '../../exercise/registry';
 import { havenSequence, recoveryDuration, type RecoveryMove } from '../../exercise/recovery';
 import { audio } from '../../game/audio';
-import { getSave } from '../../game/store';
+import { getSave, updateSave } from '../../game/store';
 import { input } from '../../input/InputHub';
+import { host } from '../../net/host';
 import { ability } from '../../rpg/abilities';
 import { blessing, offerBlessings, type BlessingDef } from '../../rpg/blessings';
 import { ROUTES, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
 import { alternatives, rerollAll, type ExLoadout } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
 import { playtestReport } from '../../rpg/report';
+import { applyProposals, propose } from '../../rpg/progression';
 import { completion, pacing, totals, workingSets, type Feedback } from '../../rpg/workout';
 import { GestureMenu, useInputEvents } from '../motionUi';
 
@@ -308,7 +310,14 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
   const openReport = () => {
     const save = getSave();
     setCopied('');
-    setReport(playtestReport(x, fb, { travel: save.settings.motion.traversal === 'assisted' ? 'gamepad' : 'march', cues: save.settings.attackCues }));
+    setReport(
+      playtestReport(x, fb, {
+        travel: save.settings.motion.traversal === 'assisted' ? 'gamepad' : 'march',
+        cues: save.settings.attackCues,
+        latency: host.latency.text(),
+        next: plan.proposals.map((p) => `${getExercise(p.exerciseId).name} ${p.from} → ${kept[p.exerciseId] ? `${p.from} (kept)` : p.to} (${p.why})`),
+      }),
+    );
   };
   const copy = () =>
     navigator.clipboard
@@ -325,6 +334,27 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
     a.download = `fitbound-playtest-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.txt`;
     a.click();
     URL.revokeObjectURL(a.href);
+  };
+  // Targets for next time, from what this run's sets showed (and the check-in, if answered).
+  const finished = x.status !== 'suspended';
+  const plan = finished ? propose(w, x.prefs, getSave().exerciseTargets, getSave().progress, fb) : { proposals: [], progress: getSave().progress };
+  const [kept, setKept] = useState<Record<string, boolean>>({});
+  const committed = useRef(false);
+  const commit = () => {
+    if (committed.current || !finished) return;
+    committed.current = true;
+    updateSave((s) => {
+      s.progress = plan.progress;
+      applyProposals(
+        s.exerciseTargets,
+        s.progress,
+        plan.proposals.filter((p) => !kept[p.exerciseId]),
+      );
+    });
+  };
+  const leave = (then: () => void) => {
+    commit();
+    then();
   };
   const rows = totals(w);
   const won = w.outcome === 'victory';
@@ -396,6 +426,23 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
             {x.blessings.length > 0 && <p>Blessings: {x.blessings.map((b) => blessingName(b)).join(', ')}</p>}
           </div>
         </div>
+        {step >= CHECKIN.length && plan.proposals.length > 0 && (
+          <div className="next-time">
+            <b>Next time</b>
+            {plan.proposals.map((p) => {
+              const ex = getExercise(p.exerciseId);
+              const keep = !!kept[p.exerciseId];
+              return (
+                <span key={p.exerciseId} className={`nt-item ${keep ? 'kept' : p.verdict}`}>
+                  {ex.name}: {keep ? targetLabel(ex, p.from) : `${targetLabel(ex, p.from)} → ${targetLabel(ex, p.to)}`} <small>{keep ? 'unchanged' : p.why}</small>
+                  <button className="btn btn-sm btn-ghost" onClick={() => setKept((k) => ({ ...k, [p.exerciseId]: !keep }))}>
+                    {keep ? 'Change it' : 'Keep'}
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
         {step < CHECKIN.length ? (
           <GestureMenu
             key={step}
@@ -416,10 +463,20 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
             active={!report}
             options={[
               { id: 'again', label: 'Back to the Sanctuary', icon: 'star' },
+              ...(plan.proposals.length
+                ? [{ id: 'keepall', label: plan.proposals.every((p) => kept[p.exerciseId]) ? 'Use the new targets' : 'Keep my targets as they are', detail: 'Changes to next time’s targets', icon: 'heart' }]
+                : []),
               { id: 'report', label: 'Playtest report', detail: 'Copy or save a text summary of this run', icon: 'shield' },
               { id: 'title', label: 'Title screen', icon: 'lock' },
             ]}
-            onChoose={(id) => (id === 'again' ? onAgain() : id === 'report' ? openReport() : onExit())}
+            onChoose={(id) => {
+              if (id === 'again') leave(onAgain);
+              else if (id === 'keepall') {
+                const all = plan.proposals.every((p) => kept[p.exerciseId]);
+                setKept(Object.fromEntries(plan.proposals.map((p) => [p.exerciseId, !all])));
+              } else if (id === 'report') openReport();
+              else leave(onExit);
+            }}
           />
         )}
       </div>

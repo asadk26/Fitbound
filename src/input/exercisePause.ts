@@ -43,6 +43,15 @@ export const PAUSE_POLICIES: Record<string, PausePolicy> = {
   // Arms pump during high knees; cross crunches start with hands behind the head.
   high_knees: { holdMs: 1500, feetTogether: true, still: true, standing: false },
   cross_crunch: { holdMs: 1500, feetTogether: true, still: true, standing: false },
+  goblet_squat: { holdMs: 1000, feetTogether: false, still: false, standing: false },
+  sumo_squat: { holdMs: 1000, feetTogether: false, still: false, standing: false },
+  lateral_raise: { holdMs: 1000, feetTogether: false, still: false, standing: false },
+  // Presses end with the hands overhead: only a long, still hold with the feet together pauses.
+  overhead_press: { holdMs: 3000, feetTogether: true, still: true, standing: false },
+  skaters: { holdMs: 1500, feetTogether: true, still: true, standing: false },
+  butt_kicks: { holdMs: 1500, feetTogether: true, still: true, standing: false },
+  punch_front: { holdMs: 1500, feetTogether: true, still: true, standing: false },
+  punch_side: { holdMs: 1500, feetTogether: true, still: true, standing: false },
 };
 
 const DEFAULT_POLICY: PausePolicy = { holdMs: 1200, feetTogether: false, still: false, standing: true };

@@ -163,6 +163,14 @@ export interface WorkoutRecord {
   volume: Record<string, { sets: number; work: number }>;
   /** The player's own check-in after the run, if given. */
   feedback?: Feedback;
+  /** Minutes the session took (wall clock) and how many sets did work. */
+  minutes?: number;
+  sets?: number;
+  intensity?: WorkoutData['intensity'];
+  /** Areas that were sore that day. */
+  sore?: string[];
+  /** Steps marched between fights. */
+  steps?: number;
 }
 
 /** A quick post-run check-in. Every answer is optional. */
@@ -172,12 +180,22 @@ export interface Feedback {
   pacing?: 'slow' | 'right' | 'rushed';
 }
 
-export function toRecord(w: WorkoutData): WorkoutRecord {
+export function toRecord(w: WorkoutData, sore: string[] = []): WorkoutRecord {
   const volume: WorkoutRecord['volume'] = {};
   for (const s of w.sets) {
     const v = (volume[s.exerciseId] ??= { sets: 0, work: 0 });
     v.sets++;
     v.work += s.camera + s.manual + Math.floor(s.holdMs / 1000);
   }
-  return { id: w.id, at: w.lastAt, outcome: w.outcome, volume };
+  return {
+    id: w.id,
+    at: w.lastAt,
+    outcome: w.outcome,
+    volume,
+    minutes: Math.round(pacing(w).total / 60000) || Math.round(Math.max(0, w.lastAt - w.startedAt) / 60000),
+    sets: workingSets(w),
+    intensity: w.intensity,
+    ...(sore.length ? { sore } : {}),
+    ...(w.march?.steps ? { steps: w.march.steps } : {}),
+  };
 }

@@ -249,3 +249,22 @@ describe('pacing and the playtest report', () => {
     expect(loadSave(store).workouts[0].feedback).toEqual({ pacing: 'slow' });
   });
 });
+
+describe('soreness today', () => {
+  it('a family you rest sits out; gentle lowers its targets; sore legs ease cardio', () => {
+    const p = prefs({ sore: { upper: 'rest', core: 'gentle', legs: 'gentle' } });
+    for (let i = 0; i < 20; i++) expect(generateLoadout(p, allChecked, [], rng(i)).upper).toBeNull();
+    expect(setTarget(getExercise('plank'), p)).toBe(Math.round(getExercise('plank').range.default * 0.6));
+    expect(setTarget(getExercise('squat'), p)).toBe(Math.round(getExercise('squat').range.default * 0.6));
+    expect(setTarget(getExercise('jumping_jack'), p)).toBe(Math.round(getExercise('jumping_jack').range.default * 0.8));
+    expect(setTarget(getExercise('jumping_jack'), prefs())).toBe(getExercise('jumping_jack').range.default);
+  });
+
+  it('is about today: yesterday’s soreness is forgotten', () => {
+    const fresh = sanitize({ expeditionPrefs: { sore: { legs: 'rest' }, soreAt: Date.now() - 3600_000 } });
+    expect(fresh.expeditionPrefs.sore).toEqual({ legs: 'rest' });
+    const old = sanitize({ expeditionPrefs: { sore: { legs: 'rest' }, soreAt: Date.now() - 30 * 3600_000 } });
+    expect(old.expeditionPrefs.sore).toEqual({});
+    expect(sanitize({ expeditionPrefs: { sore: { legs: 'wobbly' }, soreAt: Date.now() } }).expeditionPrefs.sore).toEqual({});
+  });
+});

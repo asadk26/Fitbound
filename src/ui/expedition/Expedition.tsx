@@ -21,6 +21,7 @@ import { CinemaPlayer } from '../Cinema';
 import type { Script } from '../../story/cinema';
 import { OPENING, ritualReason, ritualScript, type RitualReason } from '../../story/scripts';
 import { BlessingPick, Fallen, Haven, Mirror, PathView, Summary } from './Events';
+import { Journal } from './Journal';
 import { MovementLab } from './MovementLab';
 import { RpgBattle } from './RpgBattle';
 import { Sanctuary } from './Sanctuary';
@@ -35,7 +36,7 @@ import type { SetResult } from './setRunner';
  * choices and the Haven work from the couch with a gamepad, and the camera
  * check happens right before the first fight rather than at the start.
  */
-type View = 'cinema' | 'sanctuary' | 'lab' | 'calibrate' | 'path' | 'travel' | 'node' | 'fallen' | 'summary';
+type View = 'cinema' | 'sanctuary' | 'journal' | 'lab' | 'calibrate' | 'path' | 'travel' | 'node' | 'fallen' | 'summary';
 
 export function Expedition({ connected, resume, onExit }: { connected: boolean; resume: boolean; onExit: () => void }) {
   const [x, setXState] = useState<ExpeditionState | null>(() => {
@@ -122,7 +123,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
   useEffect(() => {
     if (!connected) return;
     const n = x ? currentNode(x) : null;
-    host.send({ type: 'GAME', title: view === 'sanctuary' || view === 'cinema' ? 'The Sanctuary' : view === 'node' && n ? n.title : 'Heart of Haze', hint: '', exercise: null, paused: false, notice: null });
+    host.send({ type: 'GAME', title: view === 'sanctuary' || view === 'cinema' || view === 'journal' ? 'The Sanctuary' : view === 'node' && n ? n.title : 'Heart of Haze', hint: '', exercise: null, paused: false, notice: null });
   }, [connected, view, x, link.controller]);
 
   /** Quick camera check before the first physical node this session. */
@@ -307,9 +308,11 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
           connected={connected}
           onBegin={begin}
           onLab={() => setView('lab')}
+          onJournal={() => setView('journal')}
           onBack={onExit}
         />
       )}
+      {view === 'journal' && <Journal onBack={() => setView('sanctuary')} />}
       {view === 'lab' && (
         <MovementLab
           connected={connected}
@@ -482,7 +485,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
         />
       )}
 
-      {ctrlLost && view !== 'summary' && view !== 'sanctuary' && view !== 'cinema' && view !== 'lab' && <ControllerLost />}
+      {ctrlLost && view !== 'summary' && view !== 'sanctuary' && view !== 'cinema' && view !== 'journal' && view !== 'lab' && <ControllerLost />}
       {x && view === 'path' && <div className="exp-route">{ROUTES[x.route].name}</div>}
     </div>
   );
@@ -524,7 +527,7 @@ function arrival(arrived: () => void): { script: Script; restored: boolean; then
 function recordHistory(x: ExpeditionState): void {
   if (!x.workout.sets.length && !x.workout.recoveryMs) return;
   updateSave((s) => {
-    s.workouts = [...s.workouts, toRecord(x.workout)].slice(-20);
+    s.workouts = [...s.workouts, toRecord(x.workout, Object.keys(x.prefs.sore ?? {}))].slice(-60);
     if (x.workout.outcome === 'victory') s.clears++;
   });
 }

@@ -24,9 +24,34 @@ export interface DayPrefs {
   exclude: string[];
   intensity: 'easy' | 'normal' | 'strong';
   experimental: boolean;
+  /** Sore today: go gentle on a family (lighter targets) or rest it (its ability sits out). */
+  sore: Partial<Record<SoreArea, Soreness>>;
+  /** When soreness was last set: it's about today, so it clears after a day. */
+  soreAt?: number;
 }
 
-export const DEFAULT_PREFS: DayPrefs = { dumbbells: false, support: false, exclude: [], intensity: 'normal', experimental: false };
+export type SoreArea = 'upper' | 'legs' | 'core';
+export type Soreness = 'gentle' | 'rest';
+export const SORE_AREAS: readonly SoreArea[] = ['upper', 'legs', 'core'];
+/** Soreness is about today: after this long it's forgotten. */
+export const SORE_TTL_MS = 20 * 3600_000;
+
+export const DEFAULT_PREFS: DayPrefs = { dumbbells: false, support: false, exclude: [], intensity: 'normal', experimental: false, sore: {} };
+
+/** Whether a family sits out today because it's sore. */
+export function restingSore(f: Family, prefs: DayPrefs): boolean {
+  return f !== 'cardio' && prefs.sore?.[f] === 'rest';
+}
+
+/**
+ * How much of the usual target a family gets today because of soreness:
+ * gentle is 60%; sore legs also ease cardio (mostly legs) to 80%.
+ */
+export function soreFactor(f: Family, prefs: DayPrefs): number {
+  const s = prefs.sore ?? {};
+  if (f === 'cardio') return s.legs ? 0.8 : 1;
+  return s[f] === 'gentle' ? 0.6 : 1;
+}
 
 export type Calibrations = Record<string, { at: number; reps: number }>;
 
@@ -75,6 +100,7 @@ function pickWeighted<T>(items: { v: T; w: number }[], rng: () => number): T | n
 }
 
 export function pickForFamily(family: Family, prefs: DayPrefs, cal: Calibrations, history: WorkoutRecord[], rng: () => number, avoid?: string): Slot | null {
+  if (restingSore(family, prefs)) return null;
   const all = EXERCISES.filter((e) => e.family === family).map((ex) => ({ ex, el: eligibility(ex, prefs, cal) }));
   const ready = all.filter((x) => x.el.tier === 'ready');
   // Experimental movements are never a silent first-time fallback.
@@ -93,7 +119,8 @@ export function generateLoadout(prefs: DayPrefs, cal: Calibrations, history: Wor
   const out = {} as ExLoadout;
   for (const f of FAMILIES) {
     const k = keep[f];
-    if (k && eligibility(getExercise(k), prefs, cal).tier !== 'blocked') out[f] = { exerciseId: k, firstCheck: eligibility(getExercise(k), prefs, cal).tier === 'check' };
+    if (restingSore(f, prefs)) out[f] = null;
+    else if (k && eligibility(getExercise(k), prefs, cal).tier !== 'blocked') out[f] = { exerciseId: k, firstCheck: eligibility(getExercise(k), prefs, cal).tier === 'check' };
     else out[f] = pickForFamily(f, prefs, cal, history, rng, avoid[f]);
   }
   return out;
@@ -117,8 +144,8 @@ export function alternatives(family: Family, current: string | undefined, prefs:
 
 const INTENSITY = { easy: 0.7, normal: 1, strong: 1.25 };
 
-/** A set's target: your own setting (or the default), scaled by today's readiness — never by enemy difficulty. */
+/** A set's target: your own setting (or the default), scaled by today's readiness and soreness — never by enemy difficulty. */
 export function setTarget(ex: ExerciseDefinition, prefs: DayPrefs, custom: Record<string, number> = {}): number {
   const base = custom[ex.id] ?? ex.range.default;
-  return Math.max(ex.range.min, Math.min(ex.range.max, Math.round(base * INTENSITY[prefs.intensity])));
+  return Math.max(ex.range.min, Math.min(ex.range.max, Math.round(base * INTENSITY[prefs.intensity] * soreFactor(ex.family, prefs))));
 }
