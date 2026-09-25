@@ -1367,10 +1367,15 @@ Since then, the following have also been implemented (not yet physically playtes
 - **Visual-first battle staging.** Battles are staged side-on in the style of a simple turn-based JRPG. The hero stands front-left, and enemies stand on a diagonal with in-scene HP, armor, ward, and intent. The camera pushes in on each exchange, and a command menu replaces the ability cards.
 - **Visual-only attack cues.** Enemies telegraph HIGH or LOW through their stance, a glint, and the direction of their swing. Early fights add a guide line and marker; late fights show only the stance. Spoken height calls were removed (see §16).
 - **Free-standing battle figures.** In battles, figures stand without their tabletop bases, with shadows that stay on the ground. The board keeps the based pieces.
+- **Playtest aids.**
+  - A *Between fights: March / Gamepad* choice in the Sanctuary, to compare navigation for §27.
+  - A time breakdown in the summary: sets, between sets, marching, Haven, menus.
+  - An optional post-run check-in on effort, fun and pacing, saved with the history. This is the first "player feedback" from §17.
+  - A copyable plain-text playtest report per run.
 
 Validation to date:
 
-- **Automated:** 280 passing unit tests.
+- **Automated:** 283 passing unit tests.
 - **Headless browser runs through the local relay with a scripted synthetic body:**
   - a full standard expedition (19 sets, all march legs, the shrine detour, and victory);
   - a short expedition;
@@ -1548,3 +1553,4 @@ That is the experience every major design decision should serve.
   - **§27:** the navigation method is marked TBD until after the next playtest.
   - **§32:** status brought up to date (marching legs, visual battle staging, visual-only cues, free-standing battle figures, 280 tests).
   - **§34:** navigation added to the open questions.
+- **2026-09-25 (later):** §32 updated with the playtest aids.

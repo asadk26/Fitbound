@@ -12,10 +12,11 @@ import { tracker, TrackerError } from '../../pose/PoseTracker';
 import { atPhaseBoundary, clearExpedition, currentNode, HERO_HP, loadExpedition, newExpedition, ROUTES, saveExpedition, type ExNode, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
 import { generateLoadout, setTarget } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
-import { addDodge, addMarch, addSet, newWorkout, toRecord } from '../../rpg/workout';
+import { addDodge, addMarch, addSet, addTime, newWorkout, toRecord } from '../../rpg/workout';
 import { Calibration } from '../Calibration';
 import { ControllerLost, RemoteCalibration, useLink } from '../Connected';
 import { useInputEvents } from '../motionUi';
+import { toggleTraversal } from '../TrialRun';
 import { BlessingPick, Fallen, Haven, Mirror, PathView, Summary } from './Events';
 import { MovementLab } from './MovementLab';
 import { RpgBattle } from './RpgBattle';
@@ -42,6 +43,8 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
   const realRun = useRef<ExpeditionState | null>(null);
   const xRef = useRef(x);
   const [view, setView] = useState<View>(() => (resume && x ? 'path' : 'sanctuary'));
+  const viewRef = useRef(view);
+  viewRef.current = view;
   const [debug, setDebug] = useState<ExNode | null>(null);
   const [nodeKey, setNodeKey] = useState(0);
   const calibrated = useRef(false);
@@ -77,10 +80,15 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
         .catch((e) => setCamera({ state: 'error', message: e instanceof TrackerError ? e.message : String(e) }));
     }
     const detach = input.attachKeyboard(window);
-    const pad = new GamepadInput(input, () => {});
+    // Select (gamepad) or T switches march ⇄ gamepad travel, on the trail only.
+    const toggle = () => viewRef.current === 'travel' && toggleTraversal();
+    const pad = new GamepadInput(input, toggle);
     pad.start();
+    const onKey = (e: KeyboardEvent) => e.code === 'KeyT' && !e.repeat && toggle();
+    window.addEventListener('keydown', onKey);
     input.setMode('menu');
     return () => {
+      window.removeEventListener('keydown', onKey);
       offFeed();
       detach();
       pad.stop();
@@ -90,6 +98,19 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Where the time goes (pacing, bible §18): marching, encounters, and the rest.
+  const viewSince = useRef({ view, at: performance.now(), run: x?.id });
+  useEffect(() => {
+    const prev = viewSince.current;
+    const now = performance.now();
+    viewSince.current = { view, at: now, run: xRef.current?.id };
+    const bucket = prev.view === 'travel' ? 'march' : prev.view === 'node' ? 'encounters' : prev.view === 'path' || prev.view === 'calibrate' || prev.view === 'fallen' ? 'other' : null;
+    const cur = xRef.current;
+    if (!bucket || !cur || debug || cur.id !== prev.run) return;
+    mutate((d) => addTime(d.workout, bucket, now - prev.at), cur.status === 'active' || cur.status === 'suspended');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   // Tell the phone what's happening, for its dashboard.
   useEffect(() => {
@@ -331,7 +352,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
           cues={getSave().settings.attackCues === 'obvious' ? 'obvious' : (node.cues ?? ROUTES.standard.nodes.find((n) => n.enemies?.join() === node.enemies!.join())?.cues ?? 'obvious')}
           onDodgeInput={(d) => mutate((s) => void (s.dodgeInput = d))}
           onSet={onSet}
-          onDodge={(o) => mutate((d) => addDodge(d.workout, o))}
+          onDodge={(o, detail) => mutate((d) => addDodge(d.workout, o, detail))}
           onDone={(res) => {
             if (res.outcome === 'victory') {
               mutate((d) => void (d.hp = Math.max(1, res.hp)));
@@ -400,6 +421,12 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
       {view === 'summary' && x && (
         <Summary
           x={x}
+          onFeedback={(fb) =>
+            updateSave((s) => {
+              const rec = s.workouts.find((r) => r.id === x.workout.id);
+              if (rec) rec.feedback = fb;
+            })
+          }
           onAgain={() => {
             setXState(null);
             xRef.current = null;

@@ -49,6 +49,39 @@ export interface WorkoutData {
   plannedSets: number;
   /** Marching between encounters: steps, and board distance marched vs moved with a controller. */
   march?: { steps: number; active: number; assisted: number };
+  /** Wall-clock time by part of the run, for pacing: marching, encounters (fights, Mirror, Haven…), and everything else. */
+  time?: Partial<Record<TimeBucket, number>>;
+  /** Each strike: its height, how it was cued, and the result. */
+  dodgeLog?: DodgeEntry[];
+}
+
+export type TimeBucket = 'march' | 'encounters' | 'other';
+
+export interface DodgeEntry {
+  h: 'high' | 'low';
+  cues: string;
+  o: keyof DodgeTally;
+}
+
+export function addTime(w: WorkoutData, bucket: TimeBucket, ms: number): void {
+  if (!(ms > 0)) return;
+  const t = (w.time ??= {});
+  t[bucket] = (t[bucket] ?? 0) + ms;
+}
+
+/**
+ * Where the run's time went. Sets and Haven are measured directly; the rest
+ * of an encounter is choosing, dodging, resting and the enemy's turn.
+ */
+export function pacing(w: WorkoutData): { sets: number; haven: number; between: number; march: number; other: number; total: number } {
+  const sets = w.sets.reduce((a, s) => a + s.activeMs, 0);
+  const t = w.time ?? {};
+  const enc = t.encounters ?? 0;
+  const haven = w.recoveryMs;
+  const between = Math.max(0, enc - sets - haven);
+  const march = t.march ?? 0;
+  const other = t.other ?? 0;
+  return { sets, haven, between, march, other, total: Math.max(enc, sets + haven) + march + other };
 }
 
 export function addMarch(w: WorkoutData, steps: number, active: number, assisted: number): void {
@@ -78,8 +111,9 @@ export function addSet(w: WorkoutData, r: SetRecord): void {
   w.lastAt = r.at;
 }
 
-export function addDodge(w: WorkoutData, o: keyof DodgeTally): void {
+export function addDodge(w: WorkoutData, o: keyof DodgeTally, detail?: Omit<DodgeEntry, 'o'>): void {
   w.dodges[o]++;
+  if (detail) (w.dodgeLog ??= []).push({ ...detail, o });
 }
 
 export function totals(w: WorkoutData): ExerciseTotal[] {
@@ -127,6 +161,15 @@ export interface WorkoutRecord {
   outcome: WorkoutData['outcome'];
   /** Sets and total verified work per exercise. */
   volume: Record<string, { sets: number; work: number }>;
+  /** The player's own check-in after the run, if given. */
+  feedback?: Feedback;
+}
+
+/** A quick post-run check-in. Every answer is optional. */
+export interface Feedback {
+  effort?: 'easy' | 'right' | 'hard';
+  fun?: 'meh' | 'good' | 'great';
+  pacing?: 'slow' | 'right' | 'rushed';
 }
 
 export function toRecord(w: WorkoutData): WorkoutRecord {

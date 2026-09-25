@@ -2984,3 +2984,35 @@ details summary {
   left: auto;
   right: 2.5vw;
 }
+
+/* Summary: pacing line and the playtest report */
+.exp-summary .sum-cols p.sum-pace {
+  color: var(--mist);
+}
+.report-overlay {
+  z-index: 60;
+  background: rgba(20, 14, 26, 0.8);
+}
+.gmenu.report {
+  width: min(90vw, 1100px);
+  background: rgba(20, 16, 34, 0.96);
+  border-radius: 12px;
+}
+.gmenu.report textarea {
+  width: 100%;
+  height: 58vh;
+  font-family: ui-monospace, monospace;
+  font-size: max(12px, 2vh);
+  background: #14101f;
+  color: var(--white);
+  border: 1px solid var(--night);
+  padding: 1vh 1vw;
+  resize: none;
+}
+.report-actions {
+  display: flex;
+  gap: 1vw;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1.2vh;
+}

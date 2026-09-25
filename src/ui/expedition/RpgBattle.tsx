@@ -67,7 +67,7 @@ export interface RpgBattleProps {
   tutorial?: boolean;
   onDodgeInput: (d: 'body' | 'controller') => void;
   onSet: (r: SetResult) => void;
-  onDodge: (o: 'dodged' | 'hit' | 'unclear') => void;
+  onDodge: (o: 'dodged' | 'hit' | 'unclear', detail: { h: 'high' | 'low'; cues: string }) => void;
   onDone: (r: FightResult) => void;
   onLeave: () => void;
 }
@@ -288,7 +288,7 @@ export function RpgBattle(p: RpgBattleProps) {
       clearInterval(strikeLoop.current!);
       strikeLoop.current = null;
       if (!swung) bus.emit('rpg:strike', { uid: s.from, height: s.height, phase: 'swing' });
-      props.current.onDodge(res);
+      props.current.onDodge(res, { h: s.height, cues: String(cues) });
       fx(engine.resolveStrike(s, res));
       setStrike({ i, n: strikes.current.length, s, left: 0, waiting: null, result: res });
       later(() => {

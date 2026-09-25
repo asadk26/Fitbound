@@ -4,7 +4,8 @@ import { defaultSave, loadSave, sanitize, writeSave } from '../src/game/save';
 import { abilityLoadout, atPhaseBoundary, boardMarkers, currentNode, standingAt, loadExpedition, newExpedition, ROUTES, saveExpedition, validateContent } from '../src/rpg/expedition';
 import { alternatives, DEFAULT_PREFS, eligibility, generateLoadout, rerollAll, rerollSlot, setTarget, type Calibrations, type DayPrefs } from '../src/rpg/loadout';
 import { NODES } from '../src/phaser/diorama/trailGraph';
-import { addMarch, addSet, completion, toRecord, totals, type SetRecord } from '../src/rpg/workout';
+import { playtestReport } from '../src/rpg/report';
+import { addDodge, addMarch, addSet, addTime, completion, pacing, toRecord, totals, type SetRecord } from '../src/rpg/workout';
 import { rng } from '../src/testing/poses';
 
 class Mem {
@@ -203,5 +204,48 @@ describe('marching between encounters', () => {
     addMarch(x.workout, 10, 0, 120);
     expect(x.workout.march).toEqual({ steps: 50, active: 300, assisted: 120 });
     expect(x.workout.sets).toHaveLength(0);
+  });
+});
+
+describe('pacing and the playtest report', () => {
+  const set = (id: string, reps: number, extra: Partial<SetRecord> = {}): SetRecord => ({ exerciseId: id, family: getExercise(id).family, at: Date.now(), camera: reps, manual: 0, left: 0, right: 0, holdMs: 0, target: 8, full: false, finishedEarly: false, activeMs: 30_000, ...extra });
+
+  it('splits the time into sets, between sets, marching and the rest', () => {
+    const x = newExpedition('short', prefs(), generateLoadout(prefs(), allChecked, [], rng(5)), {});
+    addSet(x.workout, set('pushup', 8, { full: true, activeMs: 40_000 }));
+    x.workout.recoveryMs = 60_000;
+    addTime(x.workout, 'encounters', 300_000);
+    addTime(x.workout, 'march', 90_000);
+    addTime(x.workout, 'other', 30_000);
+    addTime(x.workout, 'march', -5);
+    expect(pacing(x.workout)).toEqual({ sets: 40_000, haven: 60_000, between: 200_000, march: 90_000, other: 30_000, total: 420_000 });
+  });
+
+  it('logs each strike by height and cue level, and the report lists it all', () => {
+    const x = newExpedition('standard', prefs(), generateLoadout(prefs(), allChecked, [], rng(6)), {});
+    addSet(x.workout, set('pushup', 5, { finishedEarly: true }));
+    addSet(x.workout, set('plank', 0, { holdMs: 21_500, target: 30 }));
+    addDodge(x.workout, 'dodged', { h: 'high', cues: 'obvious' });
+    addDodge(x.workout, 'hit', { h: 'low', cues: 'subtle' });
+    addDodge(x.workout, 'unclear', { h: 'low', cues: 'subtle' });
+    addDodge(x.workout, 'dodged');
+    expect(x.workout.dodges).toEqual({ dodged: 2, hit: 1, unclear: 1 });
+    expect(x.workout.dodgeLog).toHaveLength(3);
+    addMarch(x.workout, 120, 400, 0);
+    const r = playtestReport(x, { effort: 'right', fun: 'great' }, { travel: 'march', cues: 'adaptive', when: new Date(0) });
+    expect(r).toContain('Push-ups 5/8 · finished early');
+    expect(r).toContain('Plank 21/30 s');
+    expect(r).toContain('HIGH · obvious: 1 dodged');
+    expect(r).toContain('LOW · subtle: 1 hit, 1 unseen');
+    expect(r).toContain('Marching: 120 steps');
+    expect(r).toContain('effort right · fun great · pacing —');
+  });
+
+  it('the check-in is kept with the session history', () => {
+    const s = defaultSave();
+    s.workouts = [{ id: 'w1', at: 1, outcome: 'victory', volume: {}, feedback: { pacing: 'slow' } }];
+    const store = new Mem();
+    writeSave(s, store);
+    expect(loadSave(store).workouts[0].feedback).toEqual({ pacing: 'slow' });
   });
 });

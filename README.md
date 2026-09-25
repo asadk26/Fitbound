@@ -44,7 +44,7 @@ Phase 3  A Quiet Haven → The Veiled Stair (Hollow Acolyte) → a blessing → 
 
 - **You march between encounters.** Each encounter stands at its own spot on the diorama trail: straw at the yard, the Husk by the signpost, the Charger past the ward-gate, the Mirror at the crossroads fork, the Wisps by the quarry, the Haven's campfire under the tower, the Acolyte on the new Veiled Stair, and the Warden at the end. Marching in place carries the hero there (the guided trail, at about a third of a Trial's pace so each leg is a short stretch), with a line of story as the leg begins. Walking into the marker starts the encounter.
   - **Mossy Shrine:** the fork on the way to the Bone Field offers a detour that heals 30 HP once per run.
-  - The pause menu can switch to controller traversal (it doesn't count as activity), recalibrate, or save and stop.
+  - **Between fights** (Sanctuary) chooses *March* or *Gamepad* travel. Mid-leg, Select on the gamepad, **T**, or the pause menu switches between them. Gamepad travel doesn't count as activity. The pause menu can also recalibrate, or save and stop.
   - Out of view, the hero simply stops. There's no penalty.
   - Blessings appear straight after the fight that earns them, so there's no march to them.
 - At a phase boundary, **the path** shows where you are first. Continue, or **Save and stop here**.
@@ -200,8 +200,13 @@ These are separate outcomes:
 
 Nothing physical is ever lost: every set is saved the moment it ends, through defeat, rerolls, quitting or reloading. The summary shows the two side by side:
 
-- **Workout:** camera-verified reps per movement (left and right for sided movements), hold seconds, manual reps labelled separately, sets, Haven time, time spent moving versus session time, and steps marched between fights (controller travel isn't counted).
+- **Workout:** camera-verified reps per movement (left and right for sided movements), hold seconds, manual reps labelled separately, sets, Haven time, and steps marched between fights (controller travel isn't counted).
+- **Where the time went:** in sets, between sets (choosing, dodging, rests, enemy turns), marching, Haven, and menus and story.
 - **Expedition:** result, dodges (dodged, hit, unseen), loadout and blessings.
+
+After a finished run, a quick **check-in** asks how the workout felt (too easy, about right, too hard), how much fun it was, and how the pacing was. Every question can be skipped, and the answers are kept with the session history.
+
+**Playtest report** (on the summary) shows a plain-text account of the run: every set with reps against target, whether it was full or finished early, and how long it took; the time breakdown; each strike by height and cue level; the loadout; blessings; and the check-in. **Copy** or **Save .txt** it. It stays on this computer unless you do.
 
 The last 20 sessions are kept (per-movement sets and volume) so the loadout director can vary your workout.
 
@@ -903,7 +908,7 @@ Already in place and reusable:
 
 ## Physical playtest checklist (Heart of Haze)
 
-**Nothing in the expedition has been tried by a real person yet.** Suggested order for one or two sessions:
+**Nothing in the expedition has been tried by a real person yet.** Suggested order for one or two sessions. After each expedition, open **Playtest report** on the summary and copy it into your notes.
 
 1. **Voice (laptop, Chrome or Edge):** Sanctuary → *Voice commands on* → allow the mic.
    - The Sanctuary says whether recognition is on this computer or online.

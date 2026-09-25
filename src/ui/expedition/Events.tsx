@@ -9,7 +9,8 @@ import { blessing, offerBlessings, type BlessingDef } from '../../rpg/blessings'
 import { ROUTES, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
 import { alternatives, rerollAll, type ExLoadout } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
-import { activity, completion, totals, workingSets } from '../../rpg/workout';
+import { playtestReport } from '../../rpg/report';
+import { completion, pacing, totals, workingSets, type Feedback } from '../../rpg/workout';
 import { GestureMenu, useInputEvents } from '../motionUi';
 
 const NODE_ICON: Record<NodeKind, string> = { fight: '⚔', blessing: '✦', mirror: '◈', haven: '❀', boss: '☼' };
@@ -289,9 +290,41 @@ export function Fallen({ onReform, onEnd }: { onReform: () => void; onEnd: () =>
 }
 
 /** RPG result and workout, side by side and kept separate. */
-export function Summary({ x, onAgain, onExit }: { x: ExpeditionState; onAgain: () => void; onExit: () => void }) {
+const CHECKIN: { key: keyof Feedback; title: string; options: { id: string; label: string; icon: string }[] }[] = [
+  { key: 'effort', title: 'How did the workout feel?', options: [ { id: 'easy', label: 'Too easy', icon: 'wind' }, { id: 'right', label: 'About right', icon: 'star' }, { id: 'hard', label: 'Too hard', icon: 'bolt' } ] },
+  { key: 'fun', title: 'How much fun was it?', options: [ { id: 'meh', label: 'Meh', icon: 'wind' }, { id: 'good', label: 'Good', icon: 'star' }, { id: 'great', label: 'Great', icon: 'heart' } ] },
+  { key: 'pacing', title: 'How was the pacing?', options: [ { id: 'slow', label: 'Dragged', icon: 'wind' }, { id: 'right', label: 'About right', icon: 'star' }, { id: 'rushed', label: 'Rushed', icon: 'bolt' } ] },
+];
+
+export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState; onAgain: () => void; onExit: () => void; onFeedback: (fb: Feedback) => void }) {
   const w = x.workout;
-  const act = activity(w);
+  const pace = pacing(w);
+  // A quick check-in after a finished run (not a saved one); every question can be skipped.
+  const [step, setStep] = useState(x.status === 'suspended' ? CHECKIN.length : 0);
+  const [fb, setFb] = useState<Feedback>({});
+  const [report, setReport] = useState<string | null>(null);
+  const [copied, setCopied] = useState('');
+  const openReport = () => {
+    const save = getSave();
+    setCopied('');
+    setReport(playtestReport(x, fb, { travel: save.settings.motion.traversal === 'assisted' ? 'gamepad' : 'march', cues: save.settings.attackCues }));
+  };
+  const copy = () =>
+    navigator.clipboard
+      ?.writeText(report ?? '')
+      .then(() => setCopied('Copied'))
+      .catch(() => setCopied('Copy failed — select the text instead'));
+  // B / Escape / a raised left hand closes the report.
+  useInputEvents((e) => {
+    if (report && e.type === 'back') setReport(null);
+  });
+  const download = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([report ?? ''], { type: 'text/plain' }));
+    a.download = `fitbound-playtest-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
   const rows = totals(w);
   const won = w.outcome === 'victory';
   useEffect(() => {
@@ -308,8 +341,13 @@ export function Summary({ x, onAgain, onExit }: { x: ExpeditionState; onAgain: (
           <div>
             <h3>Workout</h3>
             <p>
-              {workingSets(w)} of ~{w.plannedSets} planned sets ({Math.round(completion(w) * 100)}%) · about {mins(act.activeMs)} min in sets and recovery of {mins(act.sessionMs)} min
+              {workingSets(w)} of ~{w.plannedSets} planned sets ({Math.round(completion(w) * 100)}%)
             </p>
+            {pace.total > 0 && (
+              <p className="sum-pace">
+                {mins(pace.total)} min: {mins(pace.sets)} in sets · {mins(pace.between)} between sets · {mins(pace.march)} marching{pace.haven ? ` · ${mins(pace.haven)} Haven` : ''} · {mins(pace.other)} menus and story
+              </p>
+            )}
             <table className="sum-table">
               <tbody>
                 {rows.map((t) => {
@@ -357,15 +395,54 @@ export function Summary({ x, onAgain, onExit }: { x: ExpeditionState; onAgain: (
             {x.blessings.length > 0 && <p>Blessings: {x.blessings.map((b) => blessingName(b)).join(', ')}</p>}
           </div>
         </div>
-        <GestureMenu
-          title=""
-          options={[
-            { id: 'again', label: 'Back to the Sanctuary', icon: 'star' },
-            { id: 'title', label: 'Title screen', icon: 'lock' },
-          ]}
-          onChoose={(id) => (id === 'again' ? onAgain() : onExit())}
-        />
+        {step < CHECKIN.length ? (
+          <GestureMenu
+            key={step}
+            title={CHECKIN[step].title}
+            options={[...CHECKIN[step].options, { id: 'skip', label: 'Skip', icon: 'lock' }]}
+            onChoose={(id) => {
+              if (id !== 'skip') {
+                const next = { ...fb, [CHECKIN[step].key]: id };
+                setFb(next);
+                onFeedback(next);
+              }
+              setStep(step + 1);
+            }}
+          />
+        ) : (
+          <GestureMenu
+            title=""
+            active={!report}
+            options={[
+              { id: 'again', label: 'Back to the Sanctuary', icon: 'star' },
+              { id: 'report', label: 'Playtest report', detail: 'Copy or save a text summary of this run', icon: 'shield' },
+              { id: 'title', label: 'Title screen', icon: 'lock' },
+            ]}
+            onChoose={(id) => (id === 'again' ? onAgain() : id === 'report' ? openReport() : onExit())}
+          />
+        )}
       </div>
+      {report && (
+        <div className="tv-overlay report-overlay">
+          <div className="gmenu report">
+            <h2>Playtest report</h2>
+            <textarea readOnly value={report} onFocus={(e) => e.currentTarget.select()} />
+            <div className="report-actions">
+              <button className="btn" onClick={copy}>
+                Copy
+              </button>
+              <button className="btn" onClick={download}>
+                Save .txt
+              </button>
+              <button className="btn btn-ghost" onClick={() => setReport(null)}>
+                Close
+              </button>
+              {copied && <span className="muted">{copied}</span>}
+            </div>
+            <p className="muted small">Stays on this computer unless you copy or save it.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

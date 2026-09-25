@@ -118,6 +118,10 @@ export function Sanctuary({ connected, onBegin, onLab, onBack }: { connected: bo
             {seg(save.settings.attackCues, [['adaptive', 'Learn as you go'], ['obvious', 'Always obvious']], (v) => updateSave((s) => void (s.settings.attackCues = v)))}
           </div>
           <div className="toggle-row">
+            <span>Between fights</span>
+            {seg(save.settings.motion.traversal, [['active', 'March'], ['assisted', 'Gamepad']], (v) => updateSave((s) => void (s.settings.motion.traversal = v)))}
+          </div>
+          <div className="toggle-row">
             <span>Route</span>
             {seg(route, [['standard', 'Full (~20–25 min)'], ['short', 'Short (~12–15 min)']], setRoute)}
           </div>
