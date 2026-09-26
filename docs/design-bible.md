@@ -1397,10 +1397,11 @@ Since then, the following have also been implemented (not yet physically playtes
   - **Eight new movements**, all beta or experimental, each with its own ability: overhead press, lateral raises, goblet squats, sumo squats, glute bridges, skaters, butt kicks and Russian twists.
   - **A Lab-only punch test**, facing the phone and side-on, as a feasibility check for Punch Away and the Unbound (§22–§23).
   - **Two Lab-only experimental holds:** the wall sit (side-on) and the side plank (facing the phone, on your side). The side plank's target is split evenly between the sides, and one side can't finish the set alone.
+    Each side-plank set saves the time held on each side, and target progression judges it by the weaker side.
 
 Validation to date:
 
-- **Automated:** 338 passing unit tests. These include the new detectors, soreness, progression, the Journal, the lag measurement, the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
+- **Automated:** 342 passing unit tests. These include the new detectors, soreness, progression, the Journal, the lag measurement, the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
 - **Headless browser:** the full opening (every line in order), the ritual on the next launch (the opening does not repeat), skip, the Sanctuary screen over the garden, and the dry garden after restoration. Screenshots were reviewed; the visuals are a first version for the creator to evaluate.
 - **Headless browser runs through the local relay with a scripted synthetic body:**
   - a full standard expedition (19 sets, all march legs, the shrine detour, and victory);
@@ -1495,7 +1496,7 @@ They should be resolved through implementation and playtesting.
 - The exact final narrative choices.
 - Whether and how the protagonist can establish independent existence.
 - The ultimate status of other Echoes.
-- A proposed revision of the premise (time as the Heart's lifeblood, colliding eras, Elara vanishing after the second victory) is under discussion with the creator. §5–§8 stand until it is agreed.
+- A revised premise and expedition structure is proposed in [`docs/proposals/heart-of-haze-revision.md`](proposals/heart-of-haze-revision.md): time as the Heart's lifeblood, fractured eras, one two-fracture expedition with no short route, and Elara vanishing after the second reignition. It awaits the creator's approval; §5–§8 and §18 stand until then.
 
 ### Gameplay
 
@@ -1588,3 +1589,4 @@ That is the experience every major design decision should serve.
 - **2026-09-25 (later):** §32 updated with the refined hero; §34 notes his design has a first version.
 - **2026-09-25 (later):** §32 updated with soreness, target progression, the Journal, the lag measurement, eight new movements and the punch test. §34 adds sets scaling and punch readability as open questions.
 - **2026-09-25 (later):** §32 adds the Lab-only wall sit and side plank (338 tests). §34 adds their reliability, and notes the proposed premise revision is under discussion (§5–§8 unchanged).
+- **2026-09-26:** §32 adds per-side side-plank records (342 tests). §34 points to the revised narrative and expedition proposal, which awaits approval; no vision section is changed yet.
