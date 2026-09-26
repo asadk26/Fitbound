@@ -395,7 +395,7 @@ In rough priority order:
 
 ### 9.7 The Reflections (planned special encounters)
 
-**Status:** planned. It is documented and a minimal system is proposed. Prototype **one** in the Movement Lab only once the first two-fracture expedition works, and verify physically that copying poses is satisfying and reliably recognized before building more.
+**Status:** planned. It is documented, and a minimal system is proposed in `docs/proposals/reflections.md`. Prototype **one** in the Movement Lab only once the first two-fracture expedition works, and verify physically that copying poses is satisfying and reliably recognized before building more.
 
 **What they are:**
 - A recurring family of unusual figures scattered across the eras. They may be siblings or otherwise connected, with shared visual features, a recurring musical motif, and the odd line acknowledging their relatives.
@@ -1431,9 +1431,25 @@ Since then, the following have also been implemented (not yet physically playtes
   - **Regression tests assert** each encounter's band.
   - **Found, needs a decision:** a player doing a flat 40% of every set, just under the half-target line, gets no armour breaks, staggers or disrupts, so armoured fights take about twice as long (Husk 11 sets, Warden 21). At 50% completion the numbers are reasonable. Options: lower the line (it's tunable), make armour break reduced below half instead of binary, or accept it. Synthetic only; real sets aren't a flat 40%.
 
+- **The Awakening, time categories, the Stillpoint and the Heart's Rest (built 2026-09-26):**
+  - **The Awakening:**
+    - a guided warm-up of about 5 minutes, with a ~2-minute short version, at the start of each real session;
+    - it adapts to soreness (sore legs: heel raises instead of swings and squats) and to little room (knee lifts); it can be skipped;
+    - looping demonstration figures, no camera or detector;
+    - a resumed day gets the brief version after the readiness and camera checks;
+    - Elara's line is text only.
+  - **Workout time in six categories:** the warm-up is core; optional yoga, cooldown and chosen marching are other activity. The summary, report and Journal show both.
+  - **The Stillpoint** replaces the crossing:
+    - Rest (HP), optional stretches, your build and the Mirror, *Save and return later* (you come back to it), and Continue;
+    - a first-version atmosphere, not a board;
+    - it can only appear once a two-fracture expedition exists; a Lab jump tests it until then.
+  - **Havens:** resting restores HP with no yoga required. The stretches are optional and have demonstrations and *Finish here*.
+  - **The Heart's Rest:** an optional cooldown offered from the victory summary.
+- **Planned:** the Reflections (§9.7), with a minimal pose-copying system proposed in `docs/proposals/reflections.md`.
+
 Validation to date:
 
-- **Automated:** 375 passing unit tests. These include the new detectors, soreness, progression, the Journal, the lag measurement, the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
+- **Automated:** 378 passing unit tests. These include the new detectors, soreness, progression, the Journal, the lag measurement, the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
 - **Headless browser:** the full opening (every line in order), the ritual on the next launch (the opening does not repeat), skip, the Sanctuary screen over the garden, and the dry garden after restoration. Screenshots were reviewed; the visuals are a first version for the creator to evaluate.
 - **Headless browser runs through the local relay with a scripted synthetic body:**
   - a full standard expedition (19 sets, all march legs, the shrine detour, and victory);
@@ -1450,7 +1466,11 @@ Validation to date:
     - workout time recorded per session, split by kind;
     - the legacy save-and-resume run again (unchanged);
     - **the Medieval A preview start to finish:** both of the Green Knight's scenes, a save at his second stage resuming at that stage with no scene replayed, *Scenario preview complete* with no reignition, and the scenario's flags and seen scenes recorded;
-    - the Green Knight figures and the scene overlay were reviewed in screenshots.
+    - the Green Knight figures and the scene overlay were reviewed in screenshots;
+  - **2026-09-26 (combat, warm-up, recovery):**
+    - "Did the camera miss any?" after an early finish: the correction was recorded as 1 camera + 1 manual, and the set counted as full;
+    - the Awakening, from offer to short version to demonstrations to "Awake", recorded as warm-up time;
+    - the Stillpoint through the Lab: Rest, build review, stretches with *Finish here*, and Continue. Two layout bugs were found and fixed: an overlay swallowing clicks, and a menu too wide for the screen.
 
 These are implementation milestones, not proof that every movement and interaction works reliably with the creator’s real body and hardware.
 
@@ -1654,4 +1674,5 @@ That is the experience every major design decision should serve.
   - **§9.3 and §9.7:** the session shape, and the Reflections as planned content.
   - **§33:** the build sequence.
   - **§34:** new open questions.
+- **2026-09-26 (build pass):** §32 now covers the approved combat balance, the missed-rep correction, the Warden's phases and HP retune, the Awakening, the six time categories, the Stillpoint, Havens without required yoga, and the Heart's Rest (378 tests). §9.7 links the Reflections proposal.
 

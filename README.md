@@ -313,6 +313,29 @@ It's read-only.
 - From that, the playtest report states the real round trip and how long movements take to arrive over your Wi-Fi.
 - This is a measurement only: dodge timing is unchanged.
 
+### The Awakening, the Stillpoint and the Heart's Rest
+
+**The Awakening** is a gentle warm-up at the start of every real workout session, strongly encouraged and never required.
+- **Length:** about 5 minutes, or a ~2-minute short version.
+- **Movements:** marching, arm circles, torso turns, hips, leg swings, easy squats, and a reach, each with a looping demonstration figure. There's no camera and no scoring: follow along, press A or Enter to move on, P to pause, or *Finish here*.
+- **It adapts:** sore legs swap swings and squats for heel raises, and *Little room around me* swaps leg swings for knee lifts. *Skip for today* is always there.
+- **When it's offered:** a new expedition warms up first. Resuming on another day offers the short version after the readiness and camera checks. A second sitting on the same day that already warmed up isn't asked again.
+
+**The Stillpoint** is between the two fractures of an expedition: a quiet space between the ages. None of its options excludes another:
+- **Rest** restores your HP;
+- **Stretch** is optional;
+- **Your build & the Mirror**;
+- **Save, return later** brings you back to the Stillpoint;
+- **Continue**.
+
+It needs a two-fracture expedition, so for now try it from *Movement Lab → Encounter select → ≈ The Stillpoint*.
+
+**Havens:** reaching one restores your HP. The stretches are extra, and the memory comes after them.
+
+**The Heart's Rest:** after a reignition, the summary offers an optional short cooldown of static stretches.
+
+**Workout time** is shown in two parts. **Core workout**: the warm-up, sets, dodging, recovery between sets and setup; the ~20-minute target is about this. **Other activity**: optional yoga, the cooldown and marching you chose. Both are in the Journal.
+
 ### Fractures and scenarios (in development)
 
 The approved structure (bible §9) is one expedition across **two fractures**, meaning two eras:
