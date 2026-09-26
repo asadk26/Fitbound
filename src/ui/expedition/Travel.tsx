@@ -11,7 +11,7 @@ import { STORY } from '../../rpg/story';
 import { useSave } from '../useSave';
 import { ControllerStatus } from '../Connected';
 import { GestureMenu, HoldRing, MotionMeter, useInputEvents, useMotion } from '../motionUi';
-import { toggleTraversal } from '../TrialRun';
+import { toggleExpeditionTravel } from './travelPref';
 
 /**
  * Marching between encounters, on the meadow board. The next encounter
@@ -178,7 +178,7 @@ export function Travel({
             ]}
             onChoose={(id) => {
               if (id === 'resume') setPaused(false);
-              else if (id === 'traverse') toggleTraversal();
+              else if (id === 'traverse') toggleExpeditionTravel();
               else if (id === 'recal') onRecalibrate();
               else onStop(tally());
             }}

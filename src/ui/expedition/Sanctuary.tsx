@@ -9,6 +9,7 @@ import type { RouteId } from '../../rpg/expedition';
 import { alternatives, eligibility, generateLoadout, rerollAll, restingSore, setTarget, SORE_AREAS, type DayPrefs, type ExLoadout, type Soreness } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
 import { useInputEvents } from '../motionUi';
+import { setExpeditionTravel } from './travelPref';
 import { useSave } from '../useSave';
 import { VoiceToggle } from '../VoiceUi';
 
@@ -144,7 +145,7 @@ export function Sanctuary({ connected, onBegin, onLab, onJournal, onBack }: { co
           </div>
           <div className="toggle-row">
             <span>Between fights</span>
-            {seg(save.settings.motion.traversal, [['active', 'March'], ['assisted', 'Gamepad']], (v) => updateSave((s) => void (s.settings.motion.traversal = v)))}
+            {seg(save.settings.expeditionTravel, [['assisted', 'Controller'], ['active', 'March (extra activity)']], setExpeditionTravel)}
           </div>
         </div>
 

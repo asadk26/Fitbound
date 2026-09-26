@@ -94,3 +94,15 @@ describe('progression', () => {
     expect(statsFor(3, { atk: 1, def: 0, mag: 2 })).toEqual({ maxHp: 130, atk: 16, def: 14, mag: 18 });
   });
 });
+
+describe('travel between expedition encounters', () => {
+  it('is controller-first by default, for new and older saves; marching stays a choice; the Trial keeps its own', async () => {
+    const { sanitize } = await import('../src/game/save');
+    expect(defaultSave().settings.expeditionTravel).toBe('assisted');
+    // An older save whose shared setting was marching: expeditions start on the controller, the Trial keeps marching.
+    const old = sanitize({ settings: { motion: { traversal: 'active' } } });
+    expect(old.settings.expeditionTravel).toBe('assisted');
+    expect(old.settings.motion.traversal).toBe('active');
+    expect(sanitize({ settings: { expeditionTravel: 'active' } }).settings.expeditionTravel).toBe('active');
+  });
+});

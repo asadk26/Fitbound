@@ -29,6 +29,8 @@ export interface Settings {
   voiceCommands: boolean;
   /** Attack cues: 'adaptive' fades from obvious to body language over a run; 'obvious' always spells it out. */
   attackCues: 'adaptive' | 'obvious';
+  /** Expeditions: travel between encounters with a controller (default, bible §27) or by marching. */
+  expeditionTravel: 'active' | 'assisted';
 }
 
 export interface MotionSettings {
@@ -115,6 +117,7 @@ export function defaultSave(): SaveData {
       motion: { turnStep: 45, lean: 'normal', march: 'normal', navigation: 'guided', traversal: 'active', diagnostics: true },
       voiceCommands: false,
       attackCues: 'adaptive',
+      expeditionTravel: 'assisted',
     },
     totals: { cameraReps: 0, manualReps: 0, holdSeconds: 0, battlesWon: 0 },
     expeditionPrefs: { ...DEFAULT_PREFS },
@@ -221,6 +224,8 @@ export function sanitize(input: unknown): SaveData {
   };
   if (typeof out.settings.voiceCommands !== 'boolean') out.settings.voiceCommands = false;
   if (out.settings.attackCues !== 'obvious') out.settings.attackCues = 'adaptive';
+  // Controller-first: saves from before this setting existed start on the controller too.
+  if (out.settings.expeditionTravel !== 'active') out.settings.expeditionTravel = 'assisted';
   if (!['beginner', 'intermediate', 'advanced'].includes(out.settings.difficulty)) out.settings.difficulty = 'beginner';
   if (out.settings.model !== 'lite' && out.settings.model !== 'full') out.settings.model = 'full';
   if (out.settings.cameraFacing !== 'environment') out.settings.cameraFacing = 'user';

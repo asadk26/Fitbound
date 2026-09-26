@@ -17,7 +17,7 @@ import { addDodge, addMarch, addSet, addTime, newWorkout } from '../../rpg/worko
 import { Calibration } from '../Calibration';
 import { ControllerLost, RemoteCalibration, useLink } from '../Connected';
 import { useInputEvents } from '../motionUi';
-import { toggleTraversal } from '../TrialRun';
+import { enterExpeditionTravel, leaveExpeditionTravel, toggleExpeditionTravel } from './travelPref';
 import { CinemaPlayer } from '../Cinema';
 import type { Script } from '../../story/cinema';
 import { OPENING, ritualReason, ritualScript, type RitualReason } from '../../story/scripts';
@@ -103,7 +103,8 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     }
     const detach = input.attachKeyboard(window);
     // Select (gamepad) or T switches march ⇄ gamepad travel, on the trail only.
-    const toggle = () => viewRef.current === 'travel' && toggleTraversal();
+    enterExpeditionTravel();
+    const toggle = () => viewRef.current === 'travel' && toggleExpeditionTravel();
     const pad = new GamepadInput(input, toggle);
     pad.start();
     const onKey = (e: KeyboardEvent) => e.code === 'KeyT' && !e.repeat && toggle();
@@ -117,6 +118,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
       if (!connected) tracker.stop();
       input.setMode('off');
       if (connected) host.stop();
+      leaveExpeditionTravel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
