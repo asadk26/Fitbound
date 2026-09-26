@@ -1193,7 +1193,7 @@ Preserve existing successful behavior, especially pairing, calibration, camera s
 
 ## 32. Current Development Status
 
-*Maintained by Claude at the end of each development pass. Last updated: 2026-09-25.*
+*Maintained by Claude at the end of each development pass. Last updated: 2026-09-26.*
 
 The expanded expedition build has been implemented and pushed, but its newest systems still require the creator’s physical playtesting.
 
@@ -1218,7 +1218,7 @@ The expanded expedition build includes:
 
 Since then, the following have also been implemented (not yet physically playtested):
 
-- **Marching between encounters.** Each encounter stands at its own spot on the diorama trail, and the player marches in place to reach it. Each leg opens with a short story line. A Mossy Shrine detour heals once per run. Steps are tallied in the workout summary, separate from sets. Controller traversal remains available from the pause menu and is not counted as activity (see §27: the navigation method is still TBD).
+- **Marching between encounters.** Each encounter stands at its own spot on the diorama trail, and the player marches in place to reach it. Each leg opens with a short story line. A Mossy Shrine detour heals once per run. Steps are tallied in the workout summary, separate from sets. Controller traversal remains available from the pause menu and is not counted as activity. §27 now decides controller-first exploration, but the build still **defaults to marching**; the default hasn't been switched yet.
 - **Visual-first battle staging.** Battles are staged side-on in the style of a simple turn-based JRPG. The hero stands front-left, and enemies stand on a diagonal with in-scene HP, armor, ward, and intent. The camera pushes in on each exchange, and a command menu replaces the ability cards.
 - **Visual-only attack cues.** Enemies telegraph HIGH or LOW through their stance, a glint, and the direction of their swing. Early fights add a guide line and marker; late fights show only the stance. Spoken height calls were removed (see §16).
 - **Free-standing battle figures.** In battles, figures stand without their tabletop bases, with shadows that stay on the ground. The board keeps the based pieces.
@@ -1230,11 +1230,11 @@ Since then, the following have also been implemented (not yet physically playtes
 
 - **The opening cinematic and the reconstruction ritual (first version).** These run on a reusable in-engine cinematic system; the scripts are data.
   - **Elara's first visual identity:** a young, doll-like woman; long wavy silver-grey hair; ivory and deep-teal robes; a thin thread of the Heart's warm amber light. Her figure and dialogue portrait share one painter.
-  - **The opening:** darkness and rain, then the heartbeat; illustrated memory fragments of the kingdom; the Heart's cavern, where the rain is muffled; the rainy Sanctuary, where the hero forms on the stone and Elara waits by the well; and the distant Spark.
+  - **The opening:** darkness and rain, then the heartbeat; illustrated memory fragments; the Heart's cavern, where the rain is muffled; the rainy Sanctuary, where the hero forms on the stone and Elara waits by the well; and the distant Spark.
   - **Presentation:** player-paced dialogue; no synthetic voice for Elara anywhere in the game; line ids ready for recorded voice.
   - **Playback:** the opening plays once, can be skipped, and can be replayed from the title screen.
   - **The ritual:** about 10 s, skippable, with a context-sensitive line from Elara.
-  - **Rain motif:** the Sanctuary rains until the first restoration, then is dry and sunlit. This is not explained on screen.
+  - **Rain motif:** the Sanctuary rains until the first reignition, then is dry and sunlit. This is not explained on screen.
 
 - **The refined hero (first version).**
   - **Proportions:** still chibi, with a slightly smaller head.
@@ -1254,14 +1254,37 @@ Since then, the following have also been implemented (not yet physically playtes
   - **Two Lab-only experimental holds:** the wall sit (side-on) and the side plank (facing the phone, on your side). The side plank's target is split evenly between the sides, and one side can't finish the set alone.
     Each side-plank set saves the time held on each side, and target progression judges it by the weaker side.
 
+- **The foundation for the approved direction (2026-09-26):**
+  - **Workout sessions within expeditions (§18):**
+    - each sitting is its own session, with its own summary, check-in, Journal row (tagged with its expedition) and target progression, judged on that day's readiness;
+    - resuming on another day asks *A new day* questions first (feel, soreness, dumbbells): a resting family sits out without losing its slot, and single slots can be swapped;
+    - an interrupted session is recorded when you resume.
+  - **Fights saved at safe points:**
+    - *Pause → Save and leave* saves a fight exactly where it stands: your turn, "stand when ready", or strikes still to come;
+    - mid-set, it ends the set with what was counted and lands its ability first;
+    - resuming continues the same fight, and nothing already done is asked again. (Previously, leaving replayed the whole fight.)
+  - **A fall ends the expedition (§17)** with no reignition. Every set, dodge and step is kept. The Test of Resolve is designed in `docs/proposals/foundation.md`, not built.
+  - **Narrative text:**
+    - two opening lines now fit the premise: "Everything that ever was still runs through the Heart." and "That's the Spark. All the way at the end of time. The Heart can't reach it anymore.";
+    - the victory text is revised;
+    - the fall screen is now "You fall…" (the premature "The Echo fades…" is gone), and the README intro is corrected.
+  - **Reignitions are counted in the save.** Older saves derive the count from their victories. The save also records a list of seen scenes.
+  - **The short route is retired** for new expeditions. Runs already saved on it still finish on it.
+  - **Proposals awaiting approval** in `docs/proposals/foundation.md`: fracture architecture, bosses and the workout, the Test of Resolve, and Anachronisms.
+
 Validation to date:
 
-- **Automated:** 342 passing unit tests. These include the new detectors, soreness, progression, the Journal, the lag measurement, the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
+- **Automated:** 352 passing unit tests. These include the new detectors, soreness, progression, the Journal, the lag measurement, the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
 - **Headless browser:** the full opening (every line in order), the ritual on the next launch (the opening does not repeat), skip, the Sanctuary screen over the garden, and the dry garden after restoration. Screenshots were reviewed; the visuals are a first version for the creator to evaluate.
 - **Headless browser runs through the local relay with a scripted synthetic body:**
   - a full standard expedition (19 sets, all march legs, the shrine detour, and victory);
-  - a short expedition;
-  - the tutorial trial.
+  - a short expedition (before its retirement);
+  - the tutorial trial;
+  - **2026-09-26:**
+    - saving and leaving mid-fight and mid-set, then resuming "the next day" (a new session, *A new day*, the same turn and enemy HP, no set repeated, the fight continuing to victory);
+    - the new opening lines;
+    - the Sanctuary without a route choice;
+    - a fall ending the expedition, with its session recorded as a defeat.
 
 These are implementation milestones, not proof that every movement and interaction works reliably with the creator’s real body and hardware.
 
@@ -1335,9 +1358,9 @@ These are not settled canon or final specifications. Resolve them through propos
 
 ### Gameplay
 
-- **How bosses fit the workout:** keeping boss victories meaningful without exercise-volume traps, and the physical-failure rules for each ability type (reps, holds, shields, interrupts). *A proposal is due before any combat redesign.*
-- **Test of Resolve:** the first implementation and reward pool. *A proposal is due.*
-- **Anachronisms:** the smallest reusable architecture for cross-era discoveries and quests. *A proposal is due.*
+- **How bosses fit the workout:** keeping boss victories meaningful without exercise-volume traps, and the physical-failure rules for each ability type (reps, holds, shields, interrupts). *Proposed in `docs/proposals/foundation.md`; awaiting approval before any combat redesign.*
+- **Test of Resolve:** the first implementation and reward pool. *Proposed in `docs/proposals/foundation.md`; awaiting approval.*
+- **Anachronisms:** the smallest reusable architecture for cross-era discoveries and quests. *Proposed in `docs/proposals/foundation.md`; awaiting approval.*
 - Fracture selection weighting and repeat protection, once several scenarios exist.
 - The real workout time of an expedition, measured physically.
 - The long-term shape of multi-day expeditions, to revisit after playtesting.
@@ -1428,4 +1451,4 @@ That is the experience every major design decision should serve.
   - **§27:** navigation is controller-first with optional marching.
   - **§33:** the roadmap is now foundation, then content stages A–I.
   - **§34:** the open questions are rewritten.
-
+- **2026-09-26 (later):** §32 updated: sessions within expeditions, fights saved at safe points, a fall ends the expedition, the revised opening and victory text, reignition tracking, the short route retired (352 tests). The proposals for fracture architecture, bosses and the workout, the Test of Resolve, and Anachronisms are in `docs/proposals/foundation.md`.

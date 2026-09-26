@@ -9,7 +9,7 @@ import { tilt } from '../../input/tilt';
 import { host } from '../../net/host';
 import { showSanctuary, showScene } from '../../phaser/game';
 import { tracker, TrackerError } from '../../pose/PoseTracker';
-import { atPhaseBoundary, clearExpedition, currentNode, HERO_HP, loadExpedition, newExpedition, ROUTES, saveExpedition, type ExNode, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
+import { atPhaseBoundary, clearExpedition, currentNode, loadExpedition, newExpedition, ROUTES, saveExpedition, type ExNode, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
 import { generateLoadout, setTarget } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
 import { activeLoadout, applyReadiness, hasWork, needsReadiness, sessionRecord, startSession, upsertRecord } from '../../rpg/session';
@@ -262,9 +262,12 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     clearExpedition();
     if (outcome === 'victory') {
       audio.victory();
-      // The first time the Spark is reached, part of the kingdom is restored — and the Sanctuary's rain stops.
+      // A reignition. The first one stops the Sanctuary's rain, for good.
       firstRestoration.current = !getSave().story.restored;
-      updateSave((s) => void (s.story.restored = true));
+      updateSave((s) => {
+        s.story.restored = true;
+        s.story.reignitions++;
+      });
     }
     setView('summary');
   };
@@ -493,15 +496,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
         />
       )}
 
-      {view === 'fallen' && x && (
-        <Fallen
-          onReform={() => {
-            mutate((d) => void (d.hp = Math.round(HERO_HP * 0.6)));
-            advance();
-          }}
-          onEnd={() => finish('defeat')}
-        />
-      )}
+      {view === 'fallen' && x && <Fallen onEnd={() => finish('defeat')} />}
 
       {view === 'summary' && x && (
         <Summary

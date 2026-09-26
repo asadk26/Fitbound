@@ -2,13 +2,15 @@ import type { Beat, Line, Script } from './cinema';
 
 /**
  * The cinematic scripts. Canon notes (see docs/design-bible.md §5):
- * the Heart is benevolent; the protagonist believes he is the original hero,
- * and nothing here reveals otherwise; Elara knows more than she says, and a
- * few of her lines should read differently later ("How much do you
- * remember?", "Not yet.", "It may not be what you remember.").
+ * time flows through the Heart, which has lost its Spark; the Heart is
+ * benevolent; it reconstructs the protagonist, and that is all we say about
+ * his origin. Elara knows more than she says, so a few of her lines should
+ * read differently later ("How much do you remember?", "Not yet.").
+ * The Spark lies at the far end of time.
  *
  * The Sanctuary has been under a soft, persistent rain for a very long time.
- * It stops after the first restoration. Nothing here explains why.
+ * It stops after the first reignition and never returns. Nothing here
+ * explains why.
  */
 
 const elara = (n: number, text: string, offscreen = false): Line => ({ id: `opening.elara.${String(n).padStart(2, '0')}`, who: 'elara', text, offscreen });
@@ -21,13 +23,13 @@ export const OPENING: Script = {
     { set: 'dark', sound: { rain: 0.45, muffled: false, heart: 0, heartVol: 0, music: null }, ms: 3200 },
     { cues: ['heart-glow'], sound: { heart: 50, heartVol: 0.45 }, ms: 5200 },
 
-    // The kingdom, in fragments.
+    // Moments from somewhere in time, in fragments.
     { set: 'memory', cues: ['mem-square'], sound: { music: 'opening', heartVol: 0.3 }, ms: 2000 },
     { line: elara(1, 'It didn’t end all at once. It faded.', true) },
     { line: elara(2, 'A street. A name. A song.', true) },
     { cues: ['mem-towers'], ms: 2600 },
     { cues: ['mem-field'], ms: 2000 },
-    { line: elara(3, 'So they built something to remember it.', true) },
+    { line: elara(3, 'Everything that ever was still runs through the Heart.', true) },
 
     // The Heart. The rain is far above now.
     { set: 'heart', cues: ['heart-wake'], sound: { muffled: true, rain: 0.4, heart: 54, heartVol: 0.85 }, ms: 3600 },
@@ -52,7 +54,7 @@ export const OPENING: Script = {
 
     // The Spark, far off.
     { cues: ['to-spark'], ms: 4200 },
-    { line: elara(10, 'That’s the Spark. The Heart believes it matters. So do I.') },
+    { line: elara(10, 'That’s the Spark. All the way at the end of time. The Heart can’t reach it anymore.') },
     { line: elara(11, 'The Heart will give you what it remembers.') },
     { line: elara(12, 'It may not be what you remember.') },
     { cues: ['from-spark'], ms: 2600 },

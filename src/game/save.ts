@@ -76,15 +76,19 @@ export interface SaveData {
 export interface StoryState {
   /** The opening has been seen (or skipped): it never plays again by itself. */
   openingSeen: boolean;
-  /** The Spark has been reached once and part of the kingdom restored (the Sanctuary's rain stops). */
+  /** At least one reignition (the Sanctuary's rain has stopped, for good). Kept equal to reignitions > 0. */
   restored: boolean;
+  /** Expeditions that reignited the Spark (bible §6: the story's beats follow this count). */
+  reignitions: number;
+  /** Scenes seen (or skipped), by id, so first-time scenes never replay by themselves. */
+  seen: string[];
   /** Reconstruction rituals so far (varies Elara's line). */
   rituals: number;
   /** When the player last arrived at the Sanctuary. */
   lastVisit: number;
 }
 
-export const DEFAULT_STORY: StoryState = { openingSeen: false, restored: false, rituals: 0, lastVisit: 0 };
+export const DEFAULT_STORY: StoryState = { openingSeen: false, restored: false, reignitions: 0, seen: [], rituals: 0, lastVisit: 0 };
 
 export function defaultSave(): SaveData {
   return {
@@ -209,7 +213,8 @@ export function sanitize(input: unknown): SaveData {
     progress: sanitizeProgress(o.progress, known),
     story: {
       openingSeen: !!o.story?.openingSeen,
-      restored: !!o.story?.restored,
+      ...reignitionsOf(o.story, Array.isArray(o.workouts) ? o.workouts : []),
+      seen: strs(o.story?.seen, []).slice(0, 500),
       rituals: Number.isInteger(o.story?.rituals) && o.story!.rituals >= 0 ? o.story!.rituals : 0,
       lastVisit: typeof o.story?.lastVisit === 'number' && Number.isFinite(o.story.lastVisit) ? o.story.lastVisit : 0,
     },
@@ -232,6 +237,19 @@ export function sanitize(input: unknown): SaveData {
     out.settings.trialTargets[k] = Number.isFinite(v) && v >= 1 && v <= 50 ? Math.round(v) : DEFAULT_TARGETS[k];
   }
   return reconcileUnlocks(out);
+}
+
+/**
+ * Reignitions, from the save; saves from before the count existed derive it
+ * from their victories (at least one if the rain had already stopped).
+ */
+function reignitionsOf(story: Partial<StoryState> | undefined, workouts: Partial<WorkoutRecord>[]): Pick<StoryState, 'restored' | 'reignitions'> {
+  let n = Number.isInteger(story?.reignitions) && story!.reignitions! >= 0 ? story!.reignitions! : null;
+  if (n === null) {
+    const wins = workouts.filter((w) => w && w.outcome === 'victory').length;
+    n = story?.restored ? Math.max(1, wins) : wins;
+  }
+  return { restored: n > 0, reignitions: n };
 }
 
 function sanitizePrefs(v: unknown, known: Set<string>): DayPrefs {

@@ -36,7 +36,7 @@ export function PathView({ x, onContinue, onStop }: { x: ExpeditionState; onCont
           ))}
         </ol>
         <p className="gmenu-text">
-          ♥ {x.hp}/{x.maxHp} · {expeditionSets(x)} sets done{x.fallen ? ' · the Spark is out of reach this run' : ''}{x.battle?.index === x.index ? ' · a fight is waiting, just as you left it' : ''}
+          ♥ {x.hp}/{x.maxHp} · {expeditionSets(x)} sets done{x.battle?.index === x.index ? ' · a fight is waiting, just as you left it' : ''}
           {boundary ? ' · A good place to stop if you need to — the run will wait.' : ''}
         </p>
         <GestureMenu
@@ -273,22 +273,15 @@ export function Haven({ onDone }: { onDone: (recoveryMs: number) => void }) {
   );
 }
 
-export function Fallen({ onReform, onEnd }: { onReform: () => void; onEnd: () => void }) {
+/** A fall ends the expedition (bible §17). Everything physical, and everything discovered, is kept. */
+export function Fallen({ onEnd }: { onEnd: () => void }) {
   useEffect(() => {
     input.setMode('menu');
     audio.say(STORY.fallen);
   }, []);
   return (
     <div className="tv-overlay">
-      <GestureMenu
-        title="The Echo fades…"
-        text={`${STORY.fallen} Everything you did physically is kept either way.`}
-        options={[
-          { id: 'reform', label: 'Reform and carry on', detail: 'Keep working out; the Spark can’t be restored this run', icon: 'heart' },
-          { id: 'end', label: 'End the session', detail: 'See your workout summary', icon: 'lock' },
-        ]}
-        onChoose={(id) => (id === 'reform' ? onReform() : onEnd())}
-      />
+      <GestureMenu title="You fall…" text={STORY.fallen} options={[{ id: 'end', label: 'Return to the Sanctuary', detail: 'See your workout summary', icon: 'heart' }]} onChoose={onEnd} />
     </div>
   );
 }
@@ -367,8 +360,8 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
   return (
     <div className="tv-overlay">
       <div className="gmenu summary exp-summary">
-        <h2>{won ? 'The Spark is restored — for now' : x.status === 'suspended' ? 'Expedition saved' : 'Back to the Sanctuary'}</h2>
-        <p className="gmenu-text">{won ? STORY.victoryElara : x.fallen ? 'The character fell during this run, but the workout carried on.' : STORY.suspended}</p>
+        <h2>{won ? 'The Spark is reignited — for now' : x.status === 'suspended' ? 'Expedition saved' : 'Back to the Sanctuary'}</h2>
+        <p className="gmenu-text">{won ? STORY.victoryElara : x.fallen ? 'You fell, and the expedition is over. Everything you did physically is kept.' : x.status === 'suspended' ? STORY.suspended : 'The expedition ended here. Everything you did physically is kept.'}</p>
         <div className="sum-cols">
           <div>
             <h3>{x.earlier?.sessions.length ? 'This session' : 'Workout'}</h3>
@@ -421,7 +414,7 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
           </div>
           <div>
             <h3>Expedition</h3>
-            <p>{won ? 'Victory: the Warden fell and the Spark flared.' : x.status === 'suspended' ? `Saved at: ${ROUTES[x.route].nodes[x.index]?.title ?? 'the end'}` : x.fallen ? 'Defeated — reformed by the Heart.' : 'Ended early.'}</p>
+            <p>{won ? 'Victory: the Warden fell and the Spark was reignited.' : x.status === 'suspended' ? `Saved at: ${ROUTES[x.route].nodes[x.index]?.title ?? 'the end'}` : x.fallen ? 'You fell. No reignition this time.' : 'Ended early.'}</p>
             <p>
               Dodges: {w.dodges.dodged} dodged · {w.dodges.hit} hit · {w.dodges.unclear} unseen (no damage)
             </p>

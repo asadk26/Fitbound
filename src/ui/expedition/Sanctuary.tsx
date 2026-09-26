@@ -5,7 +5,7 @@ import { getSave, updateSave } from '../../game/store';
 import { input } from '../../input/InputHub';
 import { iconDataUrl } from '../../phaser/art';
 import { ability } from '../../rpg/abilities';
-import { ROUTES, type RouteId } from '../../rpg/expedition';
+import type { RouteId } from '../../rpg/expedition';
 import { alternatives, eligibility, generateLoadout, rerollAll, restingSore, setTarget, SORE_AREAS, type DayPrefs, type ExLoadout, type Soreness } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
 import { useInputEvents } from '../motionUi';
@@ -21,7 +21,8 @@ import { VoiceToggle } from '../VoiceUi';
 export function Sanctuary({ connected, onBegin, onLab, onJournal, onBack }: { connected: boolean; onBegin: (prefs: DayPrefs, loadout: ExLoadout, route: RouteId) => void; onLab: () => void; onJournal: () => void; onBack: () => void }) {
   const save = useSave();
   const prefs = save.expeditionPrefs;
-  const [route, setRoute] = useState<RouteId>('standard');
+  // One canonical expedition (bible §9.3). The retired short route stays only for older saved runs.
+  const route: RouteId = 'standard';
   const [loadout, setLoadout] = useState<ExLoadout>(() => generateLoadout(prefs, save.calibrations, save.workouts));
   const [focus, setFocus] = useState(0);
   const focusRef = useRef(0);
@@ -145,10 +146,6 @@ export function Sanctuary({ connected, onBegin, onLab, onJournal, onBack }: { co
             <span>Between fights</span>
             {seg(save.settings.motion.traversal, [['active', 'March'], ['assisted', 'Gamepad']], (v) => updateSave((s) => void (s.settings.motion.traversal = v)))}
           </div>
-          <div className="toggle-row">
-            <span>Route</span>
-            {seg(route, [['standard', 'Full (~20–25 min)'], ['short', 'Short (~12–15 min)']], setRoute)}
-          </div>
         </div>
 
         <p className="muted small">{STORY.loadoutNote}</p>
@@ -240,7 +237,7 @@ export function Sanctuary({ connected, onBegin, onLab, onJournal, onBack }: { co
             Reroll all
           </button>
           <button className={`btn btn-big ${focus === 0 ? 'focus' : ''}`} onClick={() => onBegin(getSave().expeditionPrefs, loadout, route)}>
-            Begin · {ROUTES[route].name}
+            Begin the expedition
           </button>
         </div>
       </div>

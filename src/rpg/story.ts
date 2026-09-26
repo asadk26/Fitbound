@@ -1,16 +1,13 @@
 /**
- * Narrative for this milestone: light and non-spoiling.
- *
- * Canon kept here (for future writing): the Heart is a benevolent failsafe
- * that keeps reconstructing the protagonist to find a way to restore a
- * kingdom consumed by corruption. The Haze preserves fragmented versions of
- * the kingdom. The protagonist is an Echo tied to the original anchor (not
- * yet revealed). Elara guides from the Sanctuary and knows more than she
- * says. The Spark is central to the Heart's mission; reaching it restores
- * the land for a while, but not for good. Loadouts are different
- * reconstructions of the protagonist's remembered abilities; blessings are
- * fragments of techniques from other reconstructions; the Mirror of Unlived
- * Lives lets you take on another configuration.
+ * Narrative text, light and non-spoiling. Canon (design bible §5): time is
+ * the blood of reality and flows through the Heart, which has lost its
+ * Spark; eras collide and the Haze spreads. The Heart (benevolent) rebuilds
+ * the protagonist and sends him toward the end of time to reignite the
+ * Spark; each reignition restores some order, for now. Elara keeps the
+ * Sanctuary and knows more than she says. Loadouts are imperfect
+ * reconstructions of his abilities; blessings are techniques the Heart
+ * recalls; the Mirror of Unlived Lives offers another configuration. The
+ * metaphor (stagnation → momentum) is never spoken.
  *
  * Rule: nothing is revealed while the player is concentrating on a movement.
  * Haven memories come after the stretches end.
@@ -28,9 +25,9 @@ export const STORY = {
     'As your breath slows, something surfaces: a courtyard in the morning, a voice counting with you — one, two, three — patient, fond. You almost know the voice. Then it’s gone.',
   havenElara: 'Elara, when you tell her later, is quiet for a moment. “Hold on to that,” she says. “The Heart doesn’t give those back easily.”',
   bossIntro: 'Beyond the last rise the Spark burns, small and stubborn. Between you and it: the Warden of the Haze.',
-  victory: 'You touch the Spark. Colour floods back into the valley — grass, sky, the far towers catching light. Restoration. For now.',
+  victory: 'You touch the Spark. It catches. Somewhere, time finds its beat again — for now.',
   victoryElara: '“It’s holding,” Elara says when you return. “It won’t hold forever. But you did this.” She doesn’t say what happens when it fades.',
-  fallen: 'Your form scatters into the Haze… and gathers again. The Heart does not give up on you. This time the Spark stays out of reach, but the path goes on.',
+  fallen: 'Your form scatters into the Haze, and the Heart gathers you home. This expedition is over. What your body did out there stays done.',
   fallenEnd: 'The Heart gathers you back to the Sanctuary. What your body did out there, it did — that stays.',
   suspended: 'You rest at the edge of the path. It will wait for you.',
   shrine: 'The Mossy Shrine hums as you pass. Some of your strength returns.',

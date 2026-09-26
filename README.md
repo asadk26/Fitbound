@@ -17,7 +17,7 @@ All modes share one input system, one exercise library, one progression system a
 
 ## Heart of Haze: expeditions
 
-*The Heart is a failsafe built to save a kingdom consumed by corruption. It keeps reconstructing you — an Echo of someone it lost — and sends you through the Haze toward the Spark. Each expedition you come back a little different.*
+*Time is the blood of reality, and it flows through the Heart. The Heart has lost its Spark: time is coming apart, eras collide, and the Haze spreads. The Heart rebuilds you and sends you toward the end of time to reignite it. Each expedition you come back a little different.*
 
 ### Start one
 
@@ -29,7 +29,6 @@ All modes share one input system, one exercise library, one progression system a
 4. In **the Sanctuary** (setup, about 20 seconds; the screen sits in the rainy garden):
    - say whether you have **dumbbells** today, and a **chair or bench** for rows;
    - say **how you feel** (Take it easy, Normal or Strong). This scales your own targets and nothing else;
-   - pick a **route**: Full (about 20–25 min, 6 fights) or Short (about 12–15 min, 4 fights);
    - review the **four-movement loadout**. Use *Swap* for one movement, or *Reroll all*;
    - optionally: rest a movement today, adjust your per-exercise targets, include experimental movements, and switch **voice commands** on.
 5. **Begin.** The camera checks you just before the first fight (a quick "stand tall"), not before.
@@ -43,7 +42,7 @@ Cinematics are staged in the engine, in the same painted diorama style as the re
 **The opening** has four stages:
 
 1. **Darkness.** Soft rain, then a heartbeat rising beneath it.
-2. **The kingdom, in fragments.** Three illustrated memories fade in and out: a festival square with nobody in it, towers coming apart stone by stone, and a wheat field greying from the edges. Elara, not yet seen, speaks over them.
+2. **Moments, in fragments.** Three illustrated memories fade in and out: a festival square with nobody in it, towers coming apart stone by stone, and a wheat field greying from the edges. Elara, not yet seen, speaks over them.
 3. **The Heart.** A crystal heart in a cavern of roots, with brass rings turning around it. The rain is muffled here, as if heard through stone. Light pulls a sword, a cape and a hand out of the dark.
 4. **The Sanctuary.** A walled garden on a floating island above a sea of haze, in the rain. The hero forms on a stone slab and rises. Elara waits beside a well that glows with the Heart's warm light, and the light shows in the wet stone and the puddles. Later she walks to the garden's edge, and the camera finds the Spark on a far rise.
 
@@ -65,7 +64,7 @@ It ends on "Come. Let's see what the Heart has remembered of you." and goes stra
 - after a few days away;
 - or simply "There you are."
 
-**The rain.** The Sanctuary has been raining for a long time. After the first expedition that reaches the Spark, the rain stops, and the garden is dry and sunlit from then on. Nothing explains why.
+**The rain.** The Sanctuary has been raining for a long time. After the first reignition (the first expedition that reaches the Spark), the rain stops, and the garden is dry and sunlit from then on. Nothing explains why. The save counts reignitions, and later story beats follow that count.
 
 **For development:**
 
@@ -245,7 +244,7 @@ The change is always previewed before you commit. It follows the same eligibilit
 
 These are separate outcomes:
 
-- **RPG defeat:** HP hits 0 from missed dodges. The character falls. **Reform and carry on** continues the workout at 60% HP (the Spark can't be restored this run); **End the session** goes to the summary.
+- **RPG defeat:** HP hits 0 from missed dodges. The character falls, and **the expedition ends** with no reignition. Every set, dodge and step you did is kept, and the session's summary, check-in and Journal row work as usual. (An optional *Test of Resolve* after a fall is designed, not built yet.)
 - **Fitness completion:** sets done against about 20 planned.
 
 Nothing physical is ever lost: every set is saved the moment it ends, through defeat, rerolls, quitting or reloading. The summary shows the two side by side:
@@ -1052,7 +1051,7 @@ Then note how the ritual feels on your second and third visits.
    - rows, if you have a bench: does the rowing arm need to face the phone as described?
    - mountain climbers and dead bugs: expect trouble; note what happens.
 3. **Movement Lab → Dodge practice** with your body: is a quick squat enough for HIGH? Is a small hop enough for LOW? Is the 2.6 s wind-up generous or too slow?
-4. **A Short expedition** (about 12–15 min), then a **Full** one on another day:
+4. **An expedition, split across two sittings** (stop at the phase boundary, resume on another day):
    - finish at least one set early on purpose;
    - after push-ups, check that nothing attacks until you stand and say you're ready;
    - leave the frame between sets (the next strike should wait) and during a swing (*unseen — no damage*);

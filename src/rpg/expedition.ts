@@ -32,12 +32,16 @@ export interface ExNode {
   at?: string;
 }
 
+/**
+ * 'standard' is today's expedition. 'short' is retired: new expeditions never
+ * use it, but runs saved on it still finish on it (bible §18).
+ */
 export type RouteId = 'standard' | 'short';
 
 export const ROUTES: Record<RouteId, { name: string; blurb: string; nodes: ExNode[]; plannedSets: number }> = {
   standard: {
-    name: 'Full expedition',
-    blurb: 'About 20–25 minutes · 6 fights, a Haven, the Warden',
+    name: 'Expedition',
+    blurb: '6 fights, a Haven, the Warden',
     plannedSets: 21,
     nodes: [
       { kind: 'fight', phase: 1, title: 'The Training Yard', enemies: ['echo_dummy'], cues: 'obvious', at: 'dummyStop' },
@@ -54,8 +58,8 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string; nodes: ExNod
     ],
   },
   short: {
-    name: 'Short expedition',
-    blurb: 'About 12–15 minutes · 4 fights and a Haven',
+    name: 'Short expedition (retired)',
+    blurb: 'An older saved run: 4 fights and a Haven',
     plannedSets: 12,
     nodes: [
       { kind: 'fight', phase: 1, title: 'The Training Yard', enemies: ['echo_dummy'], cues: 'obvious', at: 'dummyStop' },

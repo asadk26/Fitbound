@@ -159,17 +159,32 @@ describe('the reconstruction ritual', () => {
 
 describe('story progress in the save', () => {
   it('defaults to a first launch and survives a reload', () => {
-    expect(defaultSave().story).toEqual({ openingSeen: false, restored: false, rituals: 0, lastVisit: 0 });
+    expect(defaultSave().story).toEqual({ openingSeen: false, restored: false, reignitions: 0, seen: [], rituals: 0, lastVisit: 0 });
     const s = defaultSave();
-    s.story = { openingSeen: true, restored: true, rituals: 4, lastVisit: 123 };
+    s.story = { openingSeen: true, restored: true, reignitions: 2, seen: ['opening'], rituals: 4, lastVisit: 123 };
     const m = new Mem();
     writeSave(s, m);
     expect(loadSave(m).story).toEqual(s.story);
   });
 
   it('a damaged story block falls back safely', () => {
-    expect(sanitize({ story: { openingSeen: 'yes', rituals: -3, lastVisit: 'x' } }).story).toEqual({ openingSeen: true, restored: false, rituals: 0, lastVisit: 0 });
+    expect(sanitize({ story: { openingSeen: 'yes', rituals: -3, lastVisit: 'x' } }).story).toEqual({ openingSeen: true, restored: false, reignitions: 0, seen: [], rituals: 0, lastVisit: 0 });
     expect(sanitize({}).story.openingSeen).toBe(false);
+  });
+
+  it('saves from before reignitions were counted derive them from their victories', () => {
+    const v = (id: string) => ({ id, at: 1, outcome: 'victory', volume: {} });
+    expect(sanitize({ story: { restored: true }, workouts: [] }).story).toMatchObject({ restored: true, reignitions: 1 });
+    expect(sanitize({ story: { restored: true }, workouts: [v('a'), v('b')] }).story).toMatchObject({ restored: true, reignitions: 2 });
+    expect(sanitize({ story: { restored: false }, workouts: [] }).story).toMatchObject({ restored: false, reignitions: 0 });
+    // Once counted, the count is what it says, and restored follows it.
+    expect(sanitize({ story: { restored: false, reignitions: 3 } }).story).toMatchObject({ restored: true, reignitions: 3 });
+  });
+
+  it('the opening follows the approved premise: the Heart lost its Spark, at the end of time', () => {
+    const text = OPENING.beats.flatMap((b) => (b.line ? [b.line.text] : [])).join(' ');
+    expect(text).toContain('end of time');
+    expect(text).not.toMatch(/kingdom|built something|anchor/i);
   });
 });
 
