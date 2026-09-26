@@ -29,6 +29,16 @@ describe('balance harness', () => {
     }
   });
 
+  it('the Green Knight (both stages) sits in the miniboss band: about 5 sets careful, no long tail', () => {
+    const [careful, partial, tired] = measure(['green_knight'], rng(21), 600, { stages: [['green_knight_headless']] });
+    expect(careful.winRate).toBeGreaterThan(0.98);
+    expect(careful.median).toBeGreaterThanOrEqual(4);
+    expect(careful.median).toBeLessThanOrEqual(6);
+    expect(partial.p90).toBeLessThanOrEqual(8);
+    expect(tired.winRate).toBeGreaterThan(0.9);
+    expect(tired.p90).toBeLessThanOrEqual(12);
+  });
+
   it('writes the full table on request', () => {
     const out = process.env.BALANCE_OUT;
     if (!out) return;

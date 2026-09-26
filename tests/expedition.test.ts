@@ -188,7 +188,7 @@ describe('marching between encounters', () => {
   });
 
   it('board markers match the route and the hero stands at the last visited stop', () => {
-    const m = boardMarkers('standard');
+    const m = boardMarkers(ROUTES.standard.nodes);
     expect(m.length).toBe(ROUTES.standard.nodes.filter((n) => n.at).length);
     expect(m.find((k) => k.kind === 'mirror')).toBeTruthy();
     expect(m.find((k) => k.kind === 'haven')).toBeTruthy();

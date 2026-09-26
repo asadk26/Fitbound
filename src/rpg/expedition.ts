@@ -17,7 +17,7 @@ import { newWorkout, type WorkoutData } from './workout';
  * reforms them and the run carries on (the Spark just can't be restored this
  * time), so the workout never restarts from zero.
  */
-export type NodeKind = 'fight' | 'blessing' | 'mirror' | 'haven' | 'boss';
+export type NodeKind = 'fight' | 'blessing' | 'mirror' | 'haven' | 'boss' | 'crossing';
 
 export interface ExNode {
   kind: NodeKind;
@@ -30,6 +30,16 @@ export interface ExNode {
   cues?: Cues;
   /** Trail stop on the meadow board where this encounter stands (you march there). */
   at?: string;
+  /** Fracture routes: the scenario this node belongs to (e.g. 'medieval.A'). */
+  scenario?: string;
+  /** A scenario's boss: 'A' is a miniboss, 'B' a main boss. */
+  boss?: 'A' | 'B';
+  /** A staged boss: its fights in order (the first is `enemies`), with a scene before a stage. */
+  stages?: { enemies: string[]; interlude?: string }[];
+  /** The boss's introduction scene (full the first time it's reached, short after). */
+  intro?: string;
+  /** A line as the leg toward this node begins (fracture routes; legacy routes use STORY.legs). */
+  leg?: string;
 }
 
 /**
@@ -76,7 +86,18 @@ export const ROUTES: Record<RouteId, { name: string; blurb: string; nodes: ExNod
 export interface ExpeditionState {
   v: 1;
   id: string;
+  /** Legacy expeditions play a fixed route. Fracture expeditions carry their own `nodes` (then `route` is only a label). */
   route: RouteId;
+  /** Fracture expeditions: the scenarios planned (A then B; one for a development preview). */
+  plan?: string[];
+  /** Fracture expeditions: the concrete route, saved with the run so content edits never break it. */
+  nodes?: ExNode[];
+  /** Planned sets for a fracture expedition. */
+  plannedSets?: number;
+  /** A development preview of a single scenario: never a reignition. */
+  preview?: boolean;
+  /** Staged boss: the stage reached at the current node. */
+  stage?: number;
   /** Index of the next node to play. */
   index: number;
   prefs: DayPrefs;
@@ -122,13 +143,29 @@ export function newExpedition(route: RouteId, prefs: DayPrefs, loadout: ExLoadou
   };
 }
 
+/** The expedition's route: its own saved nodes, or the legacy table. */
+export function routeNodes(s: Pick<ExpeditionState, 'route' | 'nodes'>): ExNode[] {
+  return s.nodes ?? ROUTES[s.route].nodes;
+}
+
+export function plannedSets(s: Pick<ExpeditionState, 'route' | 'plannedSets'>): number {
+  return s.plannedSets ?? ROUTES[s.route].plannedSets;
+}
+
+/** How the route is named in menus and reports. */
+export function routeName(s: Pick<ExpeditionState, 'route' | 'plan' | 'preview'>, titles?: Record<string, string>): string {
+  if (!s.plan) return ROUTES[s.route].name;
+  const names = s.plan.map((id) => titles?.[id] ?? id);
+  return s.preview ? `Preview: ${names.join(' → ')}` : names.join(' → ');
+}
+
 export function currentNode(s: ExpeditionState): ExNode | null {
-  return ROUTES[s.route].nodes[s.index] ?? null;
+  return routeNodes(s)[s.index] ?? null;
 }
 
 /** True when the next node starts a new phase (a natural place to stop). */
 export function atPhaseBoundary(s: ExpeditionState): boolean {
-  const nodes = ROUTES[s.route].nodes;
+  const nodes = routeNodes(s);
   const prev = nodes[s.index - 1];
   const next = nodes[s.index];
   return !!prev && !!next && prev.phase !== next.phase;
@@ -136,14 +173,14 @@ export function atPhaseBoundary(s: ExpeditionState): boolean {
 
 /** Trail stop the hero stands at now: the last visited encounter's, or the start. */
 export function standingAt(s: ExpeditionState): string {
-  const nodes = ROUTES[s.route].nodes;
+  const nodes = routeNodes(s);
   for (let i = Math.min(s.index, nodes.length) - 1; i >= 0; i--) if (nodes[i].at) return nodes[i].at!;
   return 'start';
 }
 
 /** The encounters on the board, for the diorama. */
-export function boardMarkers(route: RouteId): BoardMarker[] {
-  return ROUTES[route].nodes.flatMap((n, i): BoardMarker[] => {
+export function boardMarkers(nodes: ExNode[]): BoardMarker[] {
+  return nodes.flatMap((n, i): BoardMarker[] => {
     if (!n.at) return [];
     if (n.kind === 'mirror' || n.kind === 'haven') return [{ id: `n${i}`, node: n.at, kind: n.kind }];
     const e = RPG_ENEMIES[n.enemies![0]];
@@ -214,7 +251,23 @@ export function sanitizeExpedition(v: unknown): ExpeditionState | null {
   if (!v || typeof v !== 'object') return null;
   const o = v as ExpeditionState;
   if (o.v !== 1 || typeof o.id !== 'string' || !(o.route in ROUTES)) return null;
-  if (!Number.isInteger(o.index) || o.index < 0 || o.index > ROUTES[o.route].nodes.length) return null;
+  if (!Number.isInteger(o.index) || o.index < 0) return null;
+  // A fracture route whose content changed: nodes that no longer resolve are skipped (never the whole run).
+  if (o.nodes !== undefined) {
+    if (!Array.isArray(o.nodes)) return null;
+    const kept: ExNode[] = [];
+    let index = o.index;
+    o.nodes.forEach((n, i) => {
+      if (validNode(n)) kept.push(n);
+      else if (i < o.index) index--;
+    });
+    const moved = index !== o.index;
+    o.nodes = kept;
+    o.index = index;
+    if (moved) delete o.battle;
+    if (!kept.length) return null;
+  }
+  if (o.index > routeNodes(o).length) return null;
   if (typeof o.hp !== 'number' || typeof o.maxHp !== 'number' || o.hp < 0 || o.hp > o.maxHp) return null;
   if (!o.loadout || !FAMILIES.every((f) => o.loadout[f] === null || (typeof o.loadout[f]?.exerciseId === 'string' && safeEx(o.loadout[f]!.exerciseId)))) return null;
   if (!Array.isArray(o.blessings) || !o.blessings.every((b) => BLESSINGS.some((x) => x.id === b))) return null;
@@ -227,6 +280,16 @@ export function sanitizeExpedition(v: unknown): ExpeditionState | null {
   return { ...rest, prefs, targets: o.targets ?? {}, dodgeInput: o.dodgeInput === 'controller' ? 'controller' : 'body', fallen: !!o.fallen, ...(earlier ? { earlier } : {}), ...(battle ? { battle } : {}) };
 }
 
+const KINDS: NodeKind[] = ['fight', 'blessing', 'mirror', 'haven', 'boss', 'crossing'];
+
+function validNode(n: ExNode): boolean {
+  if (!n || typeof n !== 'object' || !KINDS.includes(n.kind) || typeof n.title !== 'string') return false;
+  const known = (ids: unknown) => Array.isArray(ids) && ids.length > 0 && ids.every((e) => typeof e === 'string' && !!RPG_ENEMIES[e]);
+  if ((n.kind === 'fight' || n.kind === 'boss') && !known(n.enemies)) return false;
+  if (n.stages !== undefined && !(Array.isArray(n.stages) && n.stages.length > 0 && n.stages.every((st) => known(st?.enemies)))) return false;
+  return true;
+}
+
 /** A saved fight must belong to the current node and name only enemies that exist; otherwise the fight restarts. */
 function validBattle(b: BattleSave | undefined, index: number): b is BattleSave {
   if (!b || typeof b !== 'object' || b.index !== index || !['choose', 'ready', 'strikes'].includes(b.phase)) return false;
@@ -234,6 +297,7 @@ function validBattle(b: BattleSave | undefined, index: number): b is BattleSave 
   if (!e || !Array.isArray(e.foes) || !e.foes.length || !e.hero || typeof e.hero.hp !== 'number' || !e.cooldowns) return false;
   if (!e.foes.every((f) => f && typeof f.def === 'string' && RPG_ENEMIES[f.def] && typeof f.hp === 'number')) return false;
   if (b.phase === 'strikes' && !Array.isArray(b.strikes)) return false;
+  if (b.stage !== undefined && !(Number.isInteger(b.stage) && b.stage >= 0)) return false;
   return true;
 }
 

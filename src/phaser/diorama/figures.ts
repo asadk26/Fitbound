@@ -803,6 +803,131 @@ function hairStrands(ctx: Ctx, y0: number, y1: number): void {
   ctx.restore();
 }
 
+/**
+ * The Green Knight (Medieval, role A miniboss): a jolly giant of a knight,
+ * green from beard to boots, a holly bough in one hand and a great axe in
+ * the other. In his second stage he carries his own head at his hip, still
+ * talking; a sprig of holly sprouts where it was (no gore, bible §8).
+ */
+function greenKnightBody(ctx: Ctx, headless: boolean): void {
+  base(ctx, '#5f8f4e', '#3b3024', 60);
+  const green = '#4f8a45';
+  const deep = '#2f5e33';
+  const gold = '#d9b457';
+  const skin = '#7fbf6a';
+  // Great axe (right hand): long haft, broad blade.
+  ctx.save();
+  ctx.translate(126, 152);
+  ctx.rotate(-0.18);
+  roundRect(ctx, -4, -118, 8, 122, 3, '#6b4527', 2.5);
+  ctx.beginPath();
+  ctx.moveTo(4, -116);
+  ctx.quadraticCurveTo(34, -110, 30, -80);
+  ctx.quadraticCurveTo(20, -84, 4, -84);
+  ctx.closePath();
+  shade(ctx, '#c9d3c0', { x: 4, y: -116, w: 30, h: 36 }, 2.5, 0.55);
+  roundRect(ctx, -6, -100, 12, 6, 2, gold, 2);
+  ctx.restore();
+  // Legs: green greaves.
+  roundRect(ctx, 58, 138, 20, 34, 6, darken(green, 0.15));
+  roundRect(ctx, 86, 138, 20, 34, 6, darken(green, 0.15));
+  roundRect(ctx, 54, 164, 26, 10, 4, deep, 2.5);
+  roundRect(ctx, 84, 164, 26, 10, 4, deep, 2.5);
+  // Body: green mail and a mantle of leaves.
+  roundRect(ctx, 44, 78, 74, 68, 20, green, 3.5, 0.4);
+  ctx.fillStyle = lighten(green, 0.12);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 5; c++) ctx.fillRect(54 + c * 12 + (r % 2) * 5, 100 + r * 10, 6, 3);
+  roundRect(ctx, 48, 128, 66, 8, 3, gold, 2);
+  ellipse(ctx, 42, 86, 17, 13, deep, 3.5, 0.45);
+  ellipse(ctx, 120, 86, 17, 13, deep, 3.5, 0.45);
+  // Leafy mantle edge.
+  ctx.fillStyle = lighten(deep, 0.1);
+  for (let i = 0; i < 7; i++) {
+    ctx.beginPath();
+    ctx.ellipse(50 + i * 10, 82, 6, 4, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Holly bough (left hand).
+  roundRect(ctx, 22, 104, 6, 46, 3, '#5a3b22', 2);
+  for (const [x, y, a] of [
+    [18, 100, -0.6],
+    [32, 98, 0.6],
+    [16, 112, -0.4],
+    [34, 112, 0.4],
+  ] as [number, number, number][]) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(a);
+    ellipse(ctx, 0, 0, 9, 4.5, '#2e6b35', 1.8, 0.5);
+    ctx.restore();
+  }
+  for (const [x, y] of [
+    [25, 104],
+    [29, 107],
+    [23, 109],
+  ])
+    ellipse(ctx, x, y, 3, 3, '#d8434f', 1.2, 0.8);
+  ellipse(ctx, 25, 128, 9, 8, skin, 2.5, 0.4);
+  ellipse(ctx, 122, 124, 9, 8, skin, 2.5, 0.4);
+  if (headless) {
+    // A green collar, and holly growing where the head was.
+    roundRect(ctx, 64, 66, 34, 16, 7, deep, 3, 0.4);
+    for (const [x, y, a] of [
+      [74, 62, -0.5],
+      [88, 60, 0.5],
+      [81, 54, 0],
+    ] as [number, number, number][]) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(a);
+      ellipse(ctx, 0, 0, 8, 4, '#2e6b35', 1.8, 0.5);
+      ctx.restore();
+    }
+    ellipse(ctx, 81, 60, 3, 3, '#d8434f', 1.2, 0.8);
+    // His head, held by the hair at his hip, eyes open and grinning.
+    knightHead(ctx, 34, 146, 0.62, skin);
+    return;
+  }
+  knightHead(ctx, 81, 52, 1, skin);
+}
+
+function knightHead(ctx: Ctx, cx: number, cy: number, k: number, skin: string): void {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(k, k);
+  // Head and a beard of leaves.
+  ellipse(ctx, 0, 0, 26, 28, skin, 3.5, 0.4);
+  ctx.fillStyle = '#3f7d3c';
+  for (let i = -3; i <= 3; i++) {
+    ctx.beginPath();
+    ctx.ellipse(i * 7, 22 - Math.abs(i) * 2, 6, 10, i * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Hair: a tousle of leaves.
+  ctx.fillStyle = '#2f5e33';
+  for (let i = -3; i <= 3; i++) {
+    ctx.beginPath();
+    ctx.ellipse(i * 8, -24 + Math.abs(i) * 2, 8, 6, i * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  eyes(ctx, 0, -2, 9, 4, '#1d2b1a');
+  // A broad, amused grin.
+  ctx.strokeStyle = '#1d2b1a';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(0, 8, 8, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function greenKnight(ctx: Ctx): void {
+  greenKnightBody(ctx, false);
+}
+
+function greenKnightHeadless(ctx: Ctx): void {
+  greenKnightBody(ctx, true);
+}
+
 export const FIGURES: Record<string, (ctx: Ctx) => void> = {
   hero,
   skeleton,
@@ -810,6 +935,8 @@ export const FIGURES: Record<string, (ctx: Ctx) => void> = {
   mage,
   warden,
   dummy,
+  greenKnight,
+  greenKnightHeadless,
   elara,
   heroClassic,
 };

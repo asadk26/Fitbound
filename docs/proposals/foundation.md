@@ -1,6 +1,13 @@
 # Proposals: fracture architecture, bosses and the workout, the Test of Resolve, Anachronisms
 
-- **Status:** for the creator's approval. Nothing here is built yet. The design bible stays canon; where this document suggests something, the bible's open questions (§34) still apply until approved.
+- **Status: approved on 2026-09-26, with clarifications.** The decisions are folded into the bible (§9.5, §17, §18, §34).
+- **The clarifications:**
+  - selection weights stay tunable;
+  - set allowances are balancing targets, not hard limits or automatic victory triggers;
+  - the exact partial-set and boss rules need their own proposal (now `combat-balance.md`);
+  - Anachronisms start with one small quest and a few details;
+  - workout time includes optional guided marching and excludes inactive pauses.
+- **Built since:** the fracture architecture and Medieval A (see bible §32).
 - **Written:** 2026-09-26, against the code after the session/resume work (sessions per sitting, fights saved at safe points).
 
 ---

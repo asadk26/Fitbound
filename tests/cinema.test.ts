@@ -159,16 +159,16 @@ describe('the reconstruction ritual', () => {
 
 describe('story progress in the save', () => {
   it('defaults to a first launch and survives a reload', () => {
-    expect(defaultSave().story).toEqual({ openingSeen: false, restored: false, reignitions: 0, seen: [], rituals: 0, lastVisit: 0 });
+    expect(defaultSave().story).toEqual({ openingSeen: false, restored: false, reignitions: 0, seen: [], expeditions: 0, scenarios: {}, recent: [], rituals: 0, lastVisit: 0 });
     const s = defaultSave();
-    s.story = { openingSeen: true, restored: true, reignitions: 2, seen: ['opening'], rituals: 4, lastVisit: 123 };
+    s.story = { openingSeen: true, restored: true, reignitions: 2, seen: ['opening'], expeditions: 5, scenarios: { 'medieval.A': { met: 2, bossReached: true, bossDefeated: false } }, recent: [['medieval.A', 'prehistoric.B']], rituals: 4, lastVisit: 123 };
     const m = new Mem();
     writeSave(s, m);
     expect(loadSave(m).story).toEqual(s.story);
   });
 
   it('a damaged story block falls back safely', () => {
-    expect(sanitize({ story: { openingSeen: 'yes', rituals: -3, lastVisit: 'x' } }).story).toEqual({ openingSeen: true, restored: false, reignitions: 0, seen: [], rituals: 0, lastVisit: 0 });
+    expect(sanitize({ story: { openingSeen: 'yes', rituals: -3, lastVisit: 'x' } }).story).toEqual({ openingSeen: true, restored: false, reignitions: 0, seen: [], expeditions: 0, scenarios: {}, recent: [], rituals: 0, lastVisit: 0 });
     expect(sanitize({}).story.openingSeen).toBe(false);
   });
 

@@ -31,6 +31,8 @@ export const STORY = {
   fallenEnd: 'The Heart gathers you back to the Sanctuary. What your body did out there, it did — that stays.',
   suspended: 'You rest at the edge of the path. It will wait for you.',
   shrine: 'The Mossy Shrine hums as you pass. Some of your strength returns.',
+  crossingFirst: 'The ground thins under your feet. Through the Haze, another age is waiting — close enough to touch, and nothing like this one.',
+  crossing: 'The Haze thins. Another age waits on the other side.',
   /** A line as each march begins, keyed by the destination's title. */
   legs: {
     'The Training Yard': 'The Sanctuary gate opens onto a meadow the Haze has only half remembered. Somewhere ahead, straw rustles.',

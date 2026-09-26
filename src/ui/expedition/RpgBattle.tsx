@@ -17,6 +17,7 @@ import type { Cues } from '../../rpg/enemies';
 import { abilityLoadout } from '../../rpg/expedition';
 import type { ExLoadout } from '../../rpg/loadout';
 import type { BattleSave } from '../../rpg/session';
+import { interludeLines, type InterludeLine } from '../../story/interludes';
 import type { PhysicalBucket } from '../../rpg/workout';
 import { Calibration } from '../Calibration';
 import { CameraView } from '../CameraView';
@@ -40,9 +41,9 @@ import { SetRunner, type SetResult } from './setRunner';
  * Enemy attacks never happen during a set. After a floor exercise there is
  * extra time to get up before the first strike.
  */
-export type BattleStage = 'intro' | 'choose' | 'set' | 'resolve' | 'ready' | 'enemy' | 'dodge' | 'victory' | 'defeat';
+export type BattleStage = 'intro' | 'interlude' | 'choose' | 'set' | 'resolve' | 'ready' | 'enemy' | 'dodge' | 'victory' | 'defeat';
 
-const MODE_FOR: Record<BattleStage, InputMode> = { intro: 'menu', choose: 'menu', set: 'exercise', resolve: 'menu', ready: 'ready', enemy: 'menu', dodge: 'dodge', victory: 'menu', defeat: 'menu' };
+const MODE_FOR: Record<BattleStage, InputMode> = { intro: 'menu', interlude: 'menu', choose: 'menu', set: 'exercise', resolve: 'menu', ready: 'ready', enemy: 'menu', dodge: 'dodge', victory: 'menu', defeat: 'menu' };
 
 export interface FightResult {
   outcome: 'victory' | 'defeat';
@@ -81,6 +82,15 @@ export interface RpgBattleProps {
   onCheckpoint?: (save: Omit<BattleSave, 'index'>) => void;
   /** Physically active time in this fight outside the sets themselves (workout time, bible §18). */
   onPhysical?: (bucket: PhysicalBucket, ms: number) => void;
+  /** A staged boss: its fights in order (stage 0 is `enemies`), each maybe preceded by a scene. */
+  stages?: { enemies: string[]; interlude?: string }[];
+  /** A boss introduction scene (full the first time, short after). */
+  intro?: string;
+  /** Battle backdrop; defaults to the dungeon for bosses and the meadow otherwise. */
+  backdrop?: 'meadow' | 'dungeon';
+  /** Scenes already seen, and a report when one is seen (or skipped). */
+  seen?: readonly string[];
+  onSceneSeen?: (id: string) => void;
 }
 
 /** Foes charge across this long before impact (the stance is readable well before). */
@@ -99,6 +109,8 @@ const view = (f: Foe): RpgFoeView => ({ uid: f.uid, sprite: f.def.sprite, tint: 
 
 export function RpgBattle(p: RpgBattleProps) {
   const [restored] = useState(() => (p.resume ? RpgEngine.restore(p.resume.engine, abilityLoadout(p.loadout), { blessings: p.blessings }) : null));
+  /** Which stage of a staged boss is being fought. */
+  const stageIdx = useRef(restored ? (p.resume?.stage ?? 0) : 0);
   const [engine] = useState(() => {
     if (restored) return restored;
     const e = new RpgEngine(p.enemies, p.hero, abilityLoadout(p.loadout), { blessings: p.blessings });
@@ -152,7 +164,7 @@ export function RpgBattle(p: RpgBattleProps) {
   /** Strikes still to dodge from a resumed enemy turn. */
   const pendingStrikes = useRef<PendingStrike[] | null>(null);
   const checkpoint = (phase: BattleSave['phase'], rest?: PendingStrike[]) => {
-    lastSave.current = { engine: engine.snapshot(), phase, ...(phase === 'strikes' ? { strikes: structuredClone(rest ?? []) } : {}) };
+    lastSave.current = { engine: engine.snapshot(), phase, ...(phase === 'strikes' ? { strikes: structuredClone(rest ?? []) } : {}), ...(stageIdx.current ? { stage: stageIdx.current } : {}) };
     props.current.onCheckpoint?.(lastSave.current);
   };
 
@@ -208,7 +220,7 @@ export function RpgBattle(p: RpgBattleProps) {
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
   useEffect(() => {
-    startRpgBattle({ foes: engine.living.map(view), heroHp: engine.hero.hp, heroMaxHp: engine.hero.maxHp, backdrop: p.boss ? 'dungeon' : 'meadow', boss: !!p.boss });
+    startRpgBattle({ foes: engine.living.map(view), heroHp: engine.hero.hp, heroMaxHp: engine.hero.maxHp, backdrop: p.backdrop ?? (p.boss ? 'dungeon' : 'meadow'), boss: !!p.boss });
     window.setTimeout(pushStatus, 900);
     input.setMode('menu');
     const first = engine.living[0].def;
@@ -222,6 +234,16 @@ export function RpgBattle(p: RpgBattleProps) {
         if (r.phase === 'strikes') pendingStrikes.current = r.strikes ?? [];
         toReady(false);
       }, 1800);
+    } else if (p.intro && interludeLines(p.intro, p.seen ?? []).length) {
+      // A boss's introduction: the full scene the first time, a short entrance after.
+      later(
+        () =>
+          playInterlude(p.intro!, () => {
+            setNote(first.tip);
+            later(() => toChoose(), 2200);
+          }),
+        900,
+      );
     } else {
       setNote(first.tip);
       audio.say(`${first.intro} ${first.tip}`);
@@ -408,7 +430,58 @@ export function RpgBattle(p: RpgBattleProps) {
     toChoose();
   }
 
+  // ── Scenes inside the fight ─────────────────────────────────────────────
+  const [scene, setScene] = useState<{ id: string; lines: InterludeLine[]; i: number } | null>(null);
+  const sceneRef = useRef<{ id: string; lines: InterludeLine[]; i: number; then: () => void } | null>(null);
+  function playInterlude(id: string, then: () => void) {
+    const lines = interludeLines(id, props.current.seen ?? []);
+    if (!lines.length) return then();
+    sceneRef.current = { id, lines, i: 0, then };
+    setScene({ id, lines, i: 0 });
+    setStage('interlude');
+    sayLine(lines[0]);
+  }
+  const sayLine = (l: InterludeLine) => audio.say(l.text);
+  /** Next line, or (skip) the end: either way the scene counts as seen. */
+  function sceneStep(skip: boolean) {
+    const sc = sceneRef.current;
+    if (!sc) return;
+    const i = skip ? sc.lines.length : sc.i + 1;
+    if (i < sc.lines.length) {
+      sc.i = i;
+      setScene({ id: sc.id, lines: sc.lines, i });
+      sayLine(sc.lines[i]);
+      return;
+    }
+    sceneRef.current = null;
+    setScene(null);
+    props.current.onSceneSeen?.(sc.id);
+    sc.then();
+  }
+
   function win() {
+    const stages = props.current.stages;
+    const nextIdx = stageIdx.current + 1;
+    if (stages && nextIdx < stages.length) {
+      // A staged boss: the next stage follows its scene; HP, shield and cooldowns carry on.
+      setStage('resolve');
+      later(() => {
+        const next = stages[nextIdx];
+        const begin = () => {
+          stageIdx.current = nextIdx;
+          const added = engine.nextStage(next.enemies, props.current.hpScale ?? 1);
+          fx([], added.map(view));
+          if (leaving.current) {
+            checkpoint('choose');
+            return (flushPhysical(), props.current.onLeave(lastSave.current));
+          }
+          later(() => toChoose(), 1200);
+        };
+        if (next.interlude) playInterlude(next.interlude, begin);
+        else begin();
+      }, 1600);
+      return;
+    }
     setStage('victory');
     later(() => (flushPhysical(), props.current.onDone({ outcome: 'victory', hp: engine.hero.hp, firstChecks: firstChecks.current, ...(leaving.current ? { leave: true } : {}) })), 2600);
   }
@@ -512,6 +585,11 @@ export function RpgBattle(p: RpgBattleProps) {
     }
     if (pausedRef.current) {
       if (e.type === 'resume' && !recal) resume();
+      return;
+    }
+    if (st === 'interlude') {
+      if (e.type === 'confirm') sceneStep(false);
+      else if (e.type === 'back') sceneStep(true);
       return;
     }
     if (st === 'choose') {
@@ -693,6 +771,17 @@ export function RpgBattle(p: RpgBattleProps) {
       )}
 
       {(stage === 'intro' || stage === 'enemy' || stage === 'resolve') && note && <div className="tvb-note">{note}</div>}
+      {stage === 'interlude' && scene && (
+        <div className="tv-overlay interlude" onClick={() => sceneStep(false)}>
+          <div className="gmenu interlude-card">
+            {scene.lines[scene.i].who ? <b>{scene.lines[scene.i].who}</b> : null}
+            <p className={scene.lines[scene.i].who ? '' : 'narration'}>{scene.lines[scene.i].text}</p>
+            <small className="muted">
+              A / Enter · next ({scene.i + 1}/{scene.lines.length}) · B / Esc · skip
+            </small>
+          </div>
+        </div>
+      )}
 
       {physical && p.connected && (
         <div className="tvb-cam tv-pip-ctrl">

@@ -51,7 +51,7 @@ export function simulateFight(
   loadout: Loadout,
   player: SimPlayer,
   rng: () => number,
-  opts: { hpScale?: number; hero?: { hp: number; maxHp: number }; blessings?: string[]; engine?: EngineOptions; maxSets?: number } = {},
+  opts: { hpScale?: number; hero?: { hp: number; maxHp: number }; blessings?: string[]; engine?: EngineOptions; maxSets?: number; stages?: string[][] } = {},
 ): FightResult {
   const hero = opts.hero ?? { hp: 100, maxHp: 100 };
   const e = new RpgEngine(enemies, hero, loadout, { blessings: opts.blessings ?? [], ...opts.engine });
@@ -59,6 +59,8 @@ export function simulateFight(
   const maxSets = opts.maxSets ?? 40;
   let sets = 0;
   let turns = 0;
+  const later = [...(opts.stages ?? [])];
+  const stageWon = (): boolean => e.outcome === 'victory' && later.length > 0;
   while (e.outcome === 'ongoing' && sets < maxSets && turns++ < maxSets * 2) {
     const usable = FAMILIES.filter((f) => e.available(f));
     if (!usable.length) {
@@ -79,12 +81,15 @@ export function simulateFight(
     const work: SetWork = { done, target, sided: false, full: done >= target };
     e.useAbility(pick, work);
     sets++;
+    // A staged boss: the next stage follows (the hero carries on as is).
+    if (stageWon()) e.nextStage(later.shift()!, opts.hpScale ?? 1);
     if (e.outcome !== 'ongoing') break;
     const t = e.startEnemyTurn();
     for (const s of t.strikes) {
       e.resolveStrike(s, rng() < player.dodge ? 'dodged' : 'hit');
       if (e.outcome !== 'ongoing') break;
     }
+    if (stageWon()) e.nextStage(later.shift()!, opts.hpScale ?? 1);
     if (e.outcome === 'ongoing') e.endEnemyTurn();
   }
   return { won: e.outcome === 'victory', sets, hpLost: hero.hp - e.hero.hp };

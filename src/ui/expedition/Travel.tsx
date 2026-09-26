@@ -6,7 +6,7 @@ import { input } from '../../input/InputHub';
 import { travel } from '../../phaser/diorama/travel';
 import { setDioramaState, showScene } from '../../phaser/game';
 import { iconDataUrl } from '../../phaser/art';
-import { boardMarkers, currentNode, ROUTES, standingAt, type ExpeditionState } from '../../rpg/expedition';
+import { boardMarkers, currentNode, routeNodes, standingAt, type ExpeditionState } from '../../rpg/expedition';
 import { STORY } from '../../rpg/story';
 import { useSave } from '../useSave';
 import { ControllerStatus } from '../Connected';
@@ -48,7 +48,7 @@ export function Travel({
   const target = `n${x.index}`;
   const r = useMotion();
   const [choice, setChoice] = useState<{ prompt: string; options: { dir: -1 | 1; label: string; detail: string; icon: string }[] } | null>(null);
-  const [notice, setNotice] = useState<string | null>(STORY.legs[node.title] ?? null);
+  const [notice, setNotice] = useState<string | null>(node.leg ?? STORY.legs[node.title] ?? null);
   const [paused, setPausedState] = useState(false);
   const pausedRef = useRef(false);
   const [lost, setLost] = useState(false);
@@ -66,18 +66,18 @@ export function Travel({
   };
 
   useEffect(() => {
-    const nodes = ROUTES[x.route].nodes;
+    const nodes = routeNodes(x);
     setDioramaState({
       target,
       interact: x.shrineUsed ? [] : ['shrine'],
       enemies: [],
       defeated: nodes.map((_, i) => `n${i}`).filter((_, i) => i < x.index),
       gateOpen: true,
-      expedition: { markers: boardMarkers(x.route), pace: 0.35, startAt: standingAt(x) },
+      expedition: { markers: boardMarkers(nodes), pace: 0.35, startAt: standingAt(x) },
     });
     showScene('Diorama', { attract: false });
     input.setMode('explore');
-    const line = STORY.legs[node.title];
+    const line = node.leg ?? STORY.legs[node.title];
     if (line) audio.say(line);
     const t = window.setTimeout(() => setNotice(null), 9000);
     const offs = [

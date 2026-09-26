@@ -183,6 +183,19 @@ export class RpgEngine {
     }
   }
 
+  /**
+   * A staged boss's next stage: new foes enter and the fight carries on —
+   * the hero's HP, shield, Storm Charge and cooldowns stay as they are, so
+   * nothing already done is undone. Returns the new foes.
+   */
+  nextStage(enemies: string[], hpScale = 1): Foe[] {
+    const added = enemies.map((id) => this.spawn(rpgEnemy(id)));
+    if (hpScale !== 1) for (const f of added) f.hp = f.maxHp = Math.round(f.maxHp * hpScale);
+    this.strikes = [];
+    this.outcome = 'ongoing';
+    return added;
+  }
+
   private has(b: string): boolean {
     return this.blessings.has(b);
   }

@@ -158,6 +158,42 @@ export const RPG_ENEMIES: Record<string, RpgEnemyDef> = {
     intro: 'The Warden of the Haze rises between you and the Spark.',
     tip: 'Everything at once: break its armour, cancel its charge, clear its wisps, overload its shroud.',
   },
+  // ── Medieval, role A: the Green Knight (a two-stage miniboss) ───────────
+  green_knight: {
+    id: 'green_knight',
+    name: 'The Green Knight',
+    sprite: 'greenKnight',
+    scale: 1.25,
+    maxHp: 60,
+    armor: 1,
+    staggerAt: 3,
+    weak: ['fire'],
+    pattern: [
+      { kind: 'rest', name: 'Offers you the first blow' },
+      { kind: 'attack', name: 'Great Axe', strikes: [hi(9)] },
+      { kind: 'charge', name: 'Hefts the axe high…', then: { name: 'The Returned Blow', strikes: [hi(8), lo(10)] } },
+      { kind: 'attack', name: 'Holly Sweep', strikes: [lo(8)] },
+    ],
+    intro: 'A knight all in green laughs at the crossroads, a holly bough in one hand and a great axe in the other.',
+    tip: 'He lets you strike first. Upper-body abilities break his mail; disrupt or stagger him to cancel the Returned Blow.',
+  },
+  green_knight_headless: {
+    id: 'green_knight_headless',
+    name: 'The Green Knight',
+    sprite: 'greenKnightHeadless',
+    scale: 1.25,
+    maxHp: 45,
+    staggerAt: 3,
+    weak: ['fire'],
+    pattern: [
+      { kind: 'ward', name: 'The head recites the terms', amount: 14 },
+      { kind: 'attack', name: 'Blind Swing', strikes: [lo(8), hi(8)] },
+      { kind: 'charge', name: 'The head counts down…', then: { name: 'A Year and a Day', strikes: [hi(9), lo(9)] } },
+      { kind: 'attack', name: 'Holly Lash', strikes: [hi(9)] },
+    ],
+    intro: 'He carries his own head at his hip, and it is still talking.',
+    tip: 'The head’s words ward him: lightning overloads a ward. Fire still bites.',
+  },
 };
 
 export function rpgEnemy(id: string): RpgEnemyDef {

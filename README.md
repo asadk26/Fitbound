@@ -302,6 +302,32 @@ It's read-only.
 - From that, the playtest report states the real round trip and how long movements take to arrive over your Wi-Fi.
 - This is a measurement only: dodge timing is unchanged.
 
+### Fractures and scenarios (in development)
+
+The approved structure (bible §9) is one expedition across **two fractures**, meaning two eras:
+
+> Sanctuary → a first-fracture scenario (A) and its miniboss → the Crossing → a second-fracture scenario (B) and its main boss → reignite the Spark.
+
+**What exists now:**
+- **The machinery.**
+  - Scenarios are data (`src/rpg/fractures.ts`, `src/rpg/scenarios/`).
+  - Selection is random but weighted: never-met scenarios come up promptly, and recent ones step back. The weights are starting values in `SELECTION`, meant to be tuned from play.
+  - Content that has been built is kept separate from what the player has unlocked: Medieval, Prehistoric and Modern are available from the start, the 1800s after the first reignition, and the Future after the second.
+  - Each expedition's concrete route is saved with the run, so later content edits can't break it. A node that no longer resolves is skipped, never the whole run.
+  - Staged bosses have scenes between stages.
+  - First-encounter flags: a boss's introduction plays in full the first time and briefly after that; skipping counts as seen, and losing never resets it.
+  - The Crossing is a checkpoint with the Mirror and *Save and stop*.
+- **Medieval A:** the existing medieval fights, ending with the **Green Knight**, from the medieval legend.
+  - He lets you strike first.
+  - When the blow lands, his head rolls into the grass. He picks it up (the head keeps talking) and fights on, headless, with the head's words warding him. No gore: holly grows where the head was.
+  - His two stages share one encounter. The hero's HP, shield, charge and cooldowns carry on, and a save in the middle of the fight remembers the stage.
+  - In the balance harness, a careful player beats him in a median 5 sets (7 at p90). That is synthetic only.
+- **New expeditions still use the legacy route.** A real two-era expedition needs a B scenario from another era. The first will be Prehistoric B, which makes Medieval A → Prehistoric B.
+- **To play Medieval A now:** *Movement Lab → Encounter select → ▶ Medieval: the Green Knight*.
+  - It runs as a real saved run: sets count, stopping and resuming work, and it ends with *Scenario preview complete*, never a reignition.
+  - *☼ The Green Crossroads* in the same list jumps straight to the two-stage fight.
+  - Adding `?allScenarios` to the address ignores player-facing unlocks, for development.
+
 ### Movement Lab
 
 Reached from the Sanctuary.

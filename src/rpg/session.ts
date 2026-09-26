@@ -1,6 +1,6 @@
 import { FAMILIES, getExercise } from '../exercise/registry';
 import type { EngineSnapshot, PendingStrike } from './engine';
-import { ROUTES, type ExpeditionState } from './expedition';
+import { plannedSets, type ExpeditionState } from './expedition';
 import { restingSore, setTarget, type DayPrefs, type ExLoadout } from './loadout';
 import { newWorkout, toRecord, workingSets, type WorkoutRecord } from './workout';
 
@@ -26,6 +26,8 @@ export interface BattleSave {
    */
   phase: 'choose' | 'ready' | 'strikes';
   strikes?: PendingStrike[];
+  /** A staged boss: which stage this save belongs to. */
+  stage?: number;
 }
 
 /** Local calendar day, e.g. "2026-09-26". */
@@ -72,7 +74,7 @@ export function startSession(x: ExpeditionState, now = Date.now()): ExpeditionSt
     ...x,
     earlier: folded,
     status: 'active',
-    workout: newWorkout(x.prefs.intensity, ROUTES[x.route].plannedSets, now),
+    workout: newWorkout(x.prefs.intensity, plannedSets(x), now),
   };
 }
 

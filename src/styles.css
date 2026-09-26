@@ -3280,3 +3280,30 @@ details summary {
 .journal .sum-table {
   width: 100%;
 }
+
+/* Scenes inside a fight (a boss's introduction, between a staged boss's stages) */
+.tv-overlay.interlude {
+  align-items: flex-end;
+  padding-bottom: 6vh;
+  background: linear-gradient(to top, rgba(10, 8, 20, 0.72), rgba(10, 8, 20, 0) 55%);
+  cursor: pointer;
+}
+.interlude-card {
+  width: min(90vw, 1300px);
+  text-align: left;
+}
+.interlude-card b {
+  font-family: var(--pixel);
+  color: var(--gold);
+  font-size: max(13px, 3.4vh);
+  text-shadow: 2px 2px 0 var(--ink);
+}
+.interlude-card p {
+  font-size: max(15px, 3.6vh);
+  line-height: 1.45;
+  margin: 1vh 0 1.4vh;
+}
+.interlude-card p.narration {
+  font-style: italic;
+  color: var(--mist);
+}

@@ -6,6 +6,7 @@ import type { Sensitivity } from '../input/motion';
 import { DEFAULT_PREFS, SORE_AREAS, SORE_TTL_MS, type Calibrations, type DayPrefs } from '../rpg/loadout';
 import type { WorkoutRecord } from '../rpg/workout';
 import type { ProgressState } from '../rpg/progression';
+import type { ScenarioFlags } from '../rpg/fractures';
 
 export const SAVE_KEY = 'fitbound.save.v1';
 export const SAVE_VERSION = 1;
@@ -84,13 +85,19 @@ export interface StoryState {
   reignitions: number;
   /** Scenes seen (or skipped), by id, so first-time scenes never replay by themselves. */
   seen: string[];
+  /** Expeditions started (any kind). */
+  expeditions: number;
+  /** Fracture scenarios: met, boss reached, boss defeated. Persist through falls and quits. */
+  scenarios: Record<string, ScenarioFlags>;
+  /** The last few fracture expeditions' plans, newest first (for variety). */
+  recent: string[][];
   /** Reconstruction rituals so far (varies Elara's line). */
   rituals: number;
   /** When the player last arrived at the Sanctuary. */
   lastVisit: number;
 }
 
-export const DEFAULT_STORY: StoryState = { openingSeen: false, restored: false, reignitions: 0, seen: [], rituals: 0, lastVisit: 0 };
+export const DEFAULT_STORY: StoryState = { openingSeen: false, restored: false, reignitions: 0, seen: [], expeditions: 0, scenarios: {}, recent: [], rituals: 0, lastVisit: 0 };
 
 export function defaultSave(): SaveData {
   return {
@@ -218,6 +225,9 @@ export function sanitize(input: unknown): SaveData {
       openingSeen: !!o.story?.openingSeen,
       ...reignitionsOf(o.story, Array.isArray(o.workouts) ? o.workouts : []),
       seen: strs(o.story?.seen, []).slice(0, 500),
+      expeditions: Number.isInteger(o.story?.expeditions) && o.story!.expeditions >= 0 ? o.story!.expeditions : 0,
+      scenarios: sanitizeScenarios(o.story?.scenarios),
+      recent: Array.isArray(o.story?.recent) ? o.story!.recent.filter((p) => Array.isArray(p)).map((p) => strs(p, [])).slice(0, 3) : [],
       rituals: Number.isInteger(o.story?.rituals) && o.story!.rituals >= 0 ? o.story!.rituals : 0,
       lastVisit: typeof o.story?.lastVisit === 'number' && Number.isFinite(o.story.lastVisit) ? o.story.lastVisit : 0,
     },
@@ -255,6 +265,16 @@ function reignitionsOf(story: Partial<StoryState> | undefined, workouts: Partial
     n = story?.restored ? Math.max(1, wins) : wins;
   }
   return { restored: n > 0, reignitions: n };
+}
+
+function sanitizeScenarios(v: unknown): Record<string, ScenarioFlags> {
+  const out: Record<string, ScenarioFlags> = {};
+  if (!v || typeof v !== 'object') return out;
+  for (const [id, raw] of Object.entries(v as Record<string, Partial<ScenarioFlags>>)) {
+    if (!raw || typeof raw !== 'object') continue;
+    out[id] = { met: Number.isInteger(raw.met) && raw.met! >= 0 ? raw.met! : 0, bossReached: raw.bossReached === true, bossDefeated: raw.bossDefeated === true };
+  }
+  return out;
 }
 
 function sanitizePrefs(v: unknown, known: Set<string>): DayPrefs {

@@ -6,7 +6,9 @@ import { getSave, updateSave } from '../../game/store';
 import { input } from '../../input/InputHub';
 import { STRIKE_TIMING, StrikeTimer } from '../../rpg/dodge';
 import { RPG_ENEMIES } from '../../rpg/enemies';
-import { ROUTES, type NodeKind } from '../../rpg/expedition';
+import { ROUTES, type ExNode, type NodeKind } from '../../rpg/expedition';
+import { materialize } from '../../rpg/fractures';
+import { SCENARIOS } from '../../rpg/scenarios';
 import { CameraView } from '../CameraView';
 import { ControllerStatus } from '../Connected';
 import { GUIDANCE } from '../guidance';
@@ -24,7 +26,7 @@ import { SetRunner, type SetResult } from './setRunner';
  */
 type Tab = 'moves' | 'dodge' | 'voice' | 'jump';
 
-export function MovementLab({ connected, onBack, onJump }: { connected: boolean; onBack: () => void; onJump: (kind: NodeKind, enemies?: string[]) => void }) {
+export function MovementLab({ connected, onBack, onJump, onPreview }: { connected: boolean; onBack: () => void; onJump: (kind: NodeKind, enemies?: string[], node?: ExNode) => void; onPreview: (scenarioId: string) => void }) {
   const [tab, setTab] = useState<Tab>('moves');
   useEffect(() => input.setMode('menu'), []);
   return (
@@ -48,7 +50,7 @@ export function MovementLab({ connected, onBack, onJump }: { connected: boolean;
         {tab === 'moves' && <Moves connected={connected} />}
         {tab === 'dodge' && <DodgeDrill connected={connected} />}
         {tab === 'voice' && <VoiceTest />}
-        {tab === 'jump' && <Jump onJump={onJump} />}
+        {tab === 'jump' && <Jump onJump={onJump} onPreview={onPreview} />}
         <div className="row">
           <button className="btn btn-ghost" onClick={onBack}>
             Back to the Sanctuary
@@ -284,8 +286,10 @@ function VoiceTest() {
   );
 }
 
-function Jump({ onJump }: { onJump: (kind: NodeKind, enemies?: string[]) => void }) {
+function Jump({ onJump, onPreview }: { onJump: (kind: NodeKind, enemies?: string[], node?: ExNode) => void; onPreview: (scenarioId: string) => void }) {
   const fights = [...new Map(ROUTES.standard.nodes.filter((n) => n.enemies).map((n) => [n.enemies!.join('+'), n])).values()];
+  // Scenario bosses, with their stages and scenes, as they appear in a fracture route.
+  const bosses = SCENARIOS.flatMap((sc) => materialize([sc.id], SCENARIOS, () => 0, { expeditions: 99 }).filter((n) => n.kind === 'boss'));
   return (
     <div className="lab-run">
       <p className="muted small">For testing: jump straight into one encounter with your current loadout and blessings. Nothing here changes a saved run, and sets done here aren’t added to your expedition history.</p>
@@ -293,6 +297,11 @@ function Jump({ onJump }: { onJump: (kind: NodeKind, enemies?: string[]) => void
         {fights.map((n) => (
           <button key={n.title} className="btn btn-sm" onClick={() => onJump(n.kind, n.enemies)}>
             ⚔ {n.title} ({n.enemies!.map((e) => RPG_ENEMIES[e].name).join(', ')})
+          </button>
+        ))}
+        {bosses.map((n) => (
+          <button key={n.scenario + n.title} className="btn btn-sm" onClick={() => onJump('boss', n.enemies, n)}>
+            ☼ {n.title} ({n.stages ? `${n.stages.length} stages` : n.enemies!.map((e) => RPG_ENEMIES[e].name).join(', ')})
           </button>
         ))}
         <button className="btn btn-sm" onClick={() => onJump('blessing')}>
@@ -305,6 +314,20 @@ function Jump({ onJump }: { onJump: (kind: NodeKind, enemies?: string[]) => void
           ❀ Haven
         </button>
       </div>
+      {SCENARIOS.length > 0 && (
+        <>
+          <p className="muted small">
+            <b>Scenario preview (development).</b> Play one fracture scenario on its own, start to finish, as a real saved run: your sets count, but it never reignites the Spark. New expeditions use the legacy route until an A and a B scenario from two different eras both exist.
+          </p>
+          <div className="ex-chips">
+            {SCENARIOS.map((sc) => (
+              <button key={sc.id} className="btn btn-sm" onClick={() => onPreview(sc.id)}>
+                ▶ {sc.title} ({sc.role === 'A' ? 'first fracture' : 'second fracture'})
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { input } from '../../input/InputHub';
 import { host } from '../../net/host';
 import { ability } from '../../rpg/abilities';
 import { blessing, offerBlessings, type BlessingDef } from '../../rpg/blessings';
-import { ROUTES, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
+import { routeNodes, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
 import { alternatives, rerollAll, type ExLoadout } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
 import { playtestReport } from '../../rpg/report';
@@ -16,18 +16,19 @@ import { expeditionSets, hasWork } from '../../rpg/session';
 import { completion, pacing, totals, workingSets, workoutTime, type Feedback } from '../../rpg/workout';
 import { GestureMenu, useInputEvents } from '../motionUi';
 
-const NODE_ICON: Record<NodeKind, string> = { fight: '⚔', blessing: '✦', mirror: '◈', haven: '❀', boss: '☼' };
+const NODE_ICON: Record<NodeKind, string> = { fight: '⚔', blessing: '✦', mirror: '◈', haven: '❀', boss: '☼', crossing: '≈' };
 
 /** The route so far and what's next. Menus only: no camera needed. */
 export function PathView({ x, onContinue, onStop }: { x: ExpeditionState; onContinue: () => void; onStop: () => void }) {
-  const nodes = ROUTES[x.route].nodes;
+  const nodes = routeNodes(x);
   const next = nodes[x.index];
   const boundary = x.index > 0 && next && nodes[x.index - 1].phase !== next.phase;
+  const parts = x.nodes ? 2 : 3;
   useEffect(() => input.setMode('menu'), []);
   return (
     <div className="tv-overlay">
       <div className="gmenu path">
-        <h2>{boundary ? `Phase ${next.phase} of 3` : 'The path to the Spark'}</h2>
+        <h2>{boundary ? (x.nodes ? 'The Crossing' : `Phase ${next.phase} of ${parts}`) : 'The path to the Spark'}</h2>
         <ol className="path-nodes">
           {nodes.map((n, i) => (
             <li key={i} className={`${i < x.index ? 'done' : i === x.index ? 'now' : ''} phase-${n.phase}`}>
@@ -48,6 +49,45 @@ export function PathView({ x, onContinue, onStop }: { x: ExpeditionState; onCont
           onChoose={(id) => (id === 'go' ? onContinue() : onStop())}
         />
       </div>
+    </div>
+  );
+}
+
+/**
+ * The temporal crossing between the two fractures (bible §9.3): a natural
+ * place to stop (never the only one), and a chance to look into the Mirror.
+ * The first time, a few lines of what it is; after that, one.
+ */
+export function Crossing({ x, firstTime, onSeen, onContinue, onStop, onLoadout }: { x: ExpeditionState; firstTime: boolean; onSeen: () => void; onContinue: () => void; onStop: () => void; onLoadout: (l: ExLoadout | null) => void }) {
+  const [mirror, setMirror] = useState(false);
+  useEffect(() => {
+    input.setMode('menu');
+    onSeen();
+    audio.say(firstTime ? STORY.crossingFirst : STORY.crossing);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (mirror)
+    return (
+      <Mirror
+        x={x}
+        onDone={(l) => {
+          onLoadout(l);
+          setMirror(false);
+        }}
+      />
+    );
+  return (
+    <div className="tv-overlay">
+      <GestureMenu
+        title="The Crossing"
+        text={`${firstTime ? STORY.crossingFirst : STORY.crossing}\n\n♥ ${x.hp}/${x.maxHp} · ${expeditionSets(x)} sets so far. A good place to stop if you need to — the expedition will wait.`}
+        options={[
+          { id: 'go', label: 'Cross into the next age', icon: 'star' },
+          { id: 'mirror', label: 'Look into the Mirror', detail: 'Change a movement or reroll before crossing', icon: 'wind' },
+          { id: 'stop', label: 'Save and stop here', detail: 'Resume later from the other side', icon: 'lock' },
+        ]}
+        onChoose={(id) => (id === 'go' ? onContinue() : id === 'mirror' ? setMirror(true) : onStop())}
+      />
     </div>
   );
 }
@@ -360,7 +400,7 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
   return (
     <div className="tv-overlay">
       <div className="gmenu summary exp-summary">
-        <h2>{won ? 'The Spark is reignited — for now' : x.status === 'suspended' ? 'Expedition saved' : 'Back to the Sanctuary'}</h2>
+        <h2>{x.preview && !x.fallen && x.status !== 'suspended' ? 'Scenario preview complete' : won ? 'The Spark is reignited — for now' : x.status === 'suspended' ? 'Expedition saved' : 'Back to the Sanctuary'}</h2>
         <p className="gmenu-text">{won ? STORY.victoryElara : x.fallen ? 'You fell, and the expedition is over. Everything you did physically is kept.' : x.status === 'suspended' ? STORY.suspended : 'The expedition ended here. Everything you did physically is kept.'}</p>
         <div className="sum-cols">
           <div>
@@ -420,7 +460,7 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
           </div>
           <div>
             <h3>Expedition</h3>
-            <p>{won ? 'Victory: the Warden fell and the Spark was reignited.' : x.status === 'suspended' ? `Saved at: ${ROUTES[x.route].nodes[x.index]?.title ?? 'the end'}` : x.fallen ? 'You fell. No reignition this time.' : 'Ended early.'}</p>
+            <p>{won ? 'Victory: the Warden fell and the Spark was reignited.' : x.status === 'suspended' ? `Saved at: ${routeNodes(x)[x.index]?.title ?? 'the end'}` : x.fallen ? 'You fell. No reignition this time.' : 'Ended early.'}</p>
             <p>
               Dodges: {w.dodges.dodged} dodged · {w.dodges.hit} hit · {w.dodges.unclear} unseen (no damage)
             </p>

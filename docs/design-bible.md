@@ -373,7 +373,12 @@ These are player-facing rules. They do not stop development from building and te
   - most are environmental details;
   - a few may become lightweight optional quests that persist across expeditions and don't need the relevant eras in the same run;
   - no large inventories, dialogue trees or scheduling systems;
-  - the architecture is an open proposal (§34).
+  - **architecture (approved 2026-09-26):**
+    - a registry of small entries per fracture, placed at a scenario's discovery spots, linked only by persistent flags;
+    - collected objects are named flags listed in the Journal;
+    - quest steps can appear in either role of their era;
+    - a missed step is simply offered again;
+  - **starting scope:** one small quest and a few environmental details, when that stage comes.
 
 ### 9.6 What the roguelite randomizes
 
@@ -649,7 +654,7 @@ When the protagonist's HP reaches zero, **the expedition ends** and no reignitio
 
 A failed expedition is still a useful workout, and it can still reveal new content.
 
-### Test of Resolve (settled concept; details open)
+### Test of Resolve (first version approved; not built yet)
 
 After **every** failed expedition, the Heart offers an **optional** Test of Resolve: *"The expedition is over. Your resolve remains."*
 
@@ -660,7 +665,14 @@ The player can go back to the Sanctuary and finish, or take a short exercise cha
 - **One challenge, one reward.** There are no volume tiers. Only one reward can be held at a time, and it never applies to an already suspended expedition.
 - **Strengthening, not punishment.** The Test should feel like the hero strengthening his spirit, never like extra exercise for losing.
 
-The initial implementation and reward pool are open (§34).
+**First version (approved 2026-09-26):**
+- An optional challenge of 2 to 4 sets, scaled to today's remaining appropriate workout volume.
+- It accommodates soreness and limited eligible movements.
+- It is never offered as pressure. After a full session, it isn't offered at all.
+- It earns one non-stacking reward for the next new expedition. The starting candidates:
+  - lock one eligible movement into the loadout;
+  - a starting blessing chosen from three;
+  - a starting shield.
 
 ### Fitness completion
 
@@ -689,14 +701,17 @@ About **20 minutes of workout time per complete expedition, plus or minus 5**. T
 
 | Workout time includes | Workout time excludes |
 |---|---|
-| Sets and holds | Exploration |
+| Sets and holds | Controller exploration |
 | Physical dodges | Dialogue |
 | Normal recovery between sets | Cutscenes |
 | Physical transitions and equipment setup | Menus and other passive play |
+| Optional guided marching, while actually marching | Inactive pauses |
+
+Time actually exercising (sets and holds) is also kept separately measurable.
 
 It is not 20 minutes of continuous exertion, and **total adventure time is not capped.** An expedition with 21 minutes of workout and 15 minutes of exploration and story is fine. Exploration should be meaningful, not cut short to hit a total.
 
-**No automatic increase in exercise volume** may come from adding a second boss or a longer narrative encounter. How bosses fit the budget is open (§34). Boss difficulty comes from mechanics, tactics, phases and decisions, not HP padding or higher rep targets.
+**No automatic increase in exercise volume** may come from adding a second boss or a longer narrative encounter. Encounters are balanced around expected exercise volume, with **set allowances as balancing targets, never hard limits or automatic victory triggers.** The exact partial-set and boss-balancing rules await approval (§34). Boss difficulty comes from mechanics, tactics, phases and decisions, not HP padding or higher rep targets.
 
 ### Sessions and expeditions
 
@@ -1218,7 +1233,7 @@ The expanded expedition build includes:
 
 Since then, the following have also been implemented (not yet physically playtested):
 
-- **Marching between encounters.** Each encounter stands at its own spot on the diorama trail, and the player marches in place to reach it. Each leg opens with a short story line. A Mossy Shrine detour heals once per run. Steps are tallied in the workout summary, separate from sets. Controller traversal remains available from the pause menu and is not counted as activity. §27 now decides controller-first exploration, but the build still **defaults to marching**; the default hasn't been switched yet.
+- **Marching between encounters.** Each encounter stands at its own spot on the diorama trail, and the player marches in place to reach it. Each leg opens with a short story line. A Mossy Shrine detour heals once per run. Steps are tallied in the workout summary, separate from sets. Controller traversal remains available from the pause menu and is not counted as activity. Since 2026-09-26 (later), expeditions **default to controller travel** (§27); marching is the optional choice.
 - **Visual-first battle staging.** Battles are staged side-on in the style of a simple turn-based JRPG. The hero stands front-left, and enemies stand on a diagonal with in-scene HP, armor, ward, and intent. The camera pushes in on each exchange, and a command menu replaces the ability cards.
 - **Visual-only attack cues.** Enemies telegraph HIGH or LOW through their stance, a glint, and the direction of their swing. Early fights add a guide line and marker; late fights show only the stance. Spoken height calls were removed (see §16).
 - **Free-standing battle figures.** In battles, figures stand without their tabletop bases, with shadows that stay on the ground. The board keeps the based pieces.
@@ -1272,9 +1287,29 @@ Since then, the following have also been implemented (not yet physically playtes
   - **The short route is retired** for new expeditions. Runs already saved on it still finish on it.
   - **Proposals awaiting approval** in `docs/proposals/foundation.md`: fracture architecture, bosses and the workout, the Test of Resolve, and Anachronisms.
 
+- **Controller-first travel, workout time, a balance harness, the fracture architecture, and Medieval A (2026-09-26, later):**
+  - **Travel:** expeditions default to controller travel; marching is optional. Expeditions remember their own choice, and the Motion Trial keeps its own.
+  - **Workout time (§18)** is measured per session: sets and holds, dodging, recovery between sets, physical setup, marching you chose, and the Haven. Controller travel, choosing, dialogue, cutscenes, menus and paused time are excluded. Exercise time is kept separate. It shows in the summary, the playtest report and the Journal.
+  - **A balance harness** (`src/rpg/sim.ts`) plays fights through the real engine with scripted players.
+    - Today's route takes a careful player about **28 sets**, against a plan of about 21, and the Warden has a long tail.
+    - The combat rules themselves are unchanged. The exact partial-set and boss-balancing rules are proposed in `docs/proposals/combat-balance.md`.
+  - **The fracture architecture (§9):**
+    - scenarios are data;
+    - selection is weighted and tunable, and keeps content that has been built separate from what the player has unlocked;
+    - each expedition's route is saved with the run and survives content edits;
+    - staged bosses have scenes between stages;
+    - first-encounter scene flags;
+    - per-scenario flags record met, boss reached and boss defeated;
+    - the Crossing checkpoint.
+  - **Medieval A (content stage A):** the existing medieval fights, ending with the **Green Knight**.
+    - He is a two-stage miniboss: the head rolls, he picks it up, and fights on warded by its words. No gore.
+    - He has new painted figures, an introduction and a between-stage scene.
+    - In the harness, a careful player beats him in a median 5 sets (7 at p90).
+    - It is playable as a development **scenario preview** from the Movement Lab. New expeditions still use the legacy route until Prehistoric B exists.
+
 Validation to date:
 
-- **Automated:** 352 passing unit tests. These include the new detectors, soreness, progression, the Journal, the lag measurement, the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
+- **Automated:** 368 passing unit tests. These include the new detectors, soreness, progression, the Journal, the lag measurement, the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
 - **Headless browser:** the full opening (every line in order), the ritual on the next launch (the opening does not repeat), skip, the Sanctuary screen over the garden, and the dry garden after restoration. Screenshots were reviewed; the visuals are a first version for the creator to evaluate.
 - **Headless browser runs through the local relay with a scripted synthetic body:**
   - a full standard expedition (19 sets, all march legs, the shrine detour, and victory);
@@ -1284,7 +1319,14 @@ Validation to date:
     - saving and leaving mid-fight and mid-set, then resuming "the next day" (a new session, *A new day*, the same turn and enemy HP, no set repeated, the fight continuing to victory);
     - the new opening lines;
     - the Sanctuary without a route choice;
-    - a fall ending the expedition, with its session recorded as a defeat.
+    - a fall ending the expedition, with its session recorded as a defeat;
+  - **2026-09-26 (later):**
+    - the Sanctuary defaulting to controller travel;
+    - switching to marching mid-leg, remembered for expeditions while the Trial's own setting is handed back;
+    - workout time recorded per session, split by kind;
+    - the legacy save-and-resume run again (unchanged);
+    - **the Medieval A preview start to finish:** both of the Green Knight's scenes, a save at his second stage resuming at that stage with no scene replayed, *Scenario preview complete* with no reignition, and the scenario's flags and seen scenes recorded;
+    - the Green Knight figures and the scene overlay were reviewed in screenshots.
 
 These are implementation milestones, not proof that every movement and interaction works reliably with the creator’s real body and hardware.
 
@@ -1311,6 +1353,8 @@ These are priorities, not a rigid schedule. Keep the game playable at every mile
    - reignition tracking;
    - a fall ends the expedition;
    - no short route for new expeditions.
+*Items 1–3 are built (2026-09-26), and so is the fracture architecture from item 4. Only headless and synthetic tests have been run, with no physical validation.*
+
 4. **Proposals for approval before building:**
    - fracture architecture (independent A/B scenarios, selection, encounter flags, the crossing);
    - how bosses fit the workout, and physical-failure rules;
@@ -1325,7 +1369,7 @@ Physically test the expanded combat, movements, voice, partial sets, dodging, lo
 
 | Stage | Scenario |
 |---|---|
-| A | Medieval role A: the existing setting, ending with the **Green Knight** |
+| A | Medieval role A: the existing setting, ending with the **Green Knight**. *Built 2026-09-26 as a Lab preview; synthetic tests only.* |
 | B | Prehistoric role B: ending with a dinosaur main boss. **This makes the first complete canonical expedition, Medieval A → Prehistoric B → Spark, for physical and narrative validation.** |
 | C | 1800s role A: the literary scenario and the **Three Authors** group miniboss |
 | D | 1800s role B: the historical scenario, **Booth → Corrupted Lincoln** |
@@ -1358,10 +1402,9 @@ These are not settled canon or final specifications. Resolve them through propos
 
 ### Gameplay
 
-- **How bosses fit the workout:** keeping boss victories meaningful without exercise-volume traps, and the physical-failure rules for each ability type (reps, holds, shields, interrupts). *Proposed in `docs/proposals/foundation.md`; awaiting approval before any combat redesign.*
-- **Test of Resolve:** the first implementation and reward pool. *Proposed in `docs/proposals/foundation.md`; awaiting approval.*
-- **Anachronisms:** the smallest reusable architecture for cross-era discoveries and quests. *Proposed in `docs/proposals/foundation.md`; awaiting approval.*
-- Fracture selection weighting and repeat protection, once several scenarios exist.
+- **The exact partial-set effectiveness rules and boss-balancing approach.** The direction is approved (balance around expected volume; difficulty from mechanics, phases and tactics; allowances are targets, not limits). The exact rules are proposed in `docs/proposals/combat-balance.md`, with balance-harness data, and await approval. Today's 35% minimum effectiveness is not assumed to be right long-term.
+- **Tuning the selection weights and repeat protection** once several scenarios exist. The starting values are deliberately tunable.
+- **Test of Resolve** and **Anachronisms:** approved in outline, not built yet.
 - The real workout time of an expedition, measured physically.
 - The long-term shape of multi-day expeditions, to revisit after playtesting.
 - Final targets and progression rates (a first rule set exists; tune after weeks of use).
@@ -1452,3 +1495,10 @@ That is the experience every major design decision should serve.
   - **§33:** the roadmap is now foundation, then content stages A–I.
   - **§34:** the open questions are rewritten.
 - **2026-09-26 (later):** §32 updated: sessions within expeditions, fights saved at safe points, a fall ends the expedition, the revised opening and victory text, reignition tracking, the short route retired (352 tests). The proposals for fracture architecture, bosses and the workout, the Test of Resolve, and Anachronisms are in `docs/proposals/foundation.md`.
+- **2026-09-26 (later still):** the approved foundation is folded in:
+  - **§9.5:** Anachronisms architecture and starting scope;
+  - **§17:** the first version of the Test of Resolve;
+  - **§18:** workout time includes optional marching, excludes inactive pauses, and keeps exercise time separate; allowances are targets, not limits;
+  - **§34:** the exact partial-set and boss rules await `combat-balance.md`, and the selection weights stay tunable;
+  - **§32:** controller-first travel, workout time, the balance harness, the fracture architecture, and Medieval A with the Green Knight (368 tests).
+

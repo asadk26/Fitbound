@@ -1,6 +1,7 @@
 import { FAMILIES, getExercise } from '../exercise/registry';
 import { blessing } from './blessings';
-import { ROUTES, type ExpeditionState } from './expedition';
+import { routeName, type ExpeditionState } from './expedition';
+import { SCENARIO_TITLES } from './scenarios';
 import { pacing, totals, workoutTime, type Feedback, type SetRecord } from './workout';
 
 /**
@@ -16,7 +17,7 @@ export function playtestReport(x: ExpeditionState, fb: Feedback | undefined, ctx
     w.outcome === 'victory' ? 'Victory' : x.status === 'suspended' ? `Saved at node ${x.index + 1}` : x.fallen ? 'Fell; the expedition ended' : w.outcome === 'defeat' ? 'Defeat' : 'Ended early';
   const out: string[] = [];
   out.push(`FITBOUND playtest report · ${(ctx.when ?? new Date()).toLocaleString()}`);
-  out.push(`Route: ${ROUTES[x.route].name} · Outcome: ${outcome}${x.fallen && w.outcome === 'victory' ? ' (fell once)' : ''}`);
+  out.push(`Route: ${routeName(x, SCENARIO_TITLES)} · Outcome: ${outcome}${x.fallen && w.outcome === 'victory' ? ' (fell once)' : ''}`);
   out.push(`Settings: travel ${ctx.travel} · attack cues ${ctx.cues} · intensity ${w.intensity}`);
   out.push('');
   const wt = workoutTime(w);

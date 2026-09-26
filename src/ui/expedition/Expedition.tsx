@@ -9,9 +9,11 @@ import { tilt } from '../../input/tilt';
 import { host } from '../../net/host';
 import { showSanctuary, showScene } from '../../phaser/game';
 import { tracker, TrackerError } from '../../pose/PoseTracker';
-import { atPhaseBoundary, clearExpedition, currentNode, loadExpedition, newExpedition, ROUTES, saveExpedition, type ExNode, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
+import { atPhaseBoundary, clearExpedition, currentNode, loadExpedition, newExpedition, ROUTES, routeName, saveExpedition, type ExNode, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
 import { generateLoadout, setTarget } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
+import { materialize, planExpedition, plannedSetsFor, type PlanContext } from '../../rpg/fractures';
+import { FRACTURES, SCENARIO_TITLES, SCENARIOS } from '../../rpg/scenarios';
 import { activeLoadout, applyReadiness, hasWork, needsReadiness, sessionRecord, startSession, upsertRecord } from '../../rpg/session';
 import { addDodge, addMarch, addPhysical, addSet, addTime, newWorkout } from '../../rpg/workout';
 import { Calibration } from '../Calibration';
@@ -21,7 +23,7 @@ import { enterExpeditionTravel, leaveExpeditionTravel, toggleExpeditionTravel } 
 import { CinemaPlayer } from '../Cinema';
 import type { Script } from '../../story/cinema';
 import { OPENING, ritualReason, ritualScript, type RitualReason } from '../../story/scripts';
-import { BlessingPick, Fallen, Haven, Mirror, PathView, Summary } from './Events';
+import { BlessingPick, Crossing, Fallen, Haven, Mirror, PathView, Summary } from './Events';
 import { Journal } from './Journal';
 import { MovementLab } from './MovementLab';
 import { RpgBattle } from './RpgBattle';
@@ -204,6 +206,45 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     if (old && old.id !== xRef.current?.id) recordHistory({ ...old, workout: { ...old.workout, outcome: 'ended' } });
     firstRestoration.current = false;
     const next = newExpedition(route, prefs, loadout, targets);
+    // A fracture expedition when two implemented, reachable scenarios can be paired (bible §9.3);
+    // otherwise the legacy route, which stays playable until then.
+    const plan = planExpedition(SCENARIOS, FRACTURES, planContext(), Math.random);
+    if (plan) fractureRoute(next, plan);
+    updateSave((d) => {
+      d.story.expeditions++;
+      if (plan) {
+        d.story.recent = [plan, ...d.story.recent].slice(0, 3);
+        for (const id of plan) d.story.scenarios[id] = { ...(d.story.scenarios[id] ?? { bossReached: false, bossDefeated: false }), met: (d.story.scenarios[id]?.met ?? 0) + 1 };
+      }
+    });
+    commit(next);
+    routeNext();
+  };
+
+  /** Give a new expedition its concrete fracture route (saved with the run). */
+  const fractureRoute = (x: ExpeditionState, plan: string[]) => {
+    x.plan = plan;
+    x.nodes = materialize(plan, SCENARIOS, Math.random, { expeditions: getSave().story.expeditions });
+    x.plannedSets = plannedSetsFor(plan, SCENARIOS);
+    x.workout.plannedSets = x.plannedSets;
+  };
+
+  /** Development: play one implemented scenario on its own (Movement Lab). Never a reignition. */
+  const preview = (scenarioId: string) => {
+    const s = getSave();
+    const prefs = s.expeditionPrefs;
+    const loadout = generateLoadout(prefs, s.calibrations, s.workouts);
+    const targets: Record<string, number> = {};
+    for (const slot of Object.values(loadout)) if (slot) targets[slot.exerciseId] = setTarget(getExercise(slot.exerciseId), prefs, s.exerciseTargets);
+    const old = loadExpedition();
+    if (old && old.id !== xRef.current?.id) recordHistory({ ...old, workout: { ...old.workout, outcome: 'ended' } });
+    const next = newExpedition('standard', prefs, loadout, targets);
+    fractureRoute(next, [scenarioId]);
+    next.preview = true;
+    updateSave((d) => {
+      d.story.expeditions++;
+      d.story.scenarios[scenarioId] = { ...(d.story.scenarios[scenarioId] ?? { bossReached: false, bossDefeated: false }), met: (d.story.scenarios[scenarioId]?.met ?? 0) + 1 };
+    });
     commit(next);
     routeNext();
   };
@@ -212,7 +253,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
   const routeNext = () => {
     const cur = xRef.current!;
     const n = currentNode(cur);
-    if (!n) return finish(cur.fallen ? 'defeat' : 'victory');
+    if (!n) return finish(endOutcome(cur));
     if (!n.at) return enter();
     if (atPhaseBoundary(cur)) return setView('path');
     goTravel();
@@ -239,8 +280,10 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
   const enter = () => {
     const cur = xRef.current!;
     const n = currentNode(cur);
-    if (!n) return finish(cur.fallen ? 'defeat' : 'victory');
+    if (!n) return finish(endOutcome(cur));
     const physical = n.kind === 'fight' || n.kind === 'boss';
+    // A scenario's boss is "reached" the moment you enter its fight, win or lose (bible §9).
+    if (n.kind === 'boss' && n.scenario && !debug) updateSave((d) => void (d.story.scenarios[n.scenario!] = { ...(d.story.scenarios[n.scenario!] ?? { met: 1, bossDefeated: false }), bossReached: true }));
     const go = () => {
       setDebug(null);
       setNodeKey((k) => k + 1);
@@ -352,7 +395,8 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
         <MovementLab
           connected={connected}
           onBack={() => setView(x && x.status === 'active' ? 'path' : 'sanctuary')}
-          onJump={(kind: NodeKind, enemies?: string[]) => {
+          onPreview={preview}
+          onJump={(kind: NodeKind, enemies?: string[], full?: ExNode) => {
             // A scratch run (the real run's loadout if there is one); never saved.
             const s = getSave();
             realRun.current = xRef.current;
@@ -362,7 +406,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
             scratch.workout = newWorkout(s.expeditionPrefs.intensity, 1);
             xRef.current = scratch;
             setXState(scratch);
-            const n: ExNode = { kind, phase: 1, title: kind === 'boss' || enemies?.includes('warden_of_haze') ? 'Before the Spark' : 'Lab encounter', enemies };
+            const n: ExNode = full ?? { kind, phase: 1, title: kind === 'boss' || enemies?.includes('warden_of_haze') ? 'Before the Spark' : 'Lab encounter', enemies };
             setDebug(n);
             const go = () => {
               setNodeKey((k) => k + 1);
@@ -427,6 +471,11 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
           hpScale={node.hpScale}
           title={node.title}
           boss={node.kind === 'boss' || node.enemies!.includes('warden_of_haze')}
+          stages={node.stages}
+          intro={node.intro}
+          backdrop={node.boss === 'A' ? 'meadow' : undefined}
+          seen={getSave().story.seen}
+          onSceneSeen={(id) => updateSave((d) => void (d.story.seen.includes(id) || d.story.seen.push(id)))}
           hero={{ hp: x.hp, maxHp: x.maxHp }}
           loadout={debug ? x.loadout : activeLoadout(x)}
           resume={!debug && x.battle?.index === x.index ? x.battle : undefined}
@@ -444,6 +493,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
           onDodge={(o, detail) => mutate((d) => addDodge(d.workout, o, detail))}
           onDone={(res) => {
             if (res.outcome === 'victory') {
+              if (node.kind === 'boss' && node.scenario && !debug) updateSave((d) => void (d.story.scenarios[node.scenario!] = { ...(d.story.scenarios[node.scenario!] ?? { met: 1 }), bossReached: true, bossDefeated: true }));
               mutate((d) => {
                 d.hp = Math.max(1, res.hp);
                 delete d.battle;
@@ -497,6 +547,26 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
           }}
         />
       )}
+      {view === 'node' && x && node?.kind === 'crossing' && (
+        <Crossing
+          key={nodeKey}
+          x={x}
+          firstTime={!getSave().story.seen.includes('crossing')}
+          onSeen={() => updateSave((d) => void (d.story.seen.includes('crossing') || d.story.seen.push('crossing')))}
+          onContinue={advance}
+          onLoadout={(l) => {
+            if (l)
+              mutate((d) => {
+                d.loadout = l;
+                for (const slot of Object.values(l)) if (slot && !d.targets[slot.exerciseId]) d.targets[slot.exerciseId] = setTarget(getExercise(slot.exerciseId), d.prefs, getSave().exerciseTargets);
+              });
+          }}
+          onStop={() => {
+            mutate((d) => void d.index++);
+            suspend();
+          }}
+        />
+      )}
       {view === 'node' && x && node?.kind === 'haven' && (
         <Haven
           key={nodeKey}
@@ -540,7 +610,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
       )}
 
       {ctrlLost && view !== 'summary' && view !== 'sanctuary' && view !== 'cinema' && view !== 'journal' && view !== 'lab' && <ControllerLost />}
-      {x && view === 'path' && <div className="exp-route">{ROUTES[x.route].name}</div>}
+      {x && view === 'path' && <div className="exp-route">{routeName(x, SCENARIO_TITLES)}</div>}
     </div>
   );
 }
@@ -577,6 +647,19 @@ function arrival(arrived: () => void): { script: Script; restored: boolean; then
     },
   };
 }
+/** How an expedition ends when its route runs out: a reignition, unless it was a preview (or the hero fell). */
+function endOutcome(x: ExpeditionState): 'victory' | 'defeat' | 'ended' {
+  if (x.fallen) return 'defeat';
+  return x.preview ? 'ended' : 'victory';
+}
+
+/** Where the plan comes from: the save's story progress (bible §9.4). `?allScenarios` is a development switch. */
+function planContext(): PlanContext {
+  const s = getSave().story;
+  const dev = typeof location !== 'undefined' && new URLSearchParams(location.search).has('allScenarios');
+  return { reignitions: s.reignitions, scenarios: s.scenarios, recent: s.recent, dev };
+}
+
 /** Add a finished session to the save's history (for varying future loadouts). */
 function recordHistory(x: ExpeditionState): void {
   if (!hasWork(x)) return;
