@@ -122,6 +122,8 @@ export interface EngineSnapshot {
 
 export interface EngineOptions {
   blessings?: string[];
+  /** Balance experiments only (the simulation harness): replace the partial-set curve. The game never sets this. */
+  effectiveness?: (w: SetWork, floor: number) => number;
 }
 
 const ARMOR_PER_STACK = 0.18;
@@ -143,7 +145,7 @@ export class RpgEngine {
     enemies: string[],
     hero: { hp: number; maxHp: number },
     readonly loadout: Loadout,
-    opts: EngineOptions = {},
+    private readonly opts: EngineOptions = {},
   ) {
     this.hero = { hp: hero.hp, maxHp: hero.maxHp, shield: 0, charge: 0, counter: 0 };
     this.blessings = new Set(opts.blessings ?? []);
@@ -245,7 +247,7 @@ export class RpgEngine {
   useAbility(family: Family, work: SetWork): RpgFx[] {
     const fx: RpgFx[] = [];
     if (this.outcome !== 'ongoing') return fx;
-    const e = effectiveness(work, this.has('echo_of_resolve') ? 0.7 : 0);
+    const e = (this.opts.effectiveness ?? effectiveness)(work, this.has('echo_of_resolve') ? 0.7 : 0);
     if (e <= 0) {
       fx.push({ kind: 'fizzle', family });
       return fx;
