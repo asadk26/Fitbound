@@ -36,8 +36,12 @@ export type Equipment = 'dumbbells';
  */
 export type Reliability = 'stable' | 'beta' | 'experimental' | 'unavailable';
 
-/** Which body calibration the movement relies on. */
-export type CalibrationNeed = 'standing' | 'floor-side' | 'standing-side' | 'supine-side';
+/**
+ * The body position and camera view the movement is done in, which is what a
+ * calibration for it would have to capture: standing or seated facing the
+ * phone, or standing, lying face-down or lying on your back side-on to it.
+ */
+export type CalibrationNeed = 'standing' | 'seated-front' | 'floor-front' | 'floor-side' | 'standing-side' | 'supine-side';
 
 /** What an ability does in combat. The combat engine interprets these. */
 export type AbilityEffect = 'slash' | 'shield' | 'arcane' | 'bulwark' | 'gale' | 'flurry';
@@ -594,7 +598,7 @@ export const EXERCISES: ExerciseDefinition[] = [
     equipment: [],
     sided: true,
     floor: true,
-    calibration: 'standing',
+    calibration: 'seated-front',
     reliability: 'beta',
     reliabilityNote: 'Seated facing the phone, leaning back a little: hands together turn to beside each hip.',
     range: { min: 6, default: 12, max: 30 },
@@ -695,7 +699,7 @@ export const EXERCISES: ExerciseDefinition[] = [
     sided: false,
     holdSplit: true,
     floor: true,
-    calibration: 'floor-side',
+    calibration: 'floor-front',
     reliability: 'experimental',
     reliabilityNote: "Lab test only. Lying on your side facing the phone. Half the time goes to each side: once one side's half is done it should say 'Switch sides', and only the other side should finish the set.",
     range: { min: 10, default: 30, max: 90 },

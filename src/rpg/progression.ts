@@ -54,6 +54,12 @@ export interface Proposal {
 }
 
 function done(s: SetRecord, ex: ExerciseDefinition): number {
+  // A split hold is as complete as its weaker side: 15 s + 5 s of a 30 s side plank is 10 s done.
+  // Time without a side (counted manually) is taken as it comes.
+  if (ex.kind === 'hold' && ex.holdSplit && s.holdSides) {
+    const { left, right } = s.holdSides;
+    return (2 * Math.min(left, right) + Math.max(0, s.holdMs - left - right)) / 1000;
+  }
   if (ex.kind === 'hold') return s.holdMs / 1000;
   if (ex.sided) return Math.min(s.left, s.right);
   return s.camera + s.manual;
@@ -80,7 +86,8 @@ export function evidence(w: WorkoutData): Record<string, Evidence> {
     const last = pace(sets[sets.length - 1]);
     out[id] = {
       sets: sets.length,
-      full: sets.filter((s, i) => s.full || ratio[i] >= 1).length,
+      // A split hold's total can be reached unevenly (with manual time); only the balanced amount is full.
+      full: sets.filter((s, i) => (ex.holdSplit ? ratio[i] >= 1 : s.full || ratio[i] >= 1)).length,
       short: sets.filter((s, i) => s.finishedEarly || ratio[i] < 1).length,
       completion: ratio.reduce((a, r) => a + r, 0) / sets.length,
       slowdown: sets.length >= 2 && first && last ? last / first : null,

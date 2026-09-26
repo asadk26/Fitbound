@@ -67,6 +67,8 @@ export interface SessionSnapshot {
   manualReps: number;
   /** Hold exercises: seconds held this set. */
   heldMs: number;
+  /** Split holds (side planks): camera-credited time per side, ms. */
+  holdSides?: SideCounts;
   countdownLeftMs: number;
   paused: boolean;
   manualMode: boolean;
@@ -304,6 +306,7 @@ export class ExerciseSessionController {
       cameraReps: this.cameraReps,
       manualReps: this.manualReps,
       heldMs: this.heldMs,
+      ...(this.exercise.holdSplit && this.last?.holdSides ? { holdSides: { ...this.last.holdSides } } : {}),
       countdownLeftMs: this.stage === 'countdown' ? Math.max(0, this.opts.countdownMs - since) : 0,
       paused: this.paused,
       manualMode: this.manualMode,

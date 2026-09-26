@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getExercise } from '../src/exercise/registry';
 import { DEFAULT_PREFS, type DayPrefs } from '../src/rpg/loadout';
 import { applyProposals, evidence, propose, type ProgressState } from '../src/rpg/progression';
-import { addSet, newWorkout, type SetRecord, type WorkoutData } from '../src/rpg/workout';
+import { addSet, newWorkout, toRecord, type SetRecord, type WorkoutData } from '../src/rpg/workout';
 
 const prefs = (p: Partial<DayPrefs> = {}): DayPrefs => ({ ...DEFAULT_PREFS, ...p });
 const set = (id: string, done: number, target: number, extra: Partial<SetRecord> = {}): SetRecord => ({
@@ -75,6 +75,22 @@ describe('target progression', () => {
     expect(propose(strong(), prefs(), { pushup: top }, { pushup: { streak: 1, history: [] } }).proposals.find((p) => p.exerciseId === 'pushup')).toBeUndefined();
     const sided = session([set('reverse_lunge', 0, 6, { left: 6, right: 3, finishedEarly: true }), set('reverse_lunge', 0, 6, { left: 6, right: 2, finishedEarly: true })]);
     expect(evidence(sided).reverse_lunge.completion).toBeLessThan(0.6);
+  });
+
+  it('a side plank is judged by its weaker side, and its sides are kept in the history', () => {
+    const even = set('side_plank', 0, 30, { holdMs: 30_000, holdSides: { left: 15_000, right: 15_000 }, full: true });
+    const uneven = set('side_plank', 0, 30, { holdMs: 20_000, holdSides: { left: 15_000, right: 5_000 }, finishedEarly: true });
+    const e = evidence(session([even, uneven])).side_plank;
+    expect(e.full).toBe(1);
+    // 30/30 and 10/30 (twice the weaker side).
+    expect(e.completion).toBeCloseTo((1 + 1 / 3) / 2, 5);
+    // Manual time without a side reached the total, but the camera saw it uneven: not full.
+    const manual = set('side_plank', 0, 30, { holdMs: 30_000, holdSides: { left: 15_000, right: 5_000 }, full: true });
+    expect(evidence(session([manual])).side_plank.full).toBe(0);
+    const lopsided = set('side_plank', 0, 30, { holdMs: 30_000, holdSides: { left: 15_000, right: 10_000 }, full: true });
+    expect(evidence(session([lopsided])).side_plank.completion).toBeCloseTo(25 / 30, 5);
+    const rec = toRecord(session([even, uneven]));
+    expect(rec.volume.side_plank).toEqual({ sets: 2, work: 50, sides: { left: 30, right: 20 } });
   });
 
   it('kept proposals are skipped; applied ones are remembered in the history', () => {

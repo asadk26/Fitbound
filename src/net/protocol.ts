@@ -88,7 +88,7 @@ export type CtrlPayload =
   | { type: 'EXERCISE_DIAG'; setId: string; summary: DiagSummary }
   | { type: 'EXERCISE_REP'; setId: string; exerciseId: string; index: number; source: RepSource; side?: Side; at?: number }
   /** Hold exercises: total valid hold time so far in this set (never decreases). */
-  | { type: 'EXERCISE_HOLD'; setId: string; heldMs: number }
+  | { type: 'EXERCISE_HOLD'; setId: string; heldMs: number; left?: number; right?: number }
   /** The player asked to finish the set now (phone button). */
   | { type: 'FINISH_SET'; setId: string }
   | { type: 'MANUAL_MODE'; setId: string }
@@ -298,7 +298,12 @@ export function parseCtrlMsg(v: unknown): CtrlMsg | null {
         ? { ...base, type: 'EXERCISE_REP', setId: v.setId, exerciseId: v.exerciseId, index: v.index, source: v.source, ...(v.side ? { side: v.side as Side } : {}), ...stamp(v.at) }
         : null;
     case 'EXERCISE_HOLD':
-      return str(v.setId, 40) && int(v.heldMs, 0, 3_600_000) ? { ...base, type: 'EXERCISE_HOLD', setId: v.setId, heldMs: v.heldMs } : null;
+      // Split holds (side planks) also send the time per side; both or neither.
+      if ((v.left === undefined) !== (v.right === undefined)) return null;
+      if (v.left !== undefined && !(int(v.left, 0, 3_600_000) && int(v.right, 0, 3_600_000))) return null;
+      return str(v.setId, 40) && int(v.heldMs, 0, 3_600_000)
+        ? { ...base, type: 'EXERCISE_HOLD', setId: v.setId, heldMs: v.heldMs, ...(v.left !== undefined ? { left: v.left as number, right: v.right as number } : {}) }
+        : null;
     case 'FINISH_SET':
       return str(v.setId, 40) ? { ...base, type: 'FINISH_SET', setId: v.setId } : null;
     case 'MANUAL_MODE':

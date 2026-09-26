@@ -50,6 +50,8 @@ export class RemoteSet implements SetDriver {
   /** Hold exercises: accepted hold time, and when it was last reported. */
   private heldMs = 0;
   private heldAt: number | null = null;
+  /** Split holds: the phone's time per side, as last reported. */
+  private holdSides: SideCounts | null = null;
   private nextTick = HOLD_TICK_MS;
   /** Why reps did or didn't count, as measured on the phone. */
   diagnostics: DiagSummary | null = null;
@@ -132,6 +134,11 @@ export class RemoteSet implements SetDriver {
       this.heldAt = now;
       return false;
     }
+    if (this.exercise.holdSplit && msg.left !== undefined && msg.right !== undefined) {
+      // Each side can hold at most half the target.
+      const half = (this.target * 1000) / 2;
+      this.holdSides = { left: Math.min(msg.left, half), right: Math.min(msg.right, half) };
+    }
     const gain = msg.heldMs - this.heldMs;
     if (gain <= 0) return false;
     const allowed = this.heldAt === null ? HOLD_SLACK_MS : now - this.heldAt + HOLD_SLACK_MS;
@@ -149,6 +156,18 @@ export class RemoteSet implements SetDriver {
     }
     this.progress();
     return true;
+  }
+
+  /**
+   * The per-side split of the hold time accepted here: never more than was
+   * accepted in total (the rate limit above applies to the sides too).
+   */
+  private acceptedSides(): SideCounts {
+    const s = this.holdSides!;
+    const sum = s.left + s.right;
+    if (sum <= this.heldMs || sum === 0) return { ...s };
+    const k = this.heldMs / sum;
+    return { left: Math.floor(s.left * k), right: Math.floor(s.right * k) };
   }
 
   /** The phone's Finish button. */
@@ -248,6 +267,7 @@ export class RemoteSet implements SetDriver {
       cameraReps: this.cameraReps,
       manualReps: this.manualReps,
       heldMs: this.heldMs,
+      ...(this.holdSides ? { holdSides: this.acceptedSides() } : {}),
       countdownLeftMs: stage === 'countdown' ? (p?.countdownLeftMs ?? 0) : 0,
       paused: this.paused,
       manualMode: this.manualMode,

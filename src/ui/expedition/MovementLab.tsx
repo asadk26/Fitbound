@@ -135,7 +135,7 @@ function Moves({ connected }: { connected: boolean }) {
         ) : (
           <>
             <p className="lab-count">
-              Counted: {ex.kind === 'hold' ? `${Math.floor(result.holdMs / 1000)} s` : result.sides ? `left ${result.sides.left}, right ${result.sides.right}` : `${result.done} rep${result.done === 1 ? '' : 's'}`}
+              Counted: {ex.kind === 'hold' ? `${Math.floor(result.holdMs / 1000)} s${result.holdSides ? ` (left ${Math.floor(result.holdSides.left / 1000)} s, right ${Math.floor(result.holdSides.right / 1000)} s)` : ''}` : result.sides ? `left ${result.sides.left}, right ${result.sides.right}` : `${result.done} rep${result.done === 1 ? '' : 's'}`}
             </p>
             <p>Did that match what you actually did?</p>
             <div className="row">

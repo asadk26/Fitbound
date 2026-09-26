@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { SidePlankDetector, sidePlankConfig, WallSitDetector, wallSitConfig } from '../src/exercise/detectors/holds';
-import { getExercise, targetLabel } from '../src/exercise/registry';
+import { EXERCISES, getExercise, targetLabel } from '../src/exercise/registry';
 import { ExerciseSessionController, trialSessionOptions } from '../src/exercise/session';
-import { parseGameMsg } from '../src/net/protocol';
+import { parseCtrlMsg, parseGameMsg } from '../src/net/protocol';
+import { RemoteSet } from '../src/net/remoteSet';
 import type { DetectorUpdate, ExerciseDetector, ExerciseEvent, PoseFrame } from '../src/exercise/types';
 import { FRAME_MS, sidePlankPose, wallSitPose } from '../src/testing/poses';
 
@@ -139,6 +140,19 @@ describe('side plank', () => {
     expect(events.some((e) => e.type === 'setComplete')).toBe(true);
   });
 
+  it('the session reports the time held on each side', () => {
+    const ex = getExercise('side_plank');
+    const s = new ExerciseSessionController(ex, ex.createDetector!('intermediate'), 20, () => {}, trialSessionOptions(ex.id));
+    let t = 0;
+    let sn = s.update(null, t);
+    for (let i = 0; i < secs(4); i++) sn = s.update(sidePlankPose('left', 1, (t += FRAME_MS)), t);
+    for (let i = 0; i < 15; i++) sn = s.update(sidePlankPose('right', 0, (t += FRAME_MS)), t);
+    for (let i = 0; i < secs(2); i++) sn = s.update(sidePlankPose('right', 1, (t += FRAME_MS)), t);
+    expect(sn.holdSides!.left).toBeGreaterThan(3500);
+    expect(sn.holdSides!.right).toBeGreaterThan(1500);
+    expect(sn.holdSides!.left + sn.holdSides!.right).toBeCloseTo(sn.heldMs, -1);
+  });
+
   it('beginners may rest on their knees', () => {
     expect(sidePlankConfig('beginner').allowKnees).toBe(true);
   });
@@ -156,6 +170,52 @@ describe('the two holds in the library', () => {
   it('the side plank target reads as a total split in half', () => {
     expect(targetLabel(getExercise('side_plank'), 30)).toBe('30 s (15 s each side)');
   });
+  it('per-side hold time from the phone is validated, and never exceeds what the PC accepted', () => {
+    const base = { type: 'EXERCISE_HOLD', setId: 's1', heldMs: 4000, seq: 1, epoch: 1 };
+    expect(parseCtrlMsg({ ...base, left: 3000, right: 1000 })).toMatchObject({ left: 3000, right: 1000 });
+    expect(parseCtrlMsg({ ...base, left: 3000 })).toBeNull();
+    expect(parseCtrlMsg({ ...base, left: -1, right: 1000 })).toBeNull();
+    expect(parseCtrlMsg(base)).not.toHaveProperty('left');
+
+    const events: ExerciseEvent[] = [];
+    const r = new RemoteSet(
+      's1',
+      getExercise('side_plank'),
+      30,
+      (e) => events.push(e),
+      () => {},
+      'intermediate',
+    );
+    r.status({ type: 'EXERCISE_STATUS', setId: 's1', stage: 'active', countdownLeftMs: 0, tracking: 'good', confidence: 1, guidance: null, ready: true, fallbackAvailable: false, seq: 1, epoch: 1 });
+    r.hold({ type: 'EXERCISE_HOLD', setId: 's1', heldMs: 0, left: 0, right: 0, seq: 2, epoch: 1 }, 0);
+    // The phone claims 20 s (more than its half on one side) one second later: the PC accepts about 1 s.
+    r.hold({ type: 'EXERCISE_HOLD', setId: 's1', heldMs: 20_000, left: 20_000, right: 0, seq: 3, epoch: 1 }, 1000);
+    const sn = r.snapshot();
+    expect(sn.heldMs).toBeLessThan(2000);
+    expect(sn.holdSides!.left + sn.holdSides!.right).toBeLessThanOrEqual(sn.heldMs);
+    // A hold that isn't split ignores sides.
+    const p = new RemoteSet(
+      's2',
+      getExercise('plank'),
+      30,
+      () => {},
+      () => {},
+      'intermediate',
+    );
+    p.status({ type: 'EXERCISE_STATUS', setId: 's2', stage: 'active', countdownLeftMs: 0, tracking: 'good', confidence: 1, guidance: null, ready: true, fallbackAvailable: false, seq: 1, epoch: 1 });
+    p.hold({ type: 'EXERCISE_HOLD', setId: 's2', heldMs: 500, left: 500, right: 0, seq: 2, epoch: 1 }, 0);
+    expect(p.snapshot().holdSides).toBeUndefined();
+  });
+
+  it('calibration labels match how each movement is done', () => {
+    expect(getExercise('russian_twist').calibration).toBe('seated-front');
+    expect(getExercise('side_plank').calibration).toBe('floor-front');
+    for (const e of EXERCISES) {
+      if (e.floor) expect(e.calibration, e.id).not.toMatch(/^standing/);
+      expect(e.calibration.endsWith('-side'), e.id).toBe(e.camera.view === 'side');
+    }
+  });
+
   it('the phone is told the split target, validated', () => {
     const ok = parseGameMsg({ type: 'EXERCISE_BEGIN', setId: 's1', exerciseId: 'side_plank', difficulty: 'beginner', holdTargetMs: 30_000 });
     expect(ok).toMatchObject({ holdTargetMs: 30_000 });

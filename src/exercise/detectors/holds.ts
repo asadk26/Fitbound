@@ -1,6 +1,6 @@
 import { angle, bestSide, Ema, inclineFromHorizontal, LM, meanVisibility, mid, SIDE } from '../geometry';
 import { clamp01, StableCounter, TrackingGate, untrackedUpdate } from '../tracking';
-import type { DetectorUpdate, ExerciseDetector, GuidanceCode, PoseFrame, Side } from '../types';
+import type { DetectorUpdate, ExerciseDetector, GuidanceCode, PoseFrame, Side, SideCounts } from '../types';
 
 /**
  * Timed holds beyond the plank: wall sits and side planks. Both follow the
@@ -64,7 +64,7 @@ abstract class HoldDetector implements ExerciseDetector {
       if (this.phase === 'HOLDING') this.phase = 'PAUSED';
       if (g === 'lost') this.ready.reset();
       const u = untrackedUpdate(this.phase, g, this.gate.hadTracking, frame !== null, r.confidence, r.issue);
-      return { ...u, holdMs: this.held(), holding: false };
+      return { ...u, holdMs: this.held(), ...this.sideTimes(), holding: false };
     }
 
     let credited = false;
@@ -90,12 +90,18 @@ abstract class HoldDetector implements ExerciseDetector {
       repCompleted: false,
       progress: clamp01(this.held() / 60000),
       holdMs: this.held(),
+      ...this.sideTimes(),
       holding,
       metrics: r.metrics,
     };
   }
 
   protected abstract startCue(): GuidanceCode;
+
+  /** Split holds report the credited time per side. */
+  protected sideTimes(): { holdSides?: SideCounts } {
+    return {};
+  }
 
   /** The position changed under a running hold (e.g. rolled to the other side): it must settle again. */
   protected pauseHold(): void {
@@ -278,6 +284,9 @@ export class SidePlankDetector extends HoldDetector {
   }
   protected blockedCue(): GuidanceCode | null {
     return 'SWITCH_SIDES';
+  }
+  protected sideTimes(): { holdSides: SideCounts } {
+    return { holdSides: { left: Math.min(this.sideMs.left, this.halfMs), right: Math.min(this.sideMs.right, this.halfMs) } };
   }
   protected clear(): void {
     this.line.reset();

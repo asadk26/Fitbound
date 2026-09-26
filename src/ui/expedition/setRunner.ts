@@ -25,6 +25,8 @@ export interface SetResult {
   camera: number;
   manual: number;
   holdMs: number;
+  /** Split holds (side planks): camera-credited time per side, ms. */
+  holdSides?: SideCounts;
   activeMs: number;
 }
 
@@ -124,6 +126,7 @@ export class SetRunner {
         camera: ex.kind === 'hold' ? 0 : this.counts.camera,
         manual: this.counts.manual,
         holdMs,
+        ...(ex.holdSplit && sn?.holdSides ? { holdSides: fitSides(sn.holdSides, holdMs, this.target * 1000) } : {}),
         activeMs: Math.round(this.activeMs),
       };
       // Let the event finish propagating before tearing the set down.
@@ -173,4 +176,18 @@ export class SetRunner {
     this.ended = true;
     this.cleanup();
   }
+}
+
+/**
+ * A split hold's per-side time, consistent with the set's total: a completed
+ * set is exactly half the target each side; otherwise the camera's split,
+ * never adding up to more than the total (manual time has no side).
+ */
+function fitSides(s: SideCounts, holdMs: number, targetMs: number): SideCounts {
+  const half = targetMs / 2;
+  const left = Math.min(s.left, half);
+  const right = Math.min(s.right, half);
+  const sum = left + right;
+  if (sum <= holdMs || sum === 0) return { left: Math.round(left), right: Math.round(right) };
+  return { left: Math.round((left * holdMs) / sum), right: Math.round((right * holdMs) / sum) };
 }

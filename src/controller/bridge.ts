@@ -234,7 +234,8 @@ export class ControllerBridge {
       if (s.ctrl.isHold && snap.heldMs > s.heldSent && now - s.heldAt >= HOLD_REPORT_MS) {
         s.heldSent = Math.floor(snap.heldMs);
         s.heldAt = now;
-        this.out({ type: 'EXERCISE_HOLD', setId: s.id, heldMs: s.heldSent });
+        const sides = snap.holdSides ? { left: Math.floor(snap.holdSides.left), right: Math.floor(snap.holdSides.right) } : {};
+        this.out({ type: 'EXERCISE_HOLD', setId: s.id, heldMs: s.heldSent, ...sides });
       }
       if (snap.stage !== s.lastStage || now - s.lastSentAt >= EXERCISE_STATUS_MS) {
         s.lastStage = snap.stage;

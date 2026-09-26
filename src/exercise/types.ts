@@ -80,6 +80,8 @@ export interface DetectorUpdate {
   progress: number;
   /** Hold exercises only: accumulated valid hold time in ms. */
   holdMs?: number;
+  /** Split holds (side planks): credited hold time per side, ms; sums to holdMs. */
+  holdSides?: SideCounts;
   /** Hold exercises only: whether the hold is currently valid. */
   holding?: boolean;
   /** True on the update where a started rep was abandoned without counting. */

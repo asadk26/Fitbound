@@ -19,6 +19,8 @@ export interface SetRecord {
   right: number;
   /** Hold exercises: verified hold time. */
   holdMs: number;
+  /** Split holds (side planks): the camera-counted part of holdMs per side, ms. */
+  holdSides?: { left: number; right: number };
   target: number;
   full: boolean;
   /** The player chose "Finish set" before the target. */
@@ -159,8 +161,8 @@ export interface WorkoutRecord {
   id: string;
   at: number;
   outcome: WorkoutData['outcome'];
-  /** Sets and total verified work per exercise. */
-  volume: Record<string, { sets: number; work: number }>;
+  /** Sets and total verified work per exercise (split holds: also seconds per side, camera-counted). */
+  volume: Record<string, { sets: number; work: number; sides?: { left: number; right: number } }>;
   /** The player's own check-in after the run, if given. */
   feedback?: Feedback;
   /** Minutes the session took (wall clock) and how many sets did work. */
@@ -186,6 +188,11 @@ export function toRecord(w: WorkoutData, sore: string[] = []): WorkoutRecord {
     const v = (volume[s.exerciseId] ??= { sets: 0, work: 0 });
     v.sets++;
     v.work += s.camera + s.manual + Math.floor(s.holdMs / 1000);
+    if (s.holdSides) {
+      const sd = (v.sides ??= { left: 0, right: 0 });
+      sd.left += Math.floor(s.holdSides.left / 1000);
+      sd.right += Math.floor(s.holdSides.right / 1000);
+    }
   }
   return {
     id: w.id,
