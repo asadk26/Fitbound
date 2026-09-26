@@ -23,7 +23,7 @@ The game combines:
 - Turn-based tactical combat powered by real exercises.
 - Randomized exercise loadouts that change the physical workout between runs.
 - Roguelite blessings, builds, enemy interactions, and permanent progression.
-- A mysterious fantasy world reconstructed from fragmented memories.
+- A world of fractured eras colliding in time, restored a little with every reignition.
 - A recurring Sanctuary and emotionally meaningful characters.
 - Occasional alternate encounter types, including timed calisthenics circuits and rhythm-based boxing.
 - Personalized physical difficulty that respects fatigue and recovery.
@@ -80,6 +80,8 @@ Do not assume motion controls alone are sufficient to make combat fun.
 The character may lose an expedition through combat.
 
 The player should not lose because they cannot complete another push-up.
+
+Physical performance may shape how well abilities work (§17), but running out of physical energy is never, by itself, a defeat.
 
 The game must allow rest, partial sets, appropriate substitutions, and voluntary session termination.
 
@@ -147,7 +149,7 @@ A typical session should feel approximately like this:
 
 1. Launch FITBOUND.
 2. Place the phone and calibrate.
-3. Choose an expedition or another unlocked training mode.
+3. Start or resume an expedition, or choose another unlocked training mode.
 4. Indicate equipment availability and physical readiness.
 5. Receive a randomized exercise loadout.
 6. Explore or navigate brief narrative encounters using a controller or available motion controls.
@@ -169,261 +171,93 @@ The camera only needs to see the player when the current mechanic requires physi
 
 ## 5. World and Narrative
 
-### 5.1 The foundational premise
+*Approved 2026-09-26. Replaces the earlier kingdom-and-corruption premise, the original anchor and the Echo revelation.*
 
-Long ago, a kingdom faced a mysterious corruption that threatened to consume its world.
+### 5.1 The premise
 
-Its inhabitants created the Heart, an extraordinary preservation mechanism intended to save the kingdom.
+> Time is the blood of reality. It flows through the Heart, an ancient, benevolent entity that maintains the order of existence.
+>
+> But the Heart has lost its Spark. Its rhythm falters, time fractures, historical eras collide, and the Haze spreads through the disorder.
+>
+> The Heart reconstructs the protagonist, who journeys again and again through fractured time toward the end of time to reignite the Spark.
+>
+> Each successful expedition restores some order. Recovery is gradual, not instantaneous.
 
-The Heart was not designed to rule, punish, or conquer.
+In one line: **the Heart has lost its Spark. Time is coming apart. Get moving and reignite it.**
 
-It was created as a last resort.
+Keep it that simple. There are no multiverses, competing histories, time-travel paradoxes, or theory of the protagonist's consciousness. Eras collide because time is unstable; that is all the explanation the game needs.
 
-Its purpose was to preserve the world, reconstruct what was lost, and discover a way to overcome the catastrophe.
+### 5.2 The quiet metaphor
 
-But the Heart’s original solution did not hold.
+The lost Spark stands for stagnation, disconnection and lost momentum. Repeated effort gradually brings movement and life back. Let that meaning emerge through play; no character states it.
 
-The kingdom could be reconstructed, yet the corruption repeatedly returned.
+- Never frame the game as being about depression, and never present exercise as a cure for any condition.
+- Keep words like *depression*, *motivation*, *lazy*, *cure* and *therapy* out of story text and UI.
+- Rest, Havens and stopping are natural, positive parts of the rhythm. The game never shames them.
+- Restoration is always earned by effort and always partial, never a reward for suffering.
 
-Over time, the Heart began testing different possibilities.
+### 5.3 The Heart
 
-Different configurations of the world.
+- Ancient, benevolent, and nobody built it. It keeps time flowing. **It is not secretly evil**, and must not become a hidden villain or a final boss.
+- It has no voice; it speaks through light, pulse and what it reconstructs.
+- It **remembers across every expedition, won or lost**: discoveries, encounters, scenes, traces.
+- It recovers gradually. Each reignition steadies its rhythm a little.
 
-Different circumstances.
+### 5.4 The Spark
 
-Different abilities.
+- The Heart's lost rhythm. It lies at the literal **end of time**, and it is the distant light seen from the Sanctuary in the opening.
+- Reaching it and reigniting it restores order **for now**: each reignition holds a little longer. This is why winning never ends the game.
 
-Different decisions.
+### 5.5 The Haze and the fractures
 
-Different attempts to reach the source of the problem.
+- The Haze seeps through where time breaks. It reconstructs people, creatures and legends without caring whether they came from history, literature or myth.
+- Every figure the hero fights is a **Haze reconstruction**, not the real person. The word "Echo" may be used generically for such reconstructions.
+- Eras become **fractures**: compact places that can collide and leak into one another (§9).
 
-The Heart’s repeated reconstructions gave rise to the world now known as the Haze.
+### 5.6 The Sanctuary
 
-The protagonist is part of the Heart’s final contingency: a recurring adventurer sent into the unstable world to discover a solution.
+- Home, outside the ordinary flow of time. The game never explains how.
+- It is where the reconstruction ritual happens and where the world's recovery shows.
+- **It rains until the first reignition, and the rain never returns.** The game never explains why.
+- Later reignitions each leave a small, visible change.
 
-Every expedition is another possibility.
+### 5.7 Elara
 
-### 5.2 The Heart
+- The Keeper of the Sanctuary: warm and slightly dry-humoured. A person, not a tutorial interface.
+- She knows more than she says, but she is not a villain or a simple traitor.
+- **After the second reignition she disappears.** Her absence should be felt, yet the Sanctuary and the ritual keep working without her. The Sanctuary's text becomes neutral and the ritual is quiet.
+- The protagonist finds **traces** of her across later expeditions, won or lost. How her story resolves is not decided (§34).
+- Her lines are never spoken by a synthetic voice.
+- Her visual identity and voice are important assets. Keep them consistent.
 
-The Heart is fundamentally benevolent.
+### 5.8 The protagonist
 
-It is trying to save the world.
-
-Its tragedy is not that it secretly wants to destroy the kingdom, but that the problem it was built to solve is more complicated than its original purpose accounted for.
-
-It can reconstruct possibilities.
-
-It can preserve knowledge.
-
-It can learn from the protagonist’s expeditions.
-
-But it does not necessarily understand what constitutes an acceptable future.
-
-The Heart should gradually change as the player progresses.
-
-Examples include:
-
-- Previously corrupted areas becoming partially restored.
-- Changes to Sanctuary.
-- New encounter types becoming possible.
-- The Heart preserving unexpected discoveries.
-- Reconstructions behaving in ways Elara has never witnessed.
-- New possibilities becoming available after successful expeditions.
-
-The Heart must not be casually rewritten as an evil machine or a manipulative final boss.
-
-A later conflict with the Heart could arise from incomplete instructions, incompatible goals, or difficult choices without making its original purpose malicious.
-
-#### Central thematic question
-
-> Can a system created to preserve a world learn that saving its people may require allowing that world to become something new?
-
-### 5.3 The Haze
-
-The Haze is the unstable reconstructed world through which the protagonist ventures.
-
-It consists of fragments of places, histories, memories, and possibilities.
-
-A familiar environment may recur with different encounters or altered meaning.
-
-The Haze should not simply be generic purple corruption.
-
-It should feel mysterious, sometimes beautiful, sometimes unsettling, and occasionally contradictory.
-
-Its inhabitants may remember conflicting versions of events.
-
-Some places may contain evidence of previous reconstructions.
-
-An early discovery may gain a completely different meaning after the player recovers later information.
-
-This premise provides the narrative justification for replayable expeditions without requiring substantial geographical expansion.
-
-### 5.4 The protagonist
-
-At the beginning, the protagonist awakens in Sanctuary without a clear understanding of his identity.
-
-He believes he has been brought back to continue an important mission.
-
-He initially understands himself as the original hero or anchor connected to the Heart.
-
-The long-term revelation is that he is an Echo: a reconstructed consciousness connected to the original anchor.
-
-He is not necessarily merely a disposable copy.
-
-Through repeated expeditions, relationships, decisions, and discoveries, he develops an independent identity.
-
-The gameplay reinforces this theme.
-
-His abilities may change between reconstructions, but his accumulated knowledge and experiences persist.
-
-The question gradually shifts from:
-
-> “How do I fulfill the mission I was created for?”
-
-to:
-
-> “Who am I, and what future do I choose to help create?”
-
-Do not reveal the Echo truth in the opening or early tutorial.
-
-It should emerge through conflicting evidence, character interactions, and accumulated discoveries.
-
-Do not establish that every failed run creates another permanently abandoned, suffering consciousness unless that is deliberately developed as a major plot point. That interpretation would create significant narrative consequences and is not currently canon.
-
-### 5.5 The original anchor and the Spark
-
-The original anchor was connected to the creation or operation of the Heart.
-
-He may have volunteered to become part of the kingdom’s preservation system.
-
-The Spark remains central to the Heart’s original mission and the protagonist’s early objective.
-
-The relationship between the original anchor, the Spark, and the Heart should be revealed gradually.
-
-One promising direction is that the original consciousness has been resisting the Heart’s attempts at restoration because he understands something the Heart does not.
-
-That is a potential long-term revelation, not a requirement to disclose or fully settle during the first story implementation.
-
-Preserve room for nuance.
-
-### 5.6 Elara
-
-Elara is the protagonist’s guide and one of the emotional centers of the narrative.
-
-She is associated with Sanctuary and the Heart’s reconstruction process.
-
-Initially, she provides reassurance, context, and guidance.
-
-She should feel like a person rather than a tutorial interface.
-
-Her relationship with the protagonist should become more complicated as the story develops.
-
-She knows more than she initially reveals.
-
-A major proposed revelation is that she has participated in suppressing or erasing memories because she believes doing so is necessary for the Heart’s mission or the protagonist’s continued existence.
-
-Her motivations should be sympathetic and understandable, even when her actions are questionable.
-
-Do not make her a simplistic traitor.
-
-Ideally, the player should be able to revisit early dialogue after major revelations and hear it differently.
-
-Elara’s visual identity, voice, personality, and recurring dialogue are important creative assets. Preserve consistency once established.
+- The Heart reconstructs him in the Sanctuary. That is all the player needs to know at first.
+- He carries fragmented memories (a sword, a road, a street, a song) as atmosphere and mystery. They are not a puzzle the game owes an answer to.
+- There is no original anchor and no special Echo identity. Don't overexplain his reconstruction.
+- His loadout changes between expeditions because each reconstruction is imperfect (§12).
 
 ---
 
-## 6. Narrative Structure: Why Winning Does Not End the Game
+## 6. Why Winning Does Not End the Game
 
-FITBOUND is a roguelite.
+A **reignition** is the victory of a complete expedition: the second fracture's main boss falls and the Spark is reignited. It is a real achievement, and the world visibly recovers. But recovery is gradual, so there is always a reason to set out again.
 
-Its story must accommodate repeated successful expeditions, not merely repeated deaths.
+| Reignition | What changes |
+|---|---|
+| First | The Sanctuary's rain stops for good. The 1800s fracture becomes reachable (§9.4). |
+| Second | Elara disappears. The Future fracture becomes reachable. Her traces begin to appear. |
+| Later | Each leaves a small, visible restoration in the Sanctuary. |
 
-A successful run should produce a real achievement.
+Failed expeditions still matter. Discoveries, first encounters, scene flags, traces and quest progress persist (§17). Only reignitions drive the Sanctuary's restoration and the story beats above.
 
-However, reaching the Spark or defeating an important guardian does not permanently resolve the corruption.
-
-The Heart can discover a way to restore or stabilize part of the kingdom without discovering a lasting solution for the entire world.
-
-The first major victory should demonstrate that success is possible.
-
-The protagonist reaches the Spark.
-
-The Haze recedes.
-
-Part of the world is restored.
-
-Sanctuary and its inhabitants respond.
-
-The player experiences an authentic accomplishment.
-
-Then the story reveals that the restoration is incomplete or unstable.
-
-Further expeditions are necessary to understand why the solution does not last.
-
-Victory reveals the larger problem. It does not invalidate the victory.
-
-### Suggested long-form progression
-
-#### Act I — Reach the Spark
-
-Introduce the Heart, Sanctuary, Elara, the Haze, and the reconstruction cycle.
-
-The protagonist’s apparent mission is to reach the Spark and defeat the corruption.
-
-The first successful expedition achieves meaningful partial restoration.
-
-#### Act II — Understand the reconstruction
-
-Subsequent expeditions reveal:
-
-- Conflicting histories of the catastrophe.
-- The original anchor’s role.
-- Elara’s incomplete explanations.
-- The existence and significance of Echoes.
-- The Heart’s changing attempts to find a solution.
-- Why earlier restorations failed or proved insufficient.
-
-#### Act III — Determine what salvation means
-
-The protagonist eventually learns enough to question the Heart’s original definition of success.
-
-Preserving the original kingdom exactly may conflict with preserving the independent people and identities that now exist.
-
-The central mystery should culminate in a meaningful choice or resolution rather than an arbitrary final battle.
-
-The precise endings are not yet locked.
-
-Earlier possible directions include:
-
-- Continuing as a guardian of the Heart.
-- Freeing or rescuing those dependent on its reconstruction system.
-- Establishing a form of shared continuity in which the reconstructed world and its inhabitants can develop independently.
-
-These should remain thematic possibilities rather than predetermined good, bad, and true endings.
+The story's eventual conclusion, Elara's resolution and any postgame are **not designed yet** (§34). The direction stays: the narrative gives meaning, while replayable combat, builds, mastery and fitness give longevity. After any conclusion, venturing into the fractures should remain a choice worth making.
 
 ---
 
-## 7. Postgame Narrative
+## 7. (Merged into §6)
 
-The central story should eventually have a genuine conclusion.
-
-However, the protagonist should retain a reason to undertake expeditions after that conclusion.
-
-One promising direction:
-
-The Heart and protagonist establish a more sustainable future for Sanctuary, but fragments of the lost kingdom remain beyond its reach.
-
-The protagonist can voluntarily venture into the remaining Haze to recover people, memories, and possibilities.
-
-The loop changes from an obligation into a choice.
-
-This provides a natural long-term premise for additional characters, encounters, bosses, blessings, and exercise types without repeatedly undoing the player’s achievements.
-
-The game should not depend on endless new story revelations to remain enjoyable.
-
-The narrative provides meaning.
-
-Replayable combat, builds, mastery, and fitness provide longevity.
+The earlier postgame section described the superseded kingdom premise. Its lasting direction is kept in §6.
 
 ---
 
@@ -431,102 +265,125 @@ Replayable combat, builds, mastery, and fitness provide longevity.
 
 ### Art direction
 
-The preferred visual direction is a charming, handcrafted fantasy diorama.
+The preferred visual direction is a charming, handcrafted fantasy diorama:
 
-General qualities:
+- a miniature-world presentation;
+- warm, readable lighting;
+- distinct silhouettes;
+- expressive small environments;
+- magical atmospheric effects;
+- a contrast between the comforting Sanctuary and the mysterious fractures.
 
-- Miniature-world presentation.
-- Warm and readable lighting.
-- Distinct silhouettes.
-- Expressive small environments.
-- Magical atmospheric effects.
-- A contrast between comforting Sanctuary spaces and mysterious Haze environments.
+**Each fracture gets its own visual identity within that same diorama language.**
 
-The general appeal of compact, tactile fantasy diorama games is relevant, but do not copy another game’s characters, environments, or proprietary visual identity.
-
-The game should feel visually cohesive across exploration, combat, menus, and cutscenes.
-
-Avoid replacing the current successful art direction merely because new assets or techniques become available.
+Don't copy another game's characters, environments or visual identity, and don't replace the current successful art direction merely because new assets or techniques become available.
 
 ### Narrative tone
 
-The story should be mysterious, emotionally grounded, and hopeful without being simplistic.
+Mysterious, emotionally grounded and hopeful, with room for wonder, melancholy, discovery, humor (including deliberate absurdity from the Haze), recurring relationships and genuine accomplishment.
 
-Balance:
+Avoid excessive exposition. Not every encounter needs a revelation; small, memorable character moments matter.
 
-- Wonder.
-- Melancholy.
-- Discovery.
-- Occasional humor.
-- Recurring character relationships.
-- Genuine accomplishment.
+**Real historical figures** appear only as fictional Haze reconstructions, never as claims about the real people:
 
-Avoid excessive exposition.
-
-Not every encounter must reveal a world-changing secret.
-
-Small, memorable character moments are important.
+- Real tragedies are handled sincerely and without gore.
+- Figures from oppressive causes (for example Confederate soldiers and commanders) are never glorified or given Lost Cause framing.
 
 ### Cutscenes
 
-Prefer scripted in-engine cinematics using the existing visual style.
+Prefer scripted in-engine cinematics in the existing style. Cutscenes are data-driven and skippable, and dialogue is player-paced.
 
-A full animated movie is not required.
+**The opening** keeps its current staging:
 
-Camera movement, character staging, particles, dialogue portraits, music, and environmental effects can create effective scenes.
+1. darkness and rain, then a heartbeat;
+2. glimpses of fractured moments;
+3. the Heart's cavern;
+4. the protagonist forms in the rainy Sanctuary, and Elara greets him;
+5. the distant Spark is revealed (the end of time);
+6. the player receives control.
 
-The opening should be relatively brief and establish emotional intrigue rather than explaining the entire cosmology.
+The opening establishes intrigue; it does not explain the cosmology. It plays once and can be replayed from the title screen.
 
-A promising opening structure:
+**The reconstruction ritual** recurs after every expedition. It is short and skippable, and becomes quiet once Elara is gone.
 
-- Darkness and a faint heartbeat.
-- Glimpses of the ruined kingdom.
-- The Heart activates.
-- The protagonist awakens in Sanctuary.
-- Elara greets him.
-- The distant Spark is revealed.
-- The player receives control.
+**Boss introductions** are tracked per scenario:
 
-The reconstruction sequence should also become a recognizable recurring ritual after expeditions.
-
-Later versions can be shortened, varied, and skippable.
+- The first time a player reaches a boss scenario, it plays its full introduction. Every later time, it plays a much shorter entrance.
+- Skipping counts as seeing, and losing never resets the flag.
+- A staged boss, for example Booth then Lincoln, keeps its stage when an expedition is suspended.
+- Ordinary encounters don't get cutscenes.
 
 ---
 
-## 9. Core Roguelite Structure
+## 9. Expeditions and Fractures
 
-FITBOUND is primarily an encounter-driven roguelite, not an exploration-heavy RPG.
+FITBOUND is an encounter-driven roguelite, not an exploration-heavy RPG. Variety comes from eras, encounters, combat, loadouts and optional discoveries, not from large procedural geography.
 
-A run should contain a combination of:
+### 9.1 Fractures
 
-- Combat.
-- Temporary blessings.
-- Meaningful choices.
-- Character encounters.
-- Recovered information.
-- Occasional unusual challenges.
-- Recovery.
-- A final encounter.
-- Persistent progression.
+A **fracture** is an era: a compact, handcrafted environment with its own visual identity, encounters, NPCs, optional discoveries and bosses.
 
-The encounter library should be reusable and expandable.
+The current roster is **Prehistoric, Medieval fantasy, the 1800s** (historical and literary figures mixed), **Modern** and **the Future**. This roster is not a limit: more eras, or unusual temporal places, can be added later. Fractures are not linear campaign chapters.
 
-The player should sometimes encounter familiar locations or characters under different circumstances.
+### 9.2 Two roles per fracture
 
-Avoid making all variation depend on randomized dungeon layouts.
+Each fracture eventually has two independent **scenarios**:
 
-### Procedural generation priorities
+- **Role A, first-fracture scenario:** ends with that era's **miniboss**.
+- **Role B, second-fracture scenario:** ends with that era's **main boss**.
 
-Prioritize randomization in this approximate order:
+The two scenarios can share the environment and assets, but their encounters, drama and bosses are meaningfully different. **The roles are independently discoverable.** A player may meet corrupted Lincoln (1800s B) long before the Three Authors (1800s A). That is no contradiction, because time is fractured.
 
-1. Exercise loadouts.
-2. Magical abilities and temporary blessings.
-3. Encounter selection and combinations.
-4. Enemy behavior and tactical situations.
-5. Narrative opportunities and optional discoveries.
-6. Limited route variation.
+During development a fracture may have only one role implemented. The game must work without placeholder bosses.
 
-Large-scale procedural geography is not a priority.
+### 9.3 The expedition
+
+There is one canonical structure (the short route is retired for new expeditions):
+
+> Sanctuary → first fracture (a role-A scenario) → its miniboss → the temporal crossing → second fracture (a role-B scenario) → its main boss → reignite the Spark.
+
+- **The crossing** is a natural checkpoint, not the only place to stop (§18).
+- **Selection:**
+  - two different eras per expedition, drawn from **implemented and player-available** scenario roles;
+  - favor variety with protection against repeats, without becoming a predictable rotation;
+  - newly available content appears promptly;
+  - the precise weighting is open (§34).
+- **Implemented content vs story unlocks:** what exists in the build and what the player has unlocked are separate. During development, simply choose among the implemented combinations.
+
+### 9.4 Fracture availability (the complete game)
+
+- **At the start:** Medieval, Prehistoric and Modern are available.
+  - The **introductory expedition** starts in Medieval.
+  - Its second fracture is a surprise drawn from the other introductory eras, which gives the first crossing a real reveal.
+  - After that, both positions are randomized normally.
+  - Losing the introductory expedition never locks the player into repeating it: all three introductory eras stay available.
+- **First reignition:** unlocks the 1800s. Its absurdity should feel like an escalation.
+- **Second reignition:** unlocks the Future, and Elara disappears.
+
+These are player-facing rules. They do not stop development from building and testing any era earlier.
+
+### 9.5 Discoveries, Anachronisms and exploration
+
+- Exploration is controller-first, with optional guided marching for extra activity (§27).
+- Environments are compact and handcrafted, with meaningful NPC moments, lore, secrets and optional discoveries.
+- **Optional content can be missed,** for example by guided marching, and it is offered again on a later expedition.
+- Required story progression never sits behind optional exploration, and never becomes inaccessible.
+- **Anachronisms (planned concept):**
+  - because time is fractured, people and objects sometimes turn up in the wrong era, for example a Victorian clock in a prehistoric jungle;
+  - most are environmental details;
+  - a few may become lightweight optional quests that persist across expeditions and don't need the relevant eras in the same run;
+  - no large inventories, dialogue trees or scheduling systems;
+  - the architecture is an open proposal (§34).
+
+### 9.6 What the roguelite randomizes
+
+In rough priority order:
+
+1. exercise loadouts;
+2. abilities and temporary blessings;
+3. fracture scenarios and encounter selection;
+4. enemy behavior and tactical situations;
+5. narrative opportunities and optional discoveries.
 
 ---
 
@@ -660,7 +517,7 @@ Do not reroll during an active set.
 
 A reroll must preserve all completed physical work and respect the remaining workout budget.
 
-The Mirror may acquire new narrative meaning as the protagonist learns more about Echoes and the original anchor.
+The Mirror may acquire new narrative meaning as the story develops.
 
 ---
 
@@ -723,6 +580,8 @@ A partial attack may be somewhat less effective than a full one, but should not 
 
 Zero-repetition handling should remain sensible and should not trap the player in an exercise state.
 
+How partial sets affect each type of ability is an open question (§17, §34).
+
 ---
 
 ## 16. Defensive Combat
@@ -761,120 +620,118 @@ Controller/touch fallbacks should remain available.
 
 ---
 
-## 17. RPG Failure Versus Fitness Completion
+## 17. Physical Performance and RPG Outcomes
 
-These are separate systems.
+*Revised 2026-09-26. Physical performance and RPG success are no longer treated as completely separate.*
 
-### RPG failure
+### Performance can shape the fight
 
-The protagonist loses the expedition when HP reaches zero through combat.
+FITBOUND is a fitness game and an RPG. A boss victory should never become automatic just because an exercise allowance has run out.
 
-HP damage should arise primarily from:
+- A fully completed set produces its ability's intended effect.
+- A partial set produces a reduced or otherwise adjusted effect, and it always recognizes the verified effort.
+- Genuine fatigue can shape tactics. When one family is spent, the player may choose a different ability.
+- Poor decisions or weakened abilities can contribute to defeat.
 
-- Missed defensive responses.
-- Tactical mistakes.
-- Enemy abilities.
-- Combat-specific consequences.
+**Physical failure is never RPG death by itself.** A detector failure is never physical failure: reps done correctly but missed by tracking need reasonable handling (the manual fallback, tracking diagnostics, and never counting a tracking loss against the player).
+
+Different ability types (rep-based, holds, shields, interrupts and other non-damage effects) need their own partial-set rules. There is no universal "50% of reps = 50% effect" rule. The exact rules, and how bosses fit the workout, are open (§34).
+
+### Falling ends the expedition
+
+When the protagonist's HP reaches zero, **the expedition ends** and no reignition happens. Death matters as an RPG consequence. The player keeps:
+
+- all verified exercise;
+- persistent discoveries;
+- fracture encounters and first-time scene flags;
+- earned progression;
+- Elara's traces and optional quest progress.
+
+A failed expedition is still a useful workout, and it can still reveal new content.
+
+### Test of Resolve (settled concept; details open)
+
+After **every** failed expedition, the Heart offers an **optional** Test of Resolve: *"The expedition is over. Your resolve remains."*
+
+The player can go back to the Sanctuary and finish, or take a short exercise challenge to earn **one modest advantage for the next newly started expedition**.
+
+- **Scale to the session.** The Test scales to the appropriate activity still remaining in **today's** real workout session: today's verified work and readiness, not the expedition's progress. If the player has already reached an appropriate limit, the game doesn't press them to continue.
+- **Respect the body.** It respects soreness, exclusions, equipment and per-movement targets, and never makes a tired player repeat the family that just exhausted them.
+- **One challenge, one reward.** There are no volume tiers. Only one reward can be held at a time, and it never applies to an already suspended expedition.
+- **Strengthening, not punishment.** The Test should feel like the hero strengthening his spirit, never like extra exercise for losing.
+
+The initial implementation and reward pool are open (§34).
 
 ### Fitness completion
 
-The player can achieve a worthwhile workout regardless of RPG victory.
+Whatever the RPG result, track verified reps, hold time, per-exercise volume, left/right work, genuine activity, session duration, recent sessions and the player's feedback. **Fitness history is never erased by losing.**
 
-Track:
+### Fatigue
 
-- Verified repetitions.
-- Hold duration.
-- Exercise-specific volume.
-- Left/right work when applicable.
-- Actual physical activity.
-- Session duration.
-- Recent sessions.
-- Player feedback.
+If the player is tired, they can:
 
-Fitness history should never be erased by losing a run.
+- rest;
+- finish a set early;
+- substitute;
+- suspend and resume later (even mid-boss);
+- concede the expedition;
+- or continue if they are able and want to.
 
-### Fatigue and recovery
-
-If the player is physically tired, allow:
-
-- Rest.
-- Partial-set completion.
-- Appropriate substitution.
-- Voluntary termination.
-
-Do not convert exhaustion into automatic HP loss.
-
-Do not impose exercise time limits in ordinary turn-based combat.
+Exhaustion is never turned into hidden HP loss or a hidden game over. Ordinary turn-based combat has no exercise time limits.
 
 ---
 
-## 18. Expedition Duration and Pacing
+## 18. Workout Time and Pacing
 
-The initial target is:
+### The target
 
-**Full expedition:** approximately 20–25 minutes.
+About **20 minutes of workout time per complete expedition, plus or minus 5**. This is a design target to measure and physically validate, not a timer.
 
-A **Short expedition** is also desirable, approximately 12–15 minutes.
+| Workout time includes | Workout time excludes |
+|---|---|
+| Sets and holds | Exploration |
+| Physical dodges | Dialogue |
+| Normal recovery between sets | Cutscenes |
+| Physical transitions and equipment setup | Menus and other passive play |
 
-These are design targets to validate through physical playtesting, not rigid timers.
+It is not 20 minutes of continuous exertion, and **total adventure time is not capped.** An expedition with 21 minutes of workout and 15 minutes of exploration and story is fine. Exploration should be meaningful, not cut short to hit a total.
 
-A standard expedition should deliver a worthwhile amount of exercise while leaving room for tactical decisions, narrative, and recovery.
+**No automatic increase in exercise volume** may come from adding a second boss or a longer narrative encounter. How bosses fit the budget is open (§34). Boss difficulty comes from mechanics, tactics, phases and decisions, not HP padding or higher rep targets.
 
-Do not count the entirety of combat time as continuous aerobic activity.
+### Sessions and expeditions
 
-Measure verified movement separately.
+An **expedition** is one continuous RPG attempt. It can span several real **workout sessions** (sittings). This is provisionally settled; revisit it after real playtesting.
 
-### Proposed pacing structure
-
-A full expedition may contain approximately three resumable phases:
-
-#### Phase I — The Approach
-
-Early encounters, first blessings, introductory narrative opportunities.
-
-#### Phase II — Into the Haze
-
-More developed combat situations, unusual encounters, meaningful choices, and recovery.
-
-#### Phase III — The Spark
-
-Final encounter, expedition outcome, and return to Sanctuary.
-
-The exact encounter count and phase timing should be adjusted using real-person playtest results.
-
-### Resumability
-
-The player should be able to suspend an expedition and resume later.
-
-A voluntary suspension is not the same as undoing combat defeat.
-
-If returning after a substantial break, offer appropriate preparation before immediately demanding physical activity.
+- **Each session has its own** readiness and soreness check, calibration when required, sets, workout time, volume, adaptive progression and Journal entry.
+- **The expedition keeps** its fracture scenarios, loadout, blessings, HP and combat resources, encounter and boss progress, discoveries, and any suspended battle state.
+- **Returning another day** means a fresh readiness check and calibration. Sore families can swap their slot without rerolling the whole build.
+- **Stopping and resuming:**
+  - the player can stop anywhere that isn't an unsafe or unfinished exercise state;
+  - stopping mid-set ends the set with its verified work kept;
+  - the temporal crossing is the natural checkpoint, but never the only one;
+  - no completed physical work is ever repeated because of a save.
+- **A shorter workout** is simply part of the same expedition, finished in another sitting. There is no separate short expedition.
 
 ---
 
 ## 19. Workout Director
 
-FITBOUND should eventually coordinate physical workload across the entire expedition.
+A simple, transparent system that coordinates physical work. It is not a coaching AI. It considers:
 
-It should consider:
+- the loadout;
+- comfortable per-movement targets;
+- work already done in this session;
+- recent history;
+- today's readiness and soreness;
+- the encounters ahead;
+- the expedition's remaining plan.
 
-- The selected exercise loadout.
-- Comfortable exercise targets.
-- Completed work during the current run.
-- Recent exercise history.
-- Recovery and readiness.
-- Encounter selection.
-- Remaining planned workout volume.
+Rules:
 
-The purpose is not to build an elaborate fitness coaching AI.
-
-A simple, transparent system is sufficient.
-
-The Workout Director should prevent avoidable situations such as demanding repeated heavy push-up sets after the player has already completed an appropriate amount of upper-body pushing work.
-
-Physical progression should be gradual.
-
-A change in RPG difficulty should not silently change the player’s exercise prescription.
+- Targets and progression are judged **per real session**, using that day's readiness.
+- It avoids needless repetition, such as more heavy push-up sets after enough pushing work.
+- Physical progression is gradual.
+- A change in RPG difficulty never silently changes the exercise prescription.
 
 ---
 
@@ -911,7 +768,7 @@ Narratively, the relative stillness of a Haven allows memories to surface more c
 
 Hazy Chaos is an optional, timed calisthenics circuit encountered during ordinary expeditions.
 
-It becomes available after the player’s first successful expedition.
+It becomes available after the first reignition.
 
 The Heart’s breakthrough allows more unstable and demanding combinations of reconstructed abilities to appear.
 
@@ -1163,11 +1020,9 @@ Supported or considered navigation approaches include:
 - Guided marching routes.
 - Brief meaningful free exploration within compact environments.
 
-**Status: navigation method TBD.** After the next physical playtest, the creator will decide between marching navigation, hybrid navigation, or primarily controller-driven navigation. Marching adds physical activity; controller navigation may better serve future exploration options.
+**Decided (2026-09-26): controller-first exploration, with optional guided marching** for players who want extra activity. Camera controls are mainly for exercise and defensive combat. Controller movement never counts as physical activity.
 
-The current build marches between expedition encounters by default. Controller traversal is available from the pause menu, and it is not counted as physical activity. Keep both paths working until this is decided, and do not build features that only work with one of them.
-
-The creator is increasingly comfortable treating controller movement as the primary exploration method and using camera controls mainly for exercise and defensive combat.
+Guided marching may skip optional content; that content is offered again on a later expedition, and nothing required is ever lost by marching. Keep both paths working, and don't build features that only work with one of them.
 
 Do not insist on motion-controlled travel merely because the project began with that idea.
 
@@ -1416,114 +1271,90 @@ The next task is to collect physical playtest observations and refine the integr
 
 ## 33. Development Roadmap
 
-This roadmap describes priorities, not an inflexible production schedule.
+These are priorities, not a rigid schedule. Keep the game playable at every milestone, run the regression suite, keep saves compatible where practical, and always say what has passed synthetic tests versus a physical playtest.
 
-### Milestone A — Validate expanded combat
+### Foundation (before new eras)
 
-Physically test:
+1. **Documentation:** this revision.
+2. **Session and resume reliability:**
+   - separate workout sessions from expeditions;
+   - per-session Journal entries and progression;
+   - correct readiness on multi-day returns;
+   - mid-battle saves at safe points;
+   - no repeated work on resume;
+   - compatibility with existing saves and history.
+3. **Foundational narrative:**
+   - opening, victory and fall text;
+   - reignition tracking;
+   - a fall ends the expedition;
+   - no short route for new expeditions.
+4. **Proposals for approval before building:**
+   - fracture architecture (independent A/B scenarios, selection, encounter flags, the crossing);
+   - how bosses fit the workout, and physical-failure rules;
+   - the first Test of Resolve and its reward pool;
+   - a lightweight Anachronism architecture.
 
-- New exercises.
-- Voice commands.
-- Partial sets.
-- Dodging.
-- Random loadouts.
-- Combat tactics.
-- Blessings.
-- Mirror.
-- Haven.
-- Short and full expedition pacing.
+### Validate the current build
 
-Fix meaningful friction based on consolidated feedback.
+Physically test the expanded combat, movements, voice, partial sets, dodging, loadouts, blessings, Mirror, Haven, marching, and the real workout time of an expedition.
 
-### Milestone B — First complete narrative adventure
+### Fracture content, one role at a time
 
-Implement:
+| Stage | Scenario |
+|---|---|
+| A | Medieval role A: the existing setting, ending with the **Green Knight** |
+| B | Prehistoric role B: ending with a dinosaur main boss. **This makes the first complete canonical expedition, Medieval A → Prehistoric B → Spark, for physical and narrative validation.** |
+| C | 1800s role A: the literary scenario and the **Three Authors** group miniboss |
+| D | 1800s role B: the historical scenario, **Booth → Corrupted Lincoln** |
+| E | Medieval role B: complete the scenario around the existing **Warden of the Haze** |
+| F | Prehistoric role A |
+| G, H | Modern role A, then Modern role B |
+| I | Future roles A and B |
 
-- Elara’s opening cutscene.
-- Sanctuary as a narrative home.
-- The Heart’s reconstruction ritual.
-- A cohesive first expedition.
-- Meaningful NPC encounters.
-- Interconnected story fragments.
-- A memorable first major victory.
-- Real partial restoration.
-- The revelation that the Heart’s solution is incomplete.
-- Repeatable expeditions with additional discoveries.
+Legacy expedition content stays available during development. Player-facing unlocks (§9.4) can be enforced separately from building content.
 
-The opening story implementation should foreshadow the larger mystery without exhausting it.
+### Later milestones
 
-### Milestone C — Hazy Chaos and Punch Away
-
-Add the timed circuit encounter and patterned punching opportunity.
-
-Ensure that both fit the established workout budget and respect physical readiness.
-
-### Milestone D — The Unbound
-
-Implement the recurring rhythm-combat rival.
-
-Validate punch recognition, guard recovery, timing, and defensive movements.
-
-Introduce Break the Rhythm as an expedition reward.
-
-### Milestone E — The Unbound Gauntlet
-
-Build the dedicated rhythm-conditioning mode using the proven movement and sequence systems.
-
-### Milestone F — Deeper narrative and postgame
-
-Expand the Heart’s mystery through additional characters, discoveries, and evolving Sanctuary states.
-
-Preserve reasons for repeated expeditions after the central narrative reaches a satisfying resolution.
-
-Future expansions should favor meaningful new gameplay and story experiences over gratuitous world size.
+- **Hazy Chaos and Punch Away:** fit them to the workout budget and physical readiness.
+- **The Unbound, then Break the Rhythm:** validate punch recognition, guard recovery, timing and latency first.
+- **The Unbound Gauntlet.**
+- **Deeper narrative:** Elara's traces and resolution, Anachronism quests, and an eventual conclusion.
 
 ---
 
 ## 34. Open Questions
 
-The following matters should not be silently treated as fully settled canon or final mechanical specifications.
-
-They should be resolved through implementation and playtesting.
+These are not settled canon or final specifications. Resolve them through proposals, implementation and playtesting.
 
 ### Narrative
 
-- The exact origin and nature of the corruption.
-- The original anchor’s complete history.
-- The Spark’s precise relationship to the Heart.
-- What Elara knows and when she learned it.
-- The ultimate fate of the Heart.
-- The exact final narrative choices.
-- Whether and how the protagonist can establish independent existence.
-- The ultimate status of other Echoes.
-- A revised premise and expedition structure is proposed in [`docs/proposals/heart-of-haze-revision.md`](proposals/heart-of-haze-revision.md): time as the Heart's lifeblood, fractured eras, one two-fracture expedition with no short route, and Elara vanishing after the second reignition. It awaits the creator's approval; §5–§8 and §18 stand until then.
+- What happened to Elara, and how her story resolves.
+- What lies at the end of time; the story's eventual conclusion and any postgame.
+- The Heart's fate once its rhythm is restored.
+- Exact cutscene scripts beyond the opening and ritual, and per-scenario boss introductions.
 
 ### Gameplay
 
-- Final exercise targets and progression rates. A first set of rules exists (§32); tune them after a few weeks of real sessions.
-- How sets per session should scale (currently fixed by route), which belongs to the Workout Director (§19).
-- Whether straight punches read reliably, facing the phone or side-on (the Lab punch test), before Punch Away and the Unbound are designed around them.
-- Whether the wall sit and side plank read reliably on a real body (the side plank's which-side reading especially) before either joins expeditions.
-- Precise full-run encounter count.
-- Final HP, damage, and cooldown balance.
-- Ideal timing windows for dodging.
-- How frequently unusual encounters appear.
-- Which exercise detectors are reliable in the creator’s rooms.
-- Hazy Chaos circuit duration and time limits.
-- Punch Away combination length and damage balance.
-- The Unbound’s final rhythmic movement vocabulary.
-- Gauntlet round lengths and difficulty progression.
-- Navigation between encounters: marching, hybrid, or primarily controller (§27).
+- **How bosses fit the workout:** keeping boss victories meaningful without exercise-volume traps, and the physical-failure rules for each ability type (reps, holds, shields, interrupts). *A proposal is due before any combat redesign.*
+- **Test of Resolve:** the first implementation and reward pool. *A proposal is due.*
+- **Anachronisms:** the smallest reusable architecture for cross-era discoveries and quests. *A proposal is due.*
+- Fracture selection weighting and repeat protection, once several scenarios exist.
+- The real workout time of an expedition, measured physically.
+- The long-term shape of multi-day expeditions, to revisit after playtesting.
+- Final targets and progression rates (a first rule set exists; tune after weeks of use).
+- Final HP, damage and cooldown balance; dodge timing windows; how often unusual encounters appear.
+- Which detectors are reliable in the creator's rooms (the Lab-only and experimental movements especially).
+- Whether straight punches read reliably, before Punch Away and the Unbound.
+- Hazy Chaos duration and limits; Punch Away and Unbound tuning; Gauntlet progression.
 
 ### Presentation
 
-- Elara’s finalized visual identity. A first version exists (§32); it is open to refinement.
-- The protagonist’s final character design. A refined first version exists (§32); it is open to refinement.
-- Character voice casting and production.
-- Exact cutscene scripts.
-- Final soundtrack and audio direction.
+- Refinements to Elara's and the protagonist's first designs.
+- Voice casting and production.
+- Soundtrack and audio direction.
+- Each fracture's visual identity.
 
-Claude may propose solutions to these questions, but should not overwrite settled principles or present speculative lore as established fact.
+Claude may propose answers, but must not overwrite settled principles or present speculative lore as established fact.
 
 ---
 
@@ -1590,3 +1421,11 @@ That is the experience every major design decision should serve.
 - **2026-09-25 (later):** §32 updated with soreness, target progression, the Journal, the lag measurement, eight new movements and the punch test. §34 adds sets scaling and punch readability as open questions.
 - **2026-09-25 (later):** §32 adds the Lab-only wall sit and side plank (338 tests). §34 adds their reliability, and notes the proposed premise revision is under discussion (§5–§8 unchanged).
 - **2026-09-26:** §32 adds per-side side-plank records (342 tests). §34 points to the revised narrative and expedition proposal, which awaits approval; no vision section is changed yet.
+- **2026-09-26 (approval):** the creator approved the revised narrative, with changes. Changes:
+  - **§5–§9 rewritten:** the time premise, the fractures with independent A/B roles, one canonical two-fracture expedition, availability rules, discoveries and Anachronisms. The anchor, the Echo identity and Elara's memory suppression are retired; the old postgame text is folded into §6.
+  - **§3.2, §15 and §17:** performance may shape outcomes, a fall ends the expedition, and the Test of Resolve is added.
+  - **§18–§19:** workout time is 20 ± 5 minutes, excluding passive play, and sessions are distinct from expeditions.
+  - **§27:** navigation is controller-first with optional marching.
+  - **§33:** the roadmap is now foundation, then content stages A–I.
+  - **§34:** the open questions are rewritten.
+

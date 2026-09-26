@@ -19,11 +19,15 @@ A personal fitness-powered fantasy roguelite. Real exercises, counted by a phone
 - The creator owns the vision sections. Propose changes to them; don't make them silently.
 - At the end of each development pass, update **§32 Current Development Status** and **§34 Open Questions**. Add a line to the revision log at the end of the bible.
 - If a creator decision contradicts the bible, point out the mismatch and propose the edit.
-- Story text must follow the canon, and speculative lore must never be presented as settled:
-  - the Heart is benevolent;
-  - the Echo truth is not revealed early;
-  - Elara is sympathetic, never a simple traitor. Her lines are never spoken by the browser's synthetic voice.
-  - The Sanctuary rains until the first restoration. Never explain why.
+- Story text must follow the canon (§5–§9), and speculative lore must never be presented as settled:
+  - The Heart has lost its Spark, and time is coming apart. Keep it that simple: no multiverses, paradoxes or consciousness theory.
+  - The Heart is benevolent, never a hidden villain.
+  - The protagonist is simply reconstructed by the Heart. There is no anchor and no special "Echo" identity; "Echo" may only name ordinary Haze reconstructions.
+  - Elara is warm and knows more than she says, but she is never a villain. Her lines are never spoken by the browser's synthetic voice. She disappears after the second reignition, and her resolution is undecided, so don't write one.
+  - The Sanctuary rains until the first reignition and the rain never returns. Never explain why.
+  - Keep the metaphor (stagnation → momentum) unspoken. Never present exercise as a cure for anything.
+  - Real historical figures are fictional Haze reconstructions: no gore, and no glorifying or Lost Cause framing of Confederate figures.
+- `docs/proposals/` holds proposals. They are not canon until folded into the bible.
 
 ## Honesty about testing
 
@@ -45,6 +49,11 @@ Synthetic poses and headless browser runs never count as a physical playtest. Ne
   - Don't start dodge timing until the player is ready.
   - Losing camera tracking is never a failed dodge.
   - Exhaustion is never a hidden game-over. Voice is never the only way to pause.
+- **Sessions and expeditions:**
+  - Each real sitting is its own workout session, with its own readiness, record, Journal entry and progression. An expedition may span several sessions.
+  - Resuming never repeats completed physical work. Saves happen only at safe points, never mid-set or mid-dodge.
+  - A second boss or a longer story never adds exercise volume by itself.
+- **Falling** ends the expedition, with no reignition, but it never erases workout history, discoveries, scene flags, traces or quest progress.
 - **Counting:**
   - Controller-driven movement never counts as physical activity.
   - Never invent reps.
@@ -67,7 +76,7 @@ Headless end-to-end checks drive a PC page and a phone page through the real rel
 - `src/controller/`: the phone app. It runs pose tracking and streams interpreted events.
 - `src/net/`: the PC side of Connected Play: the host, the message gate, and remote sets.
 - `src/input/`: InputHub modes and commands (keyboard, gamepad, voice).
-- `src/rpg/`: combat engine, abilities, enemies, blessings, dodge reading, expedition routes, loadouts, workout records, and story text (`story.ts`).
+- `src/rpg/`: combat engine, abilities, enemies, blessings, dodge reading, expedition routes (the retired short route stays only for old saves), loadouts, workout sessions and records, and story text (`story.ts`).
 - `src/ui/expedition/`: Sanctuary, travel, battle, events (Mirror, Haven, blessings, summary), and the Movement Lab.
 - `src/phaser/`: scenes and procedurally painted diorama art. `RpgScene` stages expedition battles; `DioramaScene` is the trail board.
 - `src/story/`: cinematics. `cinema.ts` holds the script format and runner, plus the voice-line hook. `scripts.ts` holds the opening and the ritual.

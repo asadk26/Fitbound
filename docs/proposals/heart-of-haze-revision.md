@@ -1,6 +1,13 @@
 # Proposal: Heart of Haze, revised narrative and expedition structure
 
-- **Status:** proposal for the creator's approval. Nothing here is implemented, and nothing here is canon until approved.
+- **Status: superseded.** The creator approved the direction on 2026-09-26 with significant changes, and the result is now in the design bible (§5–§9, §17–§19, §33–§34), which wins wherever the two differ. Kept for history.
+- **Notable changes from this draft:**
+  - roles A and B are independently discoverable, with no "miniboss first" rule;
+  - Medieval, Prehistoric and Modern are available at the start, the 1800s after the first reignition and the Future after the second;
+  - a fall ends the expedition, followed by an optional Test of Resolve;
+  - no automatic boss "finishing window";
+  - workout time is about 20 ± 5 minutes, excluding passive play;
+  - Elara's memory suppression and the Echo mythology are retired.
 - **Replaces, once approved:** design bible §5 to §8, parts of §9, §12, §18, §19 and §33, plus the canon lines in `CLAUDE.md`.
 - **Unchanged:** the principles in §3, the fitness rules in §10 to §17, and the special encounters in §21 to §26.
 - **Written:** 2026-09-26, from the creator's brief and an audit of the code at commit `3425496` onward.
