@@ -340,9 +340,11 @@ During development a fracture may have only one role implemented. The game must 
 
 There is one canonical structure (the short route is retired for new expeditions):
 
-> Sanctuary → first fracture (a role-A scenario) → its miniboss → the temporal crossing → second fracture (a role-B scenario) → its main boss → reignite the Spark.
+> Sanctuary → **the Awakening** (warm-up) → first fracture (a role-A scenario) → its miniboss → **the Stillpoint** (the crossing) → second fracture (a role-B scenario) → its main boss → reignite the Spark → *(optional)* **the Heart's Rest** (cooldown).
 
-- **The crossing** is a natural checkpoint, not the only place to stop (§18).
+- **The Stillpoint** is the recommended stopping place after the first fracture, not the only place to stop (§18, §20).
+- **Havens** may also turn up as occasional randomized discoveries in either fracture (§20).
+- **The Reflections** may occasionally replace one ordinary fight (§9.7).
 - **Selection:**
   - two different eras per expedition, drawn from **implemented and player-available** scenario roles;
   - favor variety with protection against repeats, without becoming a predictable rotation;
@@ -389,6 +391,34 @@ In rough priority order:
 3. fracture scenarios and encounter selection;
 4. enemy behavior and tactical situations;
 5. narrative opportunities and optional discoveries.
+
+
+### 9.7 The Reflections (planned special encounters)
+
+**Status:** planned. It is documented and a minimal system is proposed. Prototype **one** in the Movement Lab only once the first two-fracture expedition works, and verify physically that copying poses is satisfying and reliably recognized before building more.
+
+**What they are:**
+- A recurring family of unusual figures scattered across the eras. They may be siblings or otherwise connected, with shared visual features, a recurring musical motif, and the odd line acknowledging their relatives.
+- Each era can eventually have one, appearing in either of that era's roles. Starting ideas, not final designs:
+  - **Prehistoric:** grounded and animal-inspired.
+  - **Medieval:** a knight who challenges through stillness and balance.
+  - **1800s:** an impeccably dressed, theatrical gentleman of composure.
+  - **Modern:** a recognizable yoga practitioner.
+  - **Future:** a holographic figure obsessed with perfect form.
+
+**How an encounter works:**
+- It isn't turn-based exercise combat. The Reflection assumes a sequence of yoga poses or controlled mobility positions, for example Warrior II, Mountain Pose and a supported balance.
+- The player resolves the encounter by mirroring them. Control and appropriate holds matter; rushing doesn't.
+- Losing balance pauses the hold. It never deals RPG damage.
+- Reasonable variations and alternatives exist for inaccessible poses.
+- It should feel different from a battle, a Haven or the warm-up.
+
+**When one appears:**
+- There is a modest chance of replacing one eligible **ordinary** fight, at most one per expedition to begin with.
+- Many expeditions have none.
+- It never replaces a miniboss or main boss, and it never adds exercise volume; it takes the replaced fight's place in the budget.
+- Each Reflection has a full first-encounter introduction, then abbreviated repeats (§8).
+- The appearance probability is tuned after testing.
 
 ---
 
@@ -585,7 +615,19 @@ A partial attack may be somewhat less effective than a full one, but should not 
 
 Zero-repetition handling should remain sensible and should not trap the player in an exercise state.
 
-How partial sets affect each type of ability is an open question (§17, §34).
+**Partial-set effects (approved 2026-09-26 as the initial balancing approach; constants tunable after physical playtesting):**
+
+| Effect | Rule |
+|---|---|
+| Numeric (damage, shield, heal) | **Full effect from 90% of the target.** Below that: **25% for any verified work, plus 75% of the share done** (of the 90%). |
+| Binary effects (disrupt/interrupt, armour break, burn, Storm Charge, stagger build-up) | Trigger at **half the target or more**, unscaled; below half, only the numeric part lands. |
+| Timed holds | The same curve on seconds held. For split holds (side planks), the weaker side decides. |
+| Sided movements | Each side is credited up to the target, then the two are averaged. |
+| No verified work | The ability fizzles and **is not spent**. |
+
+**Tracking errors:**
+- When the camera missed repetitions, the player can **enter how many it missed**, whether a partial correction or a one-tap "count the full target".
+- Corrections are recorded as **manual** work, always distinguishable from camera-counted work in the history.
 
 ---
 
@@ -640,7 +682,20 @@ FITBOUND is a fitness game and an RPG. A boss victory should never become automa
 
 **Physical failure is never RPG death by itself.** A detector failure is never physical failure: reps done correctly but missed by tracking need reasonable handling (the manual fallback, tracking diagnostics, and never counting a tracking loss against the player).
 
-Different ability types (rep-based, holds, shields, interrupts and other non-damage effects) need their own partial-set rules. There is no universal "50% of reps = 50% effect" rule. The exact rules, and how bosses fit the workout, are open (§34).
+Different ability types (rep-based, holds, shields, interrupts and other non-damage effects) have their own partial-set rules (§15). There is no universal "50% of reps = 50% effect" rule.
+
+### Boss balancing (approved direction, 2026-09-26)
+
+- **Difficulty sources:**
+  - meaningful **phases**;
+  - tactical **openings** (a staggered or disrupted foe takes more from the next hit);
+  - **distinct mechanics** per boss;
+  - self-repair (healing, armour or ward regrowth) that is **limited and interruptible**.
+- **What difficulty never comes from:** HP padding, or extra prescribed repetitions just because an enemy is a boss. HP is tuned only after the mechanics.
+- **Set allowances** are balancing targets, never hard limits, and never automatic victory.
+- **Enemy healing and armour regeneration aren't banned.** They are good mechanics when they create decisions without repeatedly undoing the player's physical effort.
+- The goal is satisfying difficulty, not making every boss easy.
+- **Validation:** a balance simulator checks each encounter against its band. Eventually it should model **whole expeditions**: carried HP, blessings, cooldowns, randomized loadouts and varying physical performance. Nobody should be assumed to reach the final boss at full HP or with unlimited capacity left.
 
 ### Falling ends the expedition
 
@@ -697,17 +752,20 @@ Exhaustion is never turned into hidden HP loss or a hidden game over. Ordinary t
 
 ### The target
 
-About **20 minutes of workout time per complete expedition, plus or minus 5**. This is a design target to measure and physically validate, not a timer.
+About **20 minutes of core workout time per complete expedition, plus or minus 5**, **including the warm-up**. This is a design target to measure and physically validate, not a timer.
 
-| Workout time includes | Workout time excludes |
-|---|---|
-| Sets and holds | Controller exploration |
-| Physical dodges | Dialogue |
-| Normal recovery between sets | Cutscenes |
-| Physical transitions and equipment setup | Menus and other passive play |
-| Optional guided marching, while actually marching | Inactive pauses |
+Time is kept in six categories:
 
-Time actually exercising (sets and holds) is also kept separately measurable.
+| Category | What it is | Counts toward |
+|---|---|---|
+| **1. Warm-up** | The Awakening | The **core** target |
+| **2. Core combat and physical recovery** | Sets and holds (exercise time, also measurable on its own), dodging, normal recovery between sets, physical setup and transitions | The **core** target |
+| **3. Optional Haven yoga/mobility** | Voluntary stretches at a Haven or the Stillpoint | Total physical activity, shown separately |
+| **4. Optional cooldown** | The Heart's Rest | Total physical activity, shown separately |
+| **5. Other physical activity** | Optional guided marching, while actually marching | Total physical activity, shown separately |
+| **6. Passive adventure** | Controller exploration, dialogue, cutscenes, menus, inactive pauses | Not workout time |
+
+**Optional activity (3–5)** never shrinks the core combat budget, and it never makes a balanced expedition look overlong.
 
 It is not 20 minutes of continuous exertion, and **total adventure time is not capped.** An expedition with 21 minutes of workout and 15 minutes of exploration and story is fine. Exploration should be meaningful, not cut short to hit a total.
 
@@ -726,6 +784,33 @@ An **expedition** is one continuous RPG attempt. It can span several real **work
   - the temporal crossing is the natural checkpoint, but never the only one;
   - no completed physical work is ever repeated because of a save.
 - **A shorter workout** is simply part of the same expedition, finished in another sitting. There is no separate short expedition.
+- **Splitting across two sittings never means two full expedition-sized workouts.** The expedition's combat volume is shared by its sessions. Each session gets its own warm-up, which is small and counted.
+
+### The Awakening (warm-up)
+
+About **five minutes** of gentle dynamic warm-up at the start of each real workout session. It is **strongly encouraged but never mandatory.**
+
+- **In the story,** the hero is getting used to a reconstructed body. After the ritual, Elara says something like *"Take a moment. You haven't worn this body before."* Her line is text, never the synthetic voice. Coordination returns as the player follows along.
+- **The movements** are accessible: marching, arm circles, torso rotations, hip mobility, leg swings, easy squats or steps. These are examples, not a fixed sequence.
+- **It adapts** to soreness, movement limits and space.
+- **It can be skipped or shortened.**
+- **It is not an exhausting circuit and not a fight.**
+- **Recording:** participation and duration are kept separately from combat. The time counts toward the core target.
+- **Resuming on another day:** a fresh warm-up is offered after the readiness check and calibration, with a brief presentation rather than the full reconstruction story.
+- **First implementation:** guided, timed movements with clear demonstrations and simple controls. It is not a new detector project.
+
+### The shape of the budget (reconciliation, 2026-09-26)
+
+**The problem:** four ordinary fights, a miniboss and a main boss at the earlier per-encounter bands (3–4, about 5, and 6–7 sets) add up to about 25 sets. With the warm-up inside the ~20-minute core, that is more than intended.
+
+**Working assumption,** to be replaced by measurement: each set costs about **1 to 1.25 minutes of core time** once you count setup, the set itself, recovery and the enemy turn. The workout-time measure (§32) will show the real figure after the first physical playtest.
+
+**Proposed budget** (awaiting the creator's decision, §34):
+- the warm-up (~5 min);
+- about **12–16 sets** of combat for the whole expedition, for example about 4 ordinary fights at ~2–2½ sets each, a miniboss at ~3–4 and a main boss at ~4–5;
+- **or** fewer ordinary fights, so bosses keep more room.
+
+Bosses keep their distinct mechanics either way. What shrinks is HP and the number of ordinary fights, not their depth.
 
 ---
 
@@ -752,9 +837,38 @@ Rules:
 
 ## 20. Havens and Recovery
 
-Havens provide deliberate changes of pace.
+**Havens are part of the RPG's recovery.** They are peaceful pockets the Haze cannot reach, and **the hero recovers HP there** (clarified 2026-09-26).
 
-They can include gentle yoga, stretching, and mobility sequences.
+- **Where they appear:** occasionally, as randomized discoveries in either fracture, and always at the Stillpoint.
+- **Resting needs no yoga.** The HP recovery never depends on completing a routine.
+- **The yoga is voluntary.** Optional yoga, static stretching or gentle mobility are extra. Completing them may earn a **modest** additional benefit, never one so strong that players feel they must stretch at every Haven.
+- **Memories come after,** never while holding a pose.
+
+### The Stillpoint (the guaranteed midpoint Haven)
+
+After the first fracture's miniboss, the Heart opens a quiet space between the ages. This replaces the plain crossing. There, the player can:
+
+- **rest:** recover HP through the Haven system;
+- do an optional gentle yoga or mobility session;
+- review their build and discoveries;
+- look into the Mirror (the crossing's Mirror is kept);
+- **save and return later**;
+- or continue into the second fracture.
+
+**Rest and Save and return later are not exclusive.** You can rest, then save.
+
+It marks the accomplishment of the first fracture and makes splitting an expedition across days feel natural. A small, atmospheric diorama is enough; it is not a new explorable environment. It is the recommended stopping place, never the only one.
+
+### The Heart's Rest (optional cooldown; working name)
+
+After the reignition, the Sanctuary offers a short, optional yoga or static-stretching cooldown.
+
+- It is a voluntary epilogue. The victory and the story payoff never wait on it.
+- Its time is tracked separately from the core workout, but included in total physical activity (§18).
+
+### Haven movements
+
+Havens can include gentle yoga, stretching, and mobility sequences.
 
 Examples:
 
@@ -1361,6 +1475,20 @@ These are priorities, not a rigid schedule. Keep the game playable at every mile
    - the first Test of Resolve and its reward pool;
    - a lightweight Anachronism architecture.
 
+### Next, in order (creator's sequence, 2026-09-26)
+
+1. **The approved combat-balance changes,** with regression tests: the partial-set curve and per-effect rules, the missed-rep correction, phases, openings, limited and interruptible self-repair, and HP tuned after mechanics.
+2. **Keep the session and resume work stable.**
+3. **The Awakening:** a lightweight, guided warm-up.
+4. **The Stillpoint:** the crossing becomes a Haven-like stop, with HP recovery, the Mirror, optional yoga and save-and-leave.
+5. **Prehistoric role B,** for the first complete Medieval A → Prehistoric B expedition.
+
+**Later:**
+- the Heart's Rest cooldown;
+- a whole-expedition balance simulator;
+- one Reflection prototyped in the Movement Lab, once the two-fracture expedition works;
+- Anachronisms and the Test of Resolve, as approved.
+
 ### Validate the current build
 
 Physically test the expanded combat, movements, voice, partial sets, dodging, loadouts, blessings, Mirror, Haven, marching, and the real workout time of an expedition.
@@ -1402,7 +1530,14 @@ These are not settled canon or final specifications. Resolve them through propos
 
 ### Gameplay
 
-- **The exact partial-set effectiveness rules and boss-balancing approach.** The direction is approved (balance around expected volume; difficulty from mechanics, phases and tactics; allowances are targets, not limits). The exact rules are proposed in `docs/proposals/combat-balance.md`, with balance-harness data, and await approval. Today's 35% minimum effectiveness is not assumed to be right long-term.
+- **The budget's shape (§18).**
+  - How many ordinary fights an expedition has, and each encounter's set band, so that ~12–16 sets plus the warm-up fit the ~20-minute core.
+  - It depends on the real minutes per set, which the first physical playtest will measure.
+- **Tuning the partial-set constants** (90% band, 25% floor, half-target binary threshold) from physical playtesting.
+- **The Awakening:** its exact movements, how it adapts to space and limitations, and whether a resumed session's short version is 2 or 3 minutes.
+- **The Haven yoga bonus:** what "modest" means in play.
+- **The Stillpoint:** its diorama's look.
+- **The Reflections:** appearance probability, pose vocabulary, and whether the camera recognizes poses reliably. That needs a physical prototype first.
 - **Tuning the selection weights and repeat protection** once several scenarios exist. The starting values are deliberately tunable.
 - **Test of Resolve** and **Anachronisms:** approved in outline, not built yet.
 - The real workout time of an expedition, measured physically.
@@ -1501,4 +1636,12 @@ That is the experience every major design decision should serve.
   - **§18:** workout time includes optional marching, excludes inactive pauses, and keeps exercise time separate; allowances are targets, not limits;
   - **§34:** the exact partial-set and boss rules await `combat-balance.md`, and the selection weights stay tunable;
   - **§32:** controller-first travel, workout time, the balance harness, the fracture architecture, and Medieval A with the Green Knight (368 tests).
+- **2026-09-26 (combat, warm-up, recovery):** the creator's decisions are folded in.
+  - **§15:** partial-set rules and missed-rep corrections, approved and tunable.
+  - **§17:** the approved boss-balancing direction; self-repair is allowed when it creates decisions.
+  - **§18:** six time categories; the warm-up counts inside the core ~20 minutes; sittings share one expedition's volume; the Awakening; a budget reconciliation, awaiting a decision.
+  - **§20:** Havens keep HP recovery without requiring yoga; the Stillpoint and the Heart's Rest are added.
+  - **§9.3 and §9.7:** the session shape, and the Reflections as planned content.
+  - **§33:** the build sequence.
+  - **§34:** new open questions.
 
