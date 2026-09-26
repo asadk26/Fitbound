@@ -12,7 +12,8 @@ import { tracker, TrackerError } from '../../pose/PoseTracker';
 import { atPhaseBoundary, clearExpedition, currentNode, HERO_HP, loadExpedition, newExpedition, ROUTES, saveExpedition, type ExNode, type ExpeditionState, type NodeKind } from '../../rpg/expedition';
 import { generateLoadout, setTarget } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
-import { addDodge, addMarch, addSet, addTime, newWorkout, toRecord } from '../../rpg/workout';
+import { activeLoadout, applyReadiness, hasWork, needsReadiness, sessionRecord, startSession, upsertRecord } from '../../rpg/session';
+import { addDodge, addMarch, addSet, addTime, newWorkout } from '../../rpg/workout';
 import { Calibration } from '../Calibration';
 import { ControllerLost, RemoteCalibration, useLink } from '../Connected';
 import { useInputEvents } from '../motionUi';
@@ -24,6 +25,7 @@ import { BlessingPick, Fallen, Haven, Mirror, PathView, Summary } from './Events
 import { Journal } from './Journal';
 import { MovementLab } from './MovementLab';
 import { RpgBattle } from './RpgBattle';
+import { Returning } from './Returning';
 import { Sanctuary } from './Sanctuary';
 import { marchNeedsBody, Travel, type MarchTally } from './Travel';
 import type { SetResult } from './setRunner';
@@ -36,19 +38,32 @@ import type { SetResult } from './setRunner';
  * choices and the Haven work from the couch with a gamepad, and the camera
  * check happens right before the first fight rather than at the start.
  */
-type View = 'cinema' | 'sanctuary' | 'journal' | 'lab' | 'calibrate' | 'path' | 'travel' | 'node' | 'fallen' | 'summary';
+type View = 'cinema' | 'sanctuary' | 'journal' | 'lab' | 'calibrate' | 'return' | 'path' | 'travel' | 'node' | 'fallen' | 'summary';
 
 export function Expedition({ connected, resume, onExit }: { connected: boolean; resume: boolean; onExit: () => void }) {
+  // Resuming is a new workout session of the same expedition (bible §18): the
+  // last sitting's session is already in the history (or is written now, if
+  // the app closed before it could be), and on another day you're asked how
+  // you feel before anything physical.
+  const [newDay] = useState(() => {
+    const saved = resume ? loadExpedition() : null;
+    return !!saved && needsReadiness(saved);
+  });
   const [x, setXState] = useState<ExpeditionState | null>(() => {
     const saved = resume ? loadExpedition() : null;
-    return saved ? { ...saved, status: 'active', workout: { ...saved.workout, outcome: 'in-progress' } } : null;
+    if (!saved) return null;
+    if (hasWork(saved) && !getSave().workouts.some((r) => r.id === saved.workout.id)) {
+      const rec = { ...sessionRecord(saved), outcome: 'suspended' as const };
+      updateSave((s) => void (s.workouts = upsertRecord(s.workouts, rec)));
+    }
+    return startSession(saved);
   });
   /** The real run, set aside while the Lab plays a scratch encounter. */
   const realRun = useRef<ExpeditionState | null>(null);
   const xRef = useRef(x);
   // Arriving at the Sanctuary: the opening the first time, the short reconstruction ritual after that.
   const [cine, setCine] = useState<{ script: Script; restored: boolean; then: () => void } | null>(() => (resume && x ? null : arrival(() => setView('sanctuary'))));
-  const [view, setView] = useState<View>(() => (resume && x ? 'path' : 'cinema'));
+  const [view, setView] = useState<View>(() => (resume && x ? (newDay ? 'return' : 'path') : 'cinema'));
   const viewRef = useRef(view);
   viewRef.current = view;
   const [debug, setDebug] = useState<ExNode | null>(null);
@@ -175,9 +190,10 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     const s = getSave();
     const targets: Record<string, number> = {};
     for (const slot of Object.values(loadout)) if (slot) targets[slot.exerciseId] = setTarget(getExercise(slot.exerciseId), prefs, s.exerciseTargets);
-    // Starting afresh over a saved run: that run's workout goes into the history first.
+    // Starting afresh over a saved run: that run's last session goes into the history first.
     const old = loadExpedition();
     if (old && old.id !== xRef.current?.id) recordHistory({ ...old, workout: { ...old.workout, outcome: 'ended' } });
+    firstRestoration.current = false;
     const next = newExpedition(route, prefs, loadout, targets);
     commit(next);
     routeNext();
@@ -253,11 +269,13 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     setView('summary');
   };
 
+  /** Save and stop: the expedition waits; this sitting's session is complete and recorded. */
   const suspend = () => {
     mutate((d) => {
       d.status = 'suspended';
       d.workout.outcome = 'suspended';
     });
+    recordHistory(xRef.current!);
     setView('summary');
   };
 
@@ -342,7 +360,18 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
 
       {view === 'calibrate' && (connected ? <RemoteCalibration kind="quick" onDone={onCalibrated} /> : <Calibration kind="quick" camera={camera} onDone={onCalibrated} />)}
 
-      {view === 'path' && x && <PathView x={x} onContinue={() => (currentNode(x)?.at ? goTravel() : enter())} onStop={suspend} />}
+      {view === 'return' && x && (
+        <Returning
+          x={x}
+          onDone={(prefs, loadout) => {
+            const s = getSave();
+            updateSave((d) => void (d.expeditionPrefs = { ...d.expeditionPrefs, intensity: prefs.intensity, sore: prefs.sore, soreAt: prefs.soreAt, dumbbells: prefs.dumbbells }));
+            commit(applyReadiness({ ...xRef.current!, loadout }, prefs, s.exerciseTargets));
+            setView('path');
+          }}
+        />
+      )}
+      {view === 'path' && x && <PathView x={x} onContinue={() => (currentNode(x)?.at && x.battle?.index !== x.index ? goTravel() : enter())} onStop={suspend} />}
       {view === 'travel' && x && (
         <Travel
           key={travelKey}
@@ -383,7 +412,9 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
           title={node.title}
           boss={node.kind === 'boss' || node.enemies!.includes('warden_of_haze')}
           hero={{ hp: x.hp, maxHp: x.maxHp }}
-          loadout={x.loadout}
+          loadout={debug ? x.loadout : activeLoadout(x)}
+          resume={!debug && x.battle?.index === x.index ? x.battle : undefined}
+          onCheckpoint={(b) => !debug && mutate((d) => void (d.battle = { ...b, index: d.index }))}
           target={target}
           blessings={x.blessings}
           connected={connected}
@@ -396,18 +427,31 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
           onDodge={(o, detail) => mutate((d) => addDodge(d.workout, o, detail))}
           onDone={(res) => {
             if (res.outcome === 'victory') {
-              mutate((d) => void (d.hp = Math.max(1, res.hp)));
+              mutate((d) => {
+                d.hp = Math.max(1, res.hp);
+                delete d.battle;
+              });
+              if (res.leave && !debug) {
+                // Asked to leave during the set that won the fight: save just past it.
+                mutate((d) => void d.index++);
+                return suspend();
+              }
               advance();
             } else {
               mutate((d) => {
                 d.fallen = true;
                 d.workout.rpgDefeats++;
+                delete d.battle;
               });
               if (debug) backToLab();
               else setView('fallen');
             }
           }}
-          onLeave={() => (debug ? backToLab() : suspend())}
+          onLeave={(b) => {
+            if (debug) return backToLab();
+            mutate((d) => void (d.battle = { ...b, index: d.index }));
+            suspend();
+          }}
         />
       )}
       {view === 'node' && x && node?.kind === 'blessing' && (
@@ -526,9 +570,10 @@ function arrival(arrived: () => void): { script: Script; restored: boolean; then
 }
 /** Add a finished session to the save's history (for varying future loadouts). */
 function recordHistory(x: ExpeditionState): void {
-  if (!x.workout.sets.length && !x.workout.recoveryMs) return;
+  if (!hasWork(x)) return;
   updateSave((s) => {
-    s.workouts = [...s.workouts, toRecord(x.workout, Object.keys(x.prefs.sore ?? {}))].slice(-60);
-    if (x.workout.outcome === 'victory') s.clears++;
+    const was = s.workouts.find((r) => r.id === x.workout.id);
+    s.workouts = upsertRecord(s.workouts, sessionRecord(x));
+    if (x.workout.outcome === 'victory' && was?.outcome !== 'victory') s.clears++;
   });
 }

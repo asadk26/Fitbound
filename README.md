@@ -89,7 +89,16 @@ Phase 3  A Quiet Haven → The Veiled Stair (Hollow Acolyte) → a blessing → 
   - Out of view, the hero simply stops. There's no penalty.
   - Blessings appear straight after the fight that earns them, so there's no march to them.
 - At a phase boundary, **the path** shows where you are first. Continue, or **Save and stop here**.
-- Resuming later restores your node, HP, loadout, blessings and the workout so far. Suspending isn't losing.
+- **Stopping and resuming.** An expedition can span several sittings, and each sitting is its own **workout session**.
+  - **Where you can stop:** *Save and stop here* on the path, the trail's pause menu, or **Pause → Save and leave in the middle of a fight**.
+  - **A fight is saved exactly where it stands.** That can be your turn, "stand when ready", or strikes still to come. In the middle of a set, the set ends with what was counted, its ability lands, and the fight is saved right after. Resuming continues the same fight: same enemy HP, same turn. Nothing you already did is asked again.
+  - **Each session gets its own summary, check-in, Journal row and target changes** ("Next time"), judged on that session's sets and that day's readiness, even when the expedition isn't finished.
+  - **Back on another day,** *A new day* asks how you feel (and whether you have dumbbells) before anything physical.
+    - Today's targets follow your answer.
+    - A family you're resting sits out today but keeps its slot for later.
+    - *Swap* changes one movement without rerolling the rest.
+    - A movement today's equipment rules out is swapped for you.
+  - **Suspending isn't losing.** If the app closes unexpectedly, that session is recorded when you resume.
 - Enemy HP is sized so a full route is about 20 sets. The marches add a few minutes of low-intensity movement between them. They're tallied as steps in the summary and never count as sets.
 
 ### The four families and the loadout
@@ -1050,7 +1059,8 @@ Then note how the ritual feels on your second and third visits.
    - try *Pause → Dodge with a controller* from the couch;
    - pause and recalibrate mid-fight;
    - save and stop at a phase boundary, close the browser, then resume from the title screen;
-   - check that the summary's workout numbers match what you did.
+   - **Pause → Save and leave** in the middle of a fight, and once in the middle of a set; resume (ideally the next day) and check that it continues the same turn, with no set repeated;
+   - on a new day, check that *A new day* appears, that a *Rest it* family sits out, and that the Journal shows one row per sitting;   - check that the summary's workout numbers match what you did.
 5. **Marching and reading foes:** do the legs between fights feel like pacing or like padding? Can you tell rearing (duck) from crouching (hop) on the *subtle* fights without any text?
 6. **Couch check:** in the tutorial trial with *Gamepad or keyboard* traversal, sit out of view. There should be no tracking warnings while exploring.
 

@@ -16,6 +16,7 @@ import { RpgEngine, type Foe, type PendingStrike, type RpgFx, type SetWork } fro
 import type { Cues } from '../../rpg/enemies';
 import { abilityLoadout } from '../../rpg/expedition';
 import type { ExLoadout } from '../../rpg/loadout';
+import type { BattleSave } from '../../rpg/session';
 import { Calibration } from '../Calibration';
 import { CameraView } from '../CameraView';
 import { ControllerStatus, RemoteCalibration, useLink } from '../Connected';
@@ -45,6 +46,8 @@ const MODE_FOR: Record<BattleStage, InputMode> = { intro: 'menu', choose: 'menu'
 export interface FightResult {
   outcome: 'victory' | 'defeat';
   hp: number;
+  /** The player asked to save and leave; the fight happened to end on that last set. */
+  leave?: boolean;
   /** Movements used here for the first time on this setup. */
   firstChecks: string[];
 }
@@ -69,7 +72,12 @@ export interface RpgBattleProps {
   onSet: (r: SetResult) => void;
   onDodge: (o: 'dodged' | 'hit' | 'unclear', detail: { h: 'high' | 'low'; cues: string }) => void;
   onDone: (r: FightResult) => void;
-  onLeave: () => void;
+  /** Save and leave: the fight as it stands at its last safe point. */
+  onLeave: (save: Omit<BattleSave, 'index'>) => void;
+  /** Resume a fight saved at a safe point (instead of starting it fresh). */
+  resume?: Omit<BattleSave, 'index'>;
+  /** Called at every safe point, so a closed app resumes the fight rather than replaying it. */
+  onCheckpoint?: (save: Omit<BattleSave, 'index'>) => void;
 }
 
 /** Foes charge across this long before impact (the stance is readable well before). */
@@ -87,7 +95,9 @@ interface StrikeView {
 const view = (f: Foe): RpgFoeView => ({ uid: f.uid, sprite: f.def.sprite, tint: f.def.tint, scale: f.def.scale, name: f.def.name });
 
 export function RpgBattle(p: RpgBattleProps) {
+  const [restored] = useState(() => (p.resume ? RpgEngine.restore(p.resume.engine, abilityLoadout(p.loadout), { blessings: p.blessings }) : null));
   const [engine] = useState(() => {
+    if (restored) return restored;
     const e = new RpgEngine(p.enemies, p.hero, abilityLoadout(p.loadout), { blessings: p.blessings });
     if (p.hpScale && p.hpScale !== 1) for (const f of e.foes) f.hp = f.maxHp = Math.round(f.maxHp * p.hpScale);
     return e;
@@ -123,6 +133,15 @@ export function RpgBattle(p: RpgBattleProps) {
   const ctrlLost = p.connected && link.controller !== 'connected';
   const props = useRef(p);
   props.current = p;
+  /** The latest safe point, and whether "save and leave" is waiting for one. */
+  const lastSave = useRef<Omit<BattleSave, 'index'>>(restored && p.resume ? p.resume : { engine: engine.snapshot(), phase: 'choose' });
+  const leaving = useRef(false);
+  /** Strikes still to dodge from a resumed enemy turn. */
+  const pendingStrikes = useRef<PendingStrike[] | null>(null);
+  const checkpoint = (phase: BattleSave['phase'], rest?: PendingStrike[]) => {
+    lastSave.current = { engine: engine.snapshot(), phase, ...(phase === 'strikes' ? { strikes: structuredClone(rest ?? []) } : {}) };
+    props.current.onCheckpoint?.(lastSave.current);
+  };
 
   const later = (fn: () => void, ms: number) => timers.current.later(fn, ms);
   const setStage = (s: BattleStage) => {
@@ -144,13 +163,25 @@ export function RpgBattle(p: RpgBattleProps) {
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
   useEffect(() => {
-    startRpgBattle({ foes: engine.foes.map(view), heroHp: engine.hero.hp, heroMaxHp: engine.hero.maxHp, backdrop: p.boss ? 'dungeon' : 'meadow', boss: !!p.boss });
+    startRpgBattle({ foes: engine.living.map(view), heroHp: engine.hero.hp, heroMaxHp: engine.hero.maxHp, backdrop: p.boss ? 'dungeon' : 'meadow', boss: !!p.boss });
     window.setTimeout(pushStatus, 900);
     input.setMode('menu');
-    const first = engine.foes[0].def;
-    setNote(first.tip);
-    audio.say(`${first.intro} ${first.tip}`);
-    later(() => toChoose(), 3000);
+    const first = engine.living[0].def;
+    if (restored && p.resume) {
+      // Carry on exactly where the fight was saved; nothing already done is asked again.
+      setNote('The fight resumes where you left it.');
+      audio.say('The fight resumes where you left it.');
+      const r = p.resume;
+      later(() => {
+        if (r.phase === 'choose') return toChoose();
+        if (r.phase === 'strikes') pendingStrikes.current = r.strikes ?? [];
+        toReady(false);
+      }, 1800);
+    } else {
+      setNote(first.tip);
+      audio.say(`${first.intro} ${first.tip}`);
+      later(() => toChoose(), 3000);
+    }
     return () => {
       timers.current.clear();
       runner.current?.dispose();
@@ -174,8 +205,17 @@ export function RpgBattle(p: RpgBattleProps) {
     }
     setFamily(null);
     setSnap(null);
+    checkpoint('choose');
     setStage('choose');
     audio.nextExercise();
+  }
+
+  /** Stand tall before the enemies act (after a set, or on resuming a fight). */
+  function toReady(floor: boolean) {
+    if (leaving.current) return props.current.onLeave(lastSave.current);
+    setStage('ready');
+    setFloorRest(floor);
+    audio.say(floor ? 'Take your time getting up. Stand tall when you are ready.' : 'Stand tall, arms relaxed, when you are ready.');
   }
 
   // ── Player turn ─────────────────────────────────────────────────────────
@@ -222,22 +262,36 @@ export function RpgBattle(p: RpgBattleProps) {
     } else if (res.done > 0) audio.say(`Finished. ${res.done} ${ex.kind === 'hold' ? 'seconds' : ''} counted.`);
     setStage('resolve');
     fx(engine.useAbility(f, work));
+    if (engine.outcome !== 'victory') checkpoint('ready');
     later(() => {
       if (engine.outcome === 'victory') return win();
-      setStage('ready');
-      setFloorRest(ex.floor);
-      audio.say(ex.floor ? 'Take your time getting up. Stand tall when you are ready.' : 'Stand tall, arms relaxed, when you are ready.');
+      toReady(ex.floor);
     }, 1800);
   }
 
   // ── Enemy turn ──────────────────────────────────────────────────────────
   function enemyTurn() {
     setStage('enemy');
+    const pending = pendingStrikes.current;
+    if (pending) {
+      // A resumed enemy turn: these strikes were already announced before the save.
+      pendingStrikes.current = null;
+      strikes.current = pending;
+      later(() => {
+        if (pending.length) {
+          dodge.current.start();
+          setStage('dodge');
+          runStrike(0);
+        } else endTurn();
+      }, 600);
+      return;
+    }
     const before = new Set(engine.foes.map((f) => f.uid));
     const t = engine.startEnemyTurn();
     const added = engine.foes.filter((f) => !before.has(f.uid)).map(view);
     fx(t.fx, added);
     strikes.current = t.strikes;
+    if (engine.outcome === 'ongoing') checkpoint('strikes', t.strikes);
     later(() => {
       if (engine.outcome === 'victory') return win();
       if (t.strikes.length) {
@@ -290,6 +344,7 @@ export function RpgBattle(p: RpgBattleProps) {
       if (!swung) bus.emit('rpg:strike', { uid: s.from, height: s.height, phase: 'swing' });
       props.current.onDodge(res, { h: s.height, cues: String(cues) });
       fx(engine.resolveStrike(s, res));
+      if (engine.outcome === 'ongoing') checkpoint('strikes', strikes.current.slice(i + 1));
       setStrike({ i, n: strikes.current.length, s, left: 0, waiting: null, result: res });
       later(() => {
         bus.emit('rpg:strike', { uid: s.from, height: s.height, phase: 'clear' });
@@ -310,7 +365,33 @@ export function RpgBattle(p: RpgBattleProps) {
 
   function win() {
     setStage('victory');
-    later(() => props.current.onDone({ outcome: 'victory', hp: engine.hero.hp, firstChecks: firstChecks.current }), 2600);
+    later(() => props.current.onDone({ outcome: 'victory', hp: engine.hero.hp, firstChecks: firstChecks.current, ...(leaving.current ? { leave: true } : {}) }), 2600);
+  }
+
+  /**
+   * Save and leave. Between turns (or with strikes still to come) the fight
+   * is saved exactly as it is. In the middle of a set, the set ends with what
+   * was counted, its ability lands, and the fight is saved right after — so
+   * nothing already done is ever asked for again.
+   */
+  function leave() {
+    const st = stageRef.current;
+    if (st === 'set' && runner.current?.running) {
+      leaving.current = true;
+      pausedRef.current = false;
+      setPausedState(false);
+      timers.current.resume();
+      runner.current.finish();
+      return;
+    }
+    if (st === 'resolve') {
+      leaving.current = true;
+      pausedRef.current = false;
+      setPausedState(false);
+      timers.current.resume();
+      return;
+    }
+    props.current.onLeave(lastSave.current);
   }
 
   function lose() {
@@ -601,7 +682,12 @@ export function RpgBattle(p: RpgBattleProps) {
               ...(runner.current?.running ? [{ id: 'finish', label: 'Finish this set', detail: 'Verified reps so far power the ability', icon: 'sword' }] : []),
               { id: 'recal', label: 'Recalibrate', detail: 'Quick; keeps the fight', icon: 'shield' },
               { id: 'dodge', label: p.dodgeInput === 'body' ? 'Dodge with a controller' : 'Dodge with your body', detail: p.dodgeInput === 'body' ? 'For couch play: ▼ duck, ▲ / A hop' : 'Duck and hop in front of the camera', icon: 'wind' },
-              { id: 'leave', label: 'Leave expedition', detail: 'Saves your run as it was before this fight', icon: 'lock' },
+              {
+                id: 'leave',
+                label: 'Save and leave',
+                detail: runner.current?.running ? 'Ends this set with what was counted, then saves the fight right there' : 'Saves the fight exactly where it is; resume any time',
+                icon: 'lock',
+              },
             ]}
             onChoose={(id) => {
               if (id === 'resume') resume();
@@ -610,7 +696,7 @@ export function RpgBattle(p: RpgBattleProps) {
                 runner.current?.finish();
               } else if (id === 'recal') startRecal();
               else if (id === 'dodge') p.onDodgeInput(p.dodgeInput === 'body' ? 'controller' : 'body');
-              else if (id === 'leave') p.onLeave();
+              else if (id === 'leave') leave();
             }}
             onBack={resume}
           />

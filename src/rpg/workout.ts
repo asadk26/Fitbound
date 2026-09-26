@@ -159,6 +159,8 @@ export function completion(w: WorkoutData): number {
 /** A compact record kept in the save for the workout director's history. */
 export interface WorkoutRecord {
   id: string;
+  /** The expedition this session belonged to (an expedition can span several sessions). */
+  expedition?: string;
   at: number;
   outcome: WorkoutData['outcome'];
   /** Sets and total verified work per exercise (split holds: also seconds per side, camera-counted). */

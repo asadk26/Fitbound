@@ -12,6 +12,7 @@ import { alternatives, rerollAll, type ExLoadout } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
 import { playtestReport } from '../../rpg/report';
 import { applyProposals, propose } from '../../rpg/progression';
+import { expeditionSets, hasWork } from '../../rpg/session';
 import { completion, pacing, totals, workingSets, type Feedback } from '../../rpg/workout';
 import { GestureMenu, useInputEvents } from '../motionUi';
 
@@ -35,7 +36,7 @@ export function PathView({ x, onContinue, onStop }: { x: ExpeditionState; onCont
           ))}
         </ol>
         <p className="gmenu-text">
-          ♥ {x.hp}/{x.maxHp} · {workingSets(x.workout)} sets done{x.fallen ? ' · the Spark is out of reach this run' : ''}
+          ♥ {x.hp}/{x.maxHp} · {expeditionSets(x)} sets done{x.fallen ? ' · the Spark is out of reach this run' : ''}{x.battle?.index === x.index ? ' · a fight is waiting, just as you left it' : ''}
           {boundary ? ' · A good place to stop if you need to — the run will wait.' : ''}
         </p>
         <GestureMenu
@@ -302,8 +303,8 @@ const CHECKIN: { key: keyof Feedback; title: string; options: { id: string; labe
 export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState; onAgain: () => void; onExit: () => void; onFeedback: (fb: Feedback) => void }) {
   const w = x.workout;
   const pace = pacing(w);
-  // A quick check-in after a finished run (not a saved one); every question can be skipped.
-  const [step, setStep] = useState(x.status === 'suspended' ? CHECKIN.length : 0);
+  // A quick check-in after every session that did some work (a saved one too); every question can be skipped.
+  const [step, setStep] = useState(hasWork(x) ? 0 : CHECKIN.length);
   const [fb, setFb] = useState<Feedback>({});
   const [report, setReport] = useState<string | null>(null);
   const [copied, setCopied] = useState('');
@@ -335,13 +336,13 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
     a.click();
     URL.revokeObjectURL(a.href);
   };
-  // Targets for next time, from what this run's sets showed (and the check-in, if answered).
-  const finished = x.status !== 'suspended';
-  const plan = finished ? propose(w, x.prefs, getSave().exerciseTargets, getSave().progress, fb) : { proposals: [], progress: getSave().progress };
+  // Targets for next time, from what this session's sets showed (and the check-in, if answered).
+  // Every session is judged on its own, with that day's readiness, even mid-expedition.
+  const plan = propose(w, x.prefs, getSave().exerciseTargets, getSave().progress, fb);
   const [kept, setKept] = useState<Record<string, boolean>>({});
   const committed = useRef(false);
   const commit = () => {
-    if (committed.current || !finished) return;
+    if (committed.current) return;
     committed.current = true;
     updateSave((s) => {
       s.progress = plan.progress;
@@ -370,9 +371,11 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
         <p className="gmenu-text">{won ? STORY.victoryElara : x.fallen ? 'The character fell during this run, but the workout carried on.' : STORY.suspended}</p>
         <div className="sum-cols">
           <div>
-            <h3>Workout</h3>
+            <h3>{x.earlier?.sessions.length ? 'This session' : 'Workout'}</h3>
             <p>
-              {workingSets(w)} of ~{w.plannedSets} planned sets ({Math.round(completion(w) * 100)}%)
+              {x.earlier?.sessions.length
+                ? `${workingSets(w)} sets this session · ${expeditionSets(x)} of ~${w.plannedSets} across the expedition`
+                : `${workingSets(w)} of ~${w.plannedSets} planned sets (${Math.round(completion(w) * 100)}%)`}
             </p>
             {pace.total > 0 && (
               <p className="sum-pace">

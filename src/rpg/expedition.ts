@@ -5,6 +5,7 @@ import { RPG_ENEMIES, type Cues } from './enemies';
 import type { BoardMarker } from '../game/bus';
 import type { Loadout } from './engine';
 import { DEFAULT_PREFS, type DayPrefs, type ExLoadout } from './loadout';
+import type { BattleSave } from './session';
 import { newWorkout, type WorkoutData } from './workout';
 
 /**
@@ -83,7 +84,12 @@ export interface ExpeditionState {
   blessings: string[];
   /** The character fell at least once: the run continues, but the Spark can't be restored. */
   fallen: boolean;
+  /** The current workout session (one real sitting; earlier sittings are in the save's history). */
   workout: WorkoutData;
+  /** Earlier sessions of this expedition: their ids and working sets, for the expedition's progress. */
+  earlier?: { sessions: string[]; sets: number };
+  /** A fight saved at a safe point, resumed exactly there. */
+  battle?: BattleSave;
   status: 'active' | 'suspended' | 'complete' | 'ended';
   /** Dodge with the body (default) or with a controller (couch play). */
   dodgeInput: 'body' | 'controller';
@@ -211,7 +217,20 @@ export function sanitizeExpedition(v: unknown): ExpeditionState | null {
   if (!o.workout || !Array.isArray(o.workout.sets)) return null;
   if (!['active', 'suspended', 'complete', 'ended'].includes(o.status)) return null;
   const prefs = { ...DEFAULT_PREFS, ...(o.prefs ?? {}) };
-  return { ...o, prefs, targets: o.targets ?? {}, dodgeInput: o.dodgeInput === 'controller' ? 'controller' : 'body', fallen: !!o.fallen };
+  const earlier = o.earlier && Array.isArray(o.earlier.sessions) && Number.isInteger(o.earlier.sets) && o.earlier.sets >= 0 ? { sessions: o.earlier.sessions.filter((x) => typeof x === 'string'), sets: o.earlier.sets } : undefined;
+  const { battle: _drop, ...rest } = o;
+  const battle = validBattle(o.battle, o.index) ? o.battle : undefined;
+  return { ...rest, prefs, targets: o.targets ?? {}, dodgeInput: o.dodgeInput === 'controller' ? 'controller' : 'body', fallen: !!o.fallen, ...(earlier ? { earlier } : {}), ...(battle ? { battle } : {}) };
+}
+
+/** A saved fight must belong to the current node and name only enemies that exist; otherwise the fight restarts. */
+function validBattle(b: BattleSave | undefined, index: number): b is BattleSave {
+  if (!b || typeof b !== 'object' || b.index !== index || !['choose', 'ready', 'strikes'].includes(b.phase)) return false;
+  const e = b.engine;
+  if (!e || !Array.isArray(e.foes) || !e.foes.length || !e.hero || typeof e.hero.hp !== 'number' || !e.cooldowns) return false;
+  if (!e.foes.every((f) => f && typeof f.def === 'string' && RPG_ENEMIES[f.def] && typeof f.hp === 'number')) return false;
+  if (b.phase === 'strikes' && !Array.isArray(b.strikes)) return false;
+  return true;
 }
 
 function safeEx(id: string): boolean {

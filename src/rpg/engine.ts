@@ -105,6 +105,21 @@ export type RpgFx =
 /** Ability id per family; a family with nothing eligible today sits out. */
 export type Loadout = Partial<Record<Family, string>>;
 
+/**
+ * Everything a fight needs to carry on exactly where it stopped: saved at a
+ * safe point (between turns, or with an enemy turn's strikes still to come),
+ * never in the middle of a set or a dodge.
+ */
+export interface EngineSnapshot {
+  foes: (Omit<Foe, 'def'> & { def: string })[];
+  hero: Hero;
+  cooldowns: Record<Family, number>;
+  lastFamily: Family | null;
+  recent: Family[];
+  turn: number;
+  nextUid: number;
+}
+
 export interface EngineOptions {
   blessings?: string[];
 }
@@ -133,6 +148,37 @@ export class RpgEngine {
     this.hero = { hp: hero.hp, maxHp: hero.maxHp, shield: 0, charge: 0, counter: 0 };
     this.blessings = new Set(opts.blessings ?? []);
     for (const id of enemies) this.spawn(rpgEnemy(id));
+  }
+
+  /** A copy of the fight's state (foes by enemy id). */
+  snapshot(): EngineSnapshot {
+    return structuredClone({
+      foes: this.foes.map((f) => ({ ...f, def: f.def.id })),
+      hero: this.hero,
+      cooldowns: this.cooldowns,
+      lastFamily: this.lastFamily,
+      recent: this.recent,
+      turn: this.turn,
+      nextUid: this.nextUid,
+    });
+  }
+
+  /** A fight rebuilt from a snapshot; null if it names an enemy that no longer exists. */
+  static restore(snap: EngineSnapshot, loadout: Loadout, opts: EngineOptions = {}): RpgEngine | null {
+    try {
+      const e = new RpgEngine([], snap.hero, loadout, opts);
+      Object.assign(e.hero, structuredClone(snap.hero));
+      for (const f of snap.foes) e.foes.push({ ...structuredClone(f), def: rpgEnemy(f.def) });
+      Object.assign(e.cooldowns, snap.cooldowns);
+      e.lastFamily = snap.lastFamily;
+      e.recent = [...snap.recent];
+      e.turn = snap.turn;
+      e.nextUid = snap.nextUid;
+      if (!e.living.length) return null;
+      return e;
+    } catch {
+      return null;
+    }
   }
 
   private has(b: string): boolean {
