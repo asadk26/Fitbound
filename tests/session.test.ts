@@ -161,3 +161,23 @@ describe('fights saved at a safe point', () => {
     expect(sanitizeExpedition(old)).not.toBeNull();
   });
 });
+
+describe('workout time', () => {
+  it('counts sets, dodging, recovery, setup, active marching and the Haven; exercise time stays separate', async () => {
+    const { addPhysical, workoutTime, newWorkout, toRecord } = await import('../src/rpg/workout');
+    const w = newWorkout('normal', 21, 0);
+    addSet(w, { ...set('squat', 1000), activeMs: 60_000 });
+    addSet(w, { ...set('pushup', 2000), activeMs: 30_000 });
+    addPhysical(w, 'dodge', 45_000);
+    addPhysical(w, 'recovery', 120_000);
+    addPhysical(w, 'setup', 15_000);
+    addPhysical(w, 'march', 90_000);
+    addPhysical(w, 'march', 0);
+    w.recoveryMs = 180_000;
+    const t = workoutTime(w);
+    expect(t).toEqual({ exercise: 90_000, dodge: 45_000, recovery: 120_000, setup: 15_000, march: 90_000, haven: 180_000, total: 540_000 });
+    const r = toRecord(w);
+    expect(r.workoutMin).toBe(9);
+    expect(r.exerciseMin).toBe(1.5);
+  });
+});

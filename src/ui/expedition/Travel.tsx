@@ -23,6 +23,8 @@ export interface MarchTally {
   steps: number;
   active: number;
   assisted: number;
+  /** Time spent moving by marching (workout time), ms. */
+  activeMs: number;
 }
 
 export function Travel({
@@ -51,9 +53,9 @@ export function Travel({
   const pausedRef = useRef(false);
   const [lost, setLost] = useState(false);
   const steps = useRef(0);
-  const start = useRef({ active: travel.active, assisted: travel.assisted });
+  const start = useRef({ active: travel.active, assisted: travel.assisted, activeMs: travel.activeMs });
   const arrived = useRef(false);
-  const tally = (): MarchTally => ({ steps: steps.current, active: travel.active - start.current.active, assisted: travel.assisted - start.current.assisted });
+  const tally = (): MarchTally => ({ steps: steps.current, active: travel.active - start.current.active, assisted: travel.assisted - start.current.assisted, activeMs: travel.activeMs - start.current.activeMs });
   const props = useRef({ onArrive, onShrine });
   props.current = { onArrive, onShrine };
 

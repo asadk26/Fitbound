@@ -82,9 +82,13 @@ Phase 2  The Bone Field (Bone Charger) → the Mirror of Unlived Lives → Drift
 Phase 3  A Quiet Haven → The Veiled Stair (Hollow Acolyte) → a blessing → Before the Spark (Warden of the Haze)
 ```
 
-- **You march between encounters.** Each encounter stands at its own spot on the diorama trail: straw at the yard, the Husk by the signpost, the Charger past the ward-gate, the Mirror at the crossroads fork, the Wisps by the quarry, the Haven's campfire under the tower, the Acolyte on the new Veiled Stair, and the Warden at the end. Marching in place carries the hero there (the guided trail, at about a third of a Trial's pace so each leg is a short stretch), with a line of story as the leg begins. Walking into the marker starts the encounter.
+- **Travelling between encounters is controller-first.** Each encounter stands at its own spot on the diorama trail: straw at the yard, the Husk by the signpost, the Charger past the ward-gate, the Mirror at the crossroads fork, the Wisps by the quarry, the Haven's campfire under the tower, the Acolyte on the new Veiled Stair, and the Warden at the end.
+  - **By default** you walk there with the gamepad stick or the arrow keys, from the couch. Controller travel is never counted as activity.
+  - **Marching is optional.** Choose *March (extra activity)* under *Between fights* in the Sanctuary. Marching in place carries the hero along the trail, and those minutes count as workout time.
+  - Each leg opens with a line of story. Walking into the marker starts the encounter.
+  - Expeditions remember their own choice. The Motion Trial keeps its own setting.
   - **Mossy Shrine:** the fork on the way to the Bone Field offers a detour that heals 30 HP once per run.
-  - **Between fights** (Sanctuary) chooses *March* or *Gamepad* travel. Mid-leg, Select on the gamepad, **T**, or the pause menu switches between them. Gamepad travel doesn't count as activity. The pause menu can also recalibrate, or save and stop.
+  - **Switching mid-leg:** Select on the gamepad, **T**, or the pause menu switches between controller and marching. The pause menu can also recalibrate, or save and stop.
   - Out of view, the hero simply stops. There's no penalty.
   - Blessings appear straight after the fight that earns them, so there's no march to them.
 - At a phase boundary, **the path** shows where you are first. Continue, or **Save and stop here**.
@@ -98,7 +102,11 @@ Phase 3  A Quiet Haven → The Veiled Stair (Hollow Acolyte) → a blessing → 
     - *Swap* changes one movement without rerolling the rest.
     - A movement today's equipment rules out is swapped for you.
   - **Suspending isn't losing.** If the app closes unexpectedly, that session is recorded when you resume.
-- Enemy HP is sized so a full route is about 20 sets. The marches add a few minutes of low-intensity movement between them. They're tallied as steps in the summary and never count as sets.
+- Enemy HP is sized so a full route is about 20 sets. Marching, if you choose it, adds a few minutes of low-intensity movement; it's tallied as steps and never counts as sets.
+- **Workout time** (bible §18) is shown in the summary, the playtest report and the Journal.
+  - **It counts:** sets and holds, dodging (the enemy turn), recovery between sets (getting up and standing ready), physical setup (getting into position, camera checks), marching you chose to do, and the Haven.
+  - **It leaves out:** controller travel, choosing, dialogue, cutscenes, menus and paused time.
+  - **Exercise time** (sets and holds alone) is shown separately. The target is about 20 minutes of workout time per complete expedition, still to be confirmed with a real playtest.
 
 ### The four families and the loadout
 

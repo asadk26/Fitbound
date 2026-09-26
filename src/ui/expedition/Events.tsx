@@ -13,7 +13,7 @@ import { STORY } from '../../rpg/story';
 import { playtestReport } from '../../rpg/report';
 import { applyProposals, propose } from '../../rpg/progression';
 import { expeditionSets, hasWork } from '../../rpg/session';
-import { completion, pacing, totals, workingSets, type Feedback } from '../../rpg/workout';
+import { completion, pacing, totals, workingSets, workoutTime, type Feedback } from '../../rpg/workout';
 import { GestureMenu, useInputEvents } from '../motionUi';
 
 const NODE_ICON: Record<NodeKind, string> = { fight: '⚔', blessing: '✦', mirror: '◈', haven: '❀', boss: '☼' };
@@ -370,6 +370,12 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
                 ? `${workingSets(w)} sets this session · ${expeditionSets(x)} of ~${w.plannedSets} across the expedition`
                 : `${workingSets(w)} of ~${w.plannedSets} planned sets (${Math.round(completion(w) * 100)}%)`}
             </p>
+            {workoutTime(w).total > 0 && (
+              <p className="sum-pace">
+                <b>Workout time {mins(workoutTime(w).total)} min</b> · exercising {mins(workoutTime(w).exercise)} · dodging {mins(workoutTime(w).dodge)} · recovery between sets {mins(workoutTime(w).recovery)}
+                {workoutTime(w).march ? ` · marching ${mins(workoutTime(w).march)}` : ''}
+              </p>
+            )}
             {pace.total > 0 && (
               <p className="sum-pace">
                 {mins(pace.total)} min: {mins(pace.sets)} in sets · {mins(pace.between)} between sets · {mins(pace.march)} marching{pace.haven ? ` · ${mins(pace.haven)} Haven` : ''} · {mins(pace.other)} menus and story

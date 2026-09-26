@@ -17,6 +17,7 @@ import type { Cues } from '../../rpg/enemies';
 import { abilityLoadout } from '../../rpg/expedition';
 import type { ExLoadout } from '../../rpg/loadout';
 import type { BattleSave } from '../../rpg/session';
+import type { PhysicalBucket } from '../../rpg/workout';
 import { Calibration } from '../Calibration';
 import { CameraView } from '../CameraView';
 import { ControllerStatus, RemoteCalibration, useLink } from '../Connected';
@@ -78,6 +79,8 @@ export interface RpgBattleProps {
   resume?: Omit<BattleSave, 'index'>;
   /** Called at every safe point, so a closed app resumes the fight rather than replaying it. */
   onCheckpoint?: (save: Omit<BattleSave, 'index'>) => void;
+  /** Physically active time in this fight outside the sets themselves (workout time, bible §18). */
+  onPhysical?: (bucket: PhysicalBucket, ms: number) => void;
 }
 
 /** Foes charge across this long before impact (the stance is readable well before). */
@@ -109,10 +112,20 @@ export function RpgBattle(p: RpgBattleProps) {
   const [sel, setSel] = useState(0);
   const selRef = useRef(0);
   const [family, setFamily] = useState<Family | null>(null);
-  const [snap, setSnap] = useState<SessionSnapshot | null>(null);
+  const [snap, setSnapState] = useState<SessionSnapshot | null>(null);
+  const snapRef = useRef<SessionSnapshot | null>(null);
+  const setSnap = (s: SessionSnapshot | null) => {
+    snapRef.current = s;
+    setSnapState(s);
+  };
   const [paused, setPausedState] = useState(false);
   const pausedRef = useRef(false);
-  const [recal, setRecal] = useState(false);
+  const [recal, setRecalState] = useState(false);
+  const recalRef = useRef(false);
+  const setRecal = (v: boolean) => {
+    recalRef.current = v;
+    setRecalState(v);
+  };
   const [note, setNote] = useState<string | null>(null);
   const [strike, setStrikeState] = useState<StrikeView | null>(null);
   const strikeRef = useRef<StrikeView | null>(null);
@@ -160,6 +173,38 @@ export function RpgBattle(p: RpgBattleProps) {
     bus.emit('rpg:foes', {
       foes: engine.foes.map((f) => ({ uid: f.uid, hp: f.hp, maxHp: f.maxHp, ward: f.ward, armor: f.armor, intent: intentText(engine, f), charging: !!f.charging || engine.shownIntent(f).kind === 'charge', staggered: f.staggered })),
     });
+
+  // ── Workout time ─────────────────────────────────────────────────────────
+  // Counted while the body is involved: getting into position for a set,
+  // getting up and standing ready afterwards (recovery), the enemy turn and
+  // its dodges, and recalibrating. Choosing, intros and paused time are not.
+  // The sets' own active time is counted from the set results.
+  const physTime = useRef<Partial<Record<PhysicalBucket, number>>>({});
+  const flushPhysical = () => {
+    for (const [b, ms] of Object.entries(physTime.current)) if (ms) props.current.onPhysical?.(b as PhysicalBucket, Math.round(ms));
+    physTime.current = {};
+  };
+  useEffect(() => {
+    let last = performance.now();
+    const id = window.setInterval(() => {
+      const now = performance.now();
+      const dt = Math.min(1000, now - last);
+      last = now;
+      const st = stageRef.current;
+      let b: PhysicalBucket | null = null;
+      if (recalRef.current) b = 'setup';
+      else if (pausedRef.current) b = null;
+      else if (st === 'set') b = snapRef.current?.stage === 'active' ? null : 'setup';
+      else if (st === 'resolve' || st === 'ready') b = 'recovery';
+      else if (st === 'enemy' || st === 'dodge') b = 'dodge';
+      if (b) physTime.current[b] = (physTime.current[b] ?? 0) + dt;
+    }, 250);
+    return () => {
+      clearInterval(id);
+      flushPhysical();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -212,7 +257,7 @@ export function RpgBattle(p: RpgBattleProps) {
 
   /** Stand tall before the enemies act (after a set, or on resuming a fight). */
   function toReady(floor: boolean) {
-    if (leaving.current) return props.current.onLeave(lastSave.current);
+    if (leaving.current) return (flushPhysical(), props.current.onLeave(lastSave.current));
     setStage('ready');
     setFloorRest(floor);
     audio.say(floor ? 'Take your time getting up. Stand tall when you are ready.' : 'Stand tall, arms relaxed, when you are ready.');
@@ -365,7 +410,7 @@ export function RpgBattle(p: RpgBattleProps) {
 
   function win() {
     setStage('victory');
-    later(() => props.current.onDone({ outcome: 'victory', hp: engine.hero.hp, firstChecks: firstChecks.current, ...(leaving.current ? { leave: true } : {}) }), 2600);
+    later(() => (flushPhysical(), props.current.onDone({ outcome: 'victory', hp: engine.hero.hp, firstChecks: firstChecks.current, ...(leaving.current ? { leave: true } : {}) })), 2600);
   }
 
   /**
@@ -391,12 +436,12 @@ export function RpgBattle(p: RpgBattleProps) {
       timers.current.resume();
       return;
     }
-    props.current.onLeave(lastSave.current);
+    (flushPhysical(), props.current.onLeave(lastSave.current));
   }
 
   function lose() {
     setStage('defeat');
-    later(() => props.current.onDone({ outcome: 'defeat', hp: 0, firstChecks: firstChecks.current }), 2800);
+    later(() => (flushPhysical(), props.current.onDone({ outcome: 'defeat', hp: 0, firstChecks: firstChecks.current })), 2800);
   }
 
   // ── Pause / recalibrate ─────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { FAMILIES, getExercise } from '../exercise/registry';
 import { blessing } from './blessings';
 import { ROUTES, type ExpeditionState } from './expedition';
-import { pacing, totals, type Feedback, type SetRecord } from './workout';
+import { pacing, totals, workoutTime, type Feedback, type SetRecord } from './workout';
 
 /**
  * A plain-text account of one expedition, for playtest notes: what was done,
@@ -13,12 +13,14 @@ export function playtestReport(x: ExpeditionState, fb: Feedback | undefined, ctx
   const p = pacing(w);
   const min = (ms: number) => `${(ms / 60000).toFixed(1)} min`;
   const outcome =
-    w.outcome === 'victory' ? 'Victory' : x.status === 'suspended' ? `Saved at node ${x.index + 1}` : x.fallen ? 'Fell (reformed), then ended' : w.outcome === 'defeat' ? 'Defeat' : 'Ended early';
+    w.outcome === 'victory' ? 'Victory' : x.status === 'suspended' ? `Saved at node ${x.index + 1}` : x.fallen ? 'Fell; the expedition ended' : w.outcome === 'defeat' ? 'Defeat' : 'Ended early';
   const out: string[] = [];
   out.push(`FITBOUND playtest report · ${(ctx.when ?? new Date()).toLocaleString()}`);
   out.push(`Route: ${ROUTES[x.route].name} · Outcome: ${outcome}${x.fallen && w.outcome === 'victory' ? ' (fell once)' : ''}`);
   out.push(`Settings: travel ${ctx.travel} · attack cues ${ctx.cues} · intensity ${w.intensity}`);
   out.push('');
+  const wt = workoutTime(w);
+  out.push(`Workout time: ${min(wt.total)} (exercising ${min(wt.exercise)} · dodging ${min(wt.dodge)} · recovery between sets ${min(wt.recovery)} · setup ${min(wt.setup)} · marching ${min(wt.march)} · Haven ${min(wt.haven)})`);
   out.push(`Time: ${min(p.total)} total`);
   out.push(`  sets ${min(p.sets)} · between sets (choosing, dodging, rests, enemy turns) ${min(p.between)} · marching ${min(p.march)} · Haven ${min(p.haven)} · menus and story ${min(p.other)}`);
   out.push('');

@@ -13,7 +13,7 @@ import { atPhaseBoundary, clearExpedition, currentNode, loadExpedition, newExped
 import { generateLoadout, setTarget } from '../../rpg/loadout';
 import { STORY } from '../../rpg/story';
 import { activeLoadout, applyReadiness, hasWork, needsReadiness, sessionRecord, startSession, upsertRecord } from '../../rpg/session';
-import { addDodge, addMarch, addSet, addTime, newWorkout } from '../../rpg/workout';
+import { addDodge, addMarch, addPhysical, addSet, addTime, newWorkout } from '../../rpg/workout';
 import { Calibration } from '../Calibration';
 import { ControllerLost, RemoteCalibration, useLink } from '../Connected';
 import { useInputEvents } from '../motionUi';
@@ -132,7 +132,14 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     const bucket = prev.view === 'travel' ? 'march' : prev.view === 'node' ? 'encounters' : prev.view === 'path' || prev.view === 'calibrate' || prev.view === 'fallen' ? 'other' : null;
     const cur = xRef.current;
     if (!bucket || !cur || debug || cur.id !== prev.run) return;
-    mutate((d) => addTime(d.workout, bucket, now - prev.at), cur.status === 'active' || cur.status === 'suspended');
+    mutate(
+      (d) => {
+        addTime(d.workout, bucket, now - prev.at);
+        // A camera check is physical setup (workout time).
+        if (prev.view === 'calibrate') addPhysical(d.workout, 'setup', now - prev.at);
+      },
+      cur.status === 'active' || cur.status === 'suspended',
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
@@ -221,7 +228,11 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
     else go();
   };
 
-  const recordMarch = (m: MarchTally) => mutate((d) => addMarch(d.workout, m.steps, Math.round(m.active), Math.round(m.assisted)));
+  const recordMarch = (m: MarchTally) =>
+    mutate((d) => {
+      addMarch(d.workout, m.steps, Math.round(m.active), Math.round(m.assisted));
+      addPhysical(d.workout, 'march', Math.round(m.activeMs));
+    });
 
   const target = (id: string) => xRef.current?.targets[id] ?? setTarget(getExercise(id), xRef.current?.prefs ?? getSave().expeditionPrefs, getSave().exerciseTargets);
 
@@ -420,6 +431,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
           loadout={debug ? x.loadout : activeLoadout(x)}
           resume={!debug && x.battle?.index === x.index ? x.battle : undefined}
           onCheckpoint={(b) => !debug && mutate((d) => void (d.battle = { ...b, index: d.index }))}
+          onPhysical={(b, ms) => !debug && xRef.current && mutate((d) => addPhysical(d.workout, b, ms))}
           target={target}
           blessings={x.blessings}
           connected={connected}

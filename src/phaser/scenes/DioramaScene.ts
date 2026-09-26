@@ -392,7 +392,10 @@ export class DioramaScene extends Phaser.Scene {
     const moved = Math.hypot(this.hero.x - x0, this.hero.y - y0);
     if (moved > 0) {
       if (assisted || input.keyForward || this.rejoin) travel.assisted += moved;
-      else travel.active += moved;
+      else {
+        travel.active += moved;
+        travel.activeMs += dt * 1000;
+      }
     }
     this.arrow.setVisible(freeRoam);
 

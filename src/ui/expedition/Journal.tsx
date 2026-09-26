@@ -81,7 +81,8 @@ export function Journal({ onBack }: { onBack: () => void }) {
                     <th>{date(r.at)}</th>
                     <td>{OUTCOME[r.outcome] ?? r.outcome}</td>
                     <td>
-                      {r.sets ?? Object.values(r.volume).reduce((a, v) => a + v.sets, 0)} sets{r.minutes ? ` · ${r.minutes} min` : ''}
+                      {r.sets ?? Object.values(r.volume).reduce((a, v) => a + v.sets, 0)} sets
+                      {r.workoutMin !== undefined ? ` · ${Math.round(r.workoutMin)} min workout` : r.minutes ? ` · ${r.minutes} min` : ''}
                       {r.steps ? ` · ${r.steps} steps` : ''}
                     </td>
                     <td className="muted">

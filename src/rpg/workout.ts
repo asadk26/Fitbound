@@ -55,6 +55,31 @@ export interface WorkoutData {
   time?: Partial<Record<TimeBucket, number>>;
   /** Each strike: its height, how it was cued, and the result. */
   dodgeLog?: DodgeEntry[];
+  /** Physically active time outside the sets themselves, by kind (see workoutTime). */
+  physical?: Partial<Record<PhysicalBucket, number>>;
+}
+
+/**
+ * Workout time (bible §18) counts what the body is doing: sets and holds,
+ * dodging, normal recovery between sets (getting up, standing ready),
+ * physical setup (getting into position, camera checks), marching when you
+ * chose to march, and Haven recovery. It leaves out controller travel,
+ * choosing, dialogue, cutscenes, menus and paused time.
+ */
+export type PhysicalBucket = 'dodge' | 'recovery' | 'setup' | 'march';
+
+export function addPhysical(w: WorkoutData, b: PhysicalBucket, ms: number): void {
+  if (!(ms > 0)) return;
+  const p = (w.physical ??= {});
+  p[b] = (p[b] ?? 0) + ms;
+}
+
+/** Workout time, with the time actually spent exercising (sets and holds) kept separate. */
+export function workoutTime(w: WorkoutData): { exercise: number; dodge: number; recovery: number; setup: number; march: number; haven: number; total: number } {
+  const exercise = w.sets.reduce((a, s) => a + s.activeMs, 0);
+  const p = w.physical ?? {};
+  const out = { exercise, dodge: p.dodge ?? 0, recovery: p.recovery ?? 0, setup: p.setup ?? 0, march: p.march ?? 0, haven: w.recoveryMs };
+  return { ...out, total: out.exercise + out.dodge + out.recovery + out.setup + out.march + out.haven };
 }
 
 export type TimeBucket = 'march' | 'encounters' | 'other';
@@ -175,6 +200,9 @@ export interface WorkoutRecord {
   sore?: string[];
   /** Steps marched between fights. */
   steps?: number;
+  /** Workout time and, within it, time exercising (sets and holds), in minutes to one decimal. */
+  workoutMin?: number;
+  exerciseMin?: number;
 }
 
 /** A quick post-run check-in. Every answer is optional. */
@@ -206,5 +234,7 @@ export function toRecord(w: WorkoutData, sore: string[] = []): WorkoutRecord {
     intensity: w.intensity,
     ...(sore.length ? { sore } : {}),
     ...(w.march?.steps ? { steps: w.march.steps } : {}),
+    workoutMin: Math.round(workoutTime(w).total / 6000) / 10,
+    exerciseMin: Math.round(workoutTime(w).exercise / 6000) / 10,
   };
 }
