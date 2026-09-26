@@ -1,6 +1,12 @@
 # Proposal: partial-set rules and boss balancing
 
-**Status:** for the creator's approval before any combat change. Nothing described here as "proposed" has been changed in the game.
+**Status: approved on 2026-09-26, with refinements, and built** (see bible §15, §17 and §32). The refinements:
+- the constants stay tunable;
+- missed repetitions can be corrected partially or in full, as manual work;
+- enemy healing and armour regrowth remain allowed when they create decisions;
+- the encounter bands must fit the expedition budget (bible §18 reconciliation).
+
+**Since building it:** a tired player at a flat 40% (below the half-target line) can no longer break armour or stagger, and armoured fights get much longer. See the note in bible §32. The sections below are the proposal as written.
 
 **What exists:**
 - A balance harness, `src/rpg/sim.ts` and `tests/balance.test.ts`, that plays fights through the real engine with scripted players.

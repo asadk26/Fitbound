@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DodgeReader, StrikeTimer, type DodgeSample } from '../src/rpg/dodge';
-import { effectiveness, RpgEngine, type Loadout, type PendingStrike, type RpgFx, type SetWork } from '../src/rpg/engine';
+import { effectiveness, RpgEngine, triggersBinary, type Loadout, type PendingStrike, type RpgFx, type SetWork } from '../src/rpg/engine';
 import { FRAME_MS, squatPose, standPose } from '../src/testing/poses';
 
 const LOADOUT: Loadout = { upper: 'sunder', legs: 'quake', cardio: 'arc', core: 'aegis' };
@@ -18,19 +18,33 @@ function enemyTurn(e: RpgEngine, outcome: 'dodged' | 'hit' | 'unclear') {
 }
 
 describe('set effectiveness', () => {
-  it('full sets are 1; partial sets scale modestly; nothing verified fizzles', () => {
+  it('full from 90% of the target; below that 25% plus a share; nothing verified fizzles (bible §15)', () => {
     expect(effectiveness(full())).toBe(1);
-    expect(effectiveness(part(5, 8))).toBeCloseTo(0.35 + 0.65 * (5 / 8));
-    expect(effectiveness(part(1, 8))).toBeGreaterThan(0.4);
+    expect(effectiveness(part(9, 10))).toBe(1);
+    expect(effectiveness(part(5, 10))).toBeCloseTo(0.25 + 0.75 * (0.5 / 0.9));
+    expect(effectiveness(part(1, 10))).toBeCloseTo(0.25 + 0.75 * (0.1 / 0.9));
     expect(effectiveness(part(0, 8))).toBe(0);
     expect(effectiveness(part(3, 8), 0.7)).toBe(0.7); // Echo of Resolve floor
+  });
+
+  it('binary effects need half the target: a token set does numbers only', () => {
+    expect(triggersBinary(part(4, 10))).toBe(false);
+    expect(triggersBinary(part(5, 10))).toBe(true);
+    expect(triggersBinary(full())).toBe(true);
+    // Armour break (Sundering Strike) on a token set: damage lands, the armour stays.
+    const a = new RpgEngine(['iron_husk'], { hp: 100, maxHp: 100 }, LOADOUT);
+    a.useAbility('upper', part(2, 10));
+    expect(a.foes[0].armor).toBe(3);
+    const b = new RpgEngine(['iron_husk'], { hp: 100, maxHp: 100 }, LOADOUT);
+    b.useAbility('upper', part(5, 10));
+    expect(b.foes[0].armor).toBeLessThan(3);
   });
 
   it('sided sets only credit each side up to its target (no double-counting one side)', () => {
     const lopsided: SetWork = { done: 10, target: 5, sided: true, sides: { left: 10, right: 0 }, full: false };
     const even: SetWork = { done: 6, target: 5, sided: true, sides: { left: 3, right: 3 }, full: false };
-    expect(effectiveness(lopsided)).toBeCloseTo(0.35 + 0.65 * 0.5);
-    expect(effectiveness(even)).toBeCloseTo(0.35 + 0.65 * 0.6);
+    expect(effectiveness(lopsided)).toBeCloseTo(0.25 + 0.75 * (0.5 / 0.9));
+    expect(effectiveness(even)).toBeCloseTo(0.25 + 0.75 * (0.6 / 0.9));
   });
 });
 
@@ -153,7 +167,7 @@ describe('blessings interact', () => {
 
   it('Static Mantle + Storm Charge + a shield throw blocked damage back', () => {
     const e = new RpgEngine(['echo_dummy'], { hp: 100, maxHp: 100 }, LOADOUT, { blessings: ['static_mantle'] });
-    e.useAbility('cardio', part(1)); // +1 charge
+    e.useAbility('cardio', full()); // +1 charge
     enemyTurn(e, 'dodged');
     e.hero.shield = 20; // as if a ward was up
     const { strikes } = e.startEnemyTurn();
@@ -321,3 +335,54 @@ describe('learning curve', () => {
     }
   });
 });
+
+describe('openings, phases and limited self-repair (bible §17)', () => {
+  it('a staggered foe takes +50% from the next hit, once', () => {
+    const e = new RpgEngine(['bone_charger'], { hp: 100, maxHp: 100 }, { upper: 'sunder', legs: 'quake', cardio: 'arc', core: 'aegis' });
+    e.useAbility('legs', full()); // Quake: stagger 2 = Bone Charger's threshold
+    expect(e.foes[0].staggered).toBe(true);
+    enemyTurn(e, 'dodged');
+    const fx = e.useAbility('upper', full());
+    expect(kinds(fx)).toContain('opening');
+    const later = e.useAbility('cardio', full());
+    expect(kinds(later)).not.toContain('opening');
+  });
+
+  it('a disrupt interrupts a shown self-repair (and opens the foe up)', () => {
+    const e = new RpgEngine(['hollow_acolyte'], { hp: 100, maxHp: 100 }, { upper: 'hook', legs: 'quake', cardio: 'arc', core: 'aegis' });
+    enemyTurn(e, 'dodged'); // Hex Bolt; next shown: Reweave the Ward
+    expect(e.shownIntent(e.foes[0]).kind).toBe('ward');
+    const fx = e.useAbility('upper', full());
+    expect(kinds(fx)).toContain('disrupt');
+    expect(e.shownIntent(e.foes[0]).kind).not.toBe('ward');
+  });
+
+  it('self-repair has a per-phase limit', () => {
+    const e = new RpgEngine(['hollow_acolyte'], { hp: 100, maxHp: 100 }, { core: 'aegis' });
+    let reweaves = 0;
+    for (let t = 0; t < 12; t++) {
+      const before = e.foes[0].ward;
+      enemyTurn(e, 'dodged');
+      if (e.foes[0].ward > before) reweaves++;
+    }
+    expect(reweaves).toBe(2);
+  });
+
+  it('the Warden casts off its iron half-way: its wisps leave, its shroud falls, its armour goes', () => {
+    const e = new RpgEngine(['warden_of_haze'], { hp: 999, maxHp: 999 }, LOADOUT);
+    const w = e.foes[0];
+    enemyTurn(e, 'dodged'); // Iron Maul
+    enemyTurn(e, 'dodged'); // Calls the Haze
+    expect(e.living.length).toBe(3);
+    w.ward = 20;
+    w.hp = Math.floor(w.maxHp * 0.5) + 1;
+    const fx = e.useAbility('upper', full());
+    expect(kinds(fx)).toContain('phase');
+    expect(w.phase).toBe(1);
+    expect(e.living.map((f) => f.def.id)).toEqual(['warden_of_haze']);
+    expect(w.ward).toBe(0);
+    expect(w.armor).toBe(0);
+    expect(e.shownIntent(w).name).toBe('Unbound Maul');
+  });
+});
+

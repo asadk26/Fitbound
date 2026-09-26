@@ -172,3 +172,24 @@ describe('phone bridge reports holds and sides', () => {
     expect(reps.map((r) => r.side)).toEqual(['right']);
   });
 });
+
+describe('missed-repetition corrections (bible §15)', () => {
+  it('adds manual work only, credits the side that is behind, and recomputes "full"', async () => {
+    const { applyCorrection, missing } = await import('../src/ui/expedition/correction');
+    const base = { exerciseId: 'squat', target: 10, done: 7, full: false, ending: 'finished' as const, camera: 7, manual: 0, holdMs: 0, activeMs: 20000 };
+    const reps = { kind: 'reps' as const, sided: false };
+    expect(missing(base, reps)).toBe(3);
+    const two = applyCorrection(base, reps, 2);
+    expect(two).toMatchObject({ camera: 7, manual: 2, done: 9, full: false });
+    expect(applyCorrection(base, reps, 3)).toMatchObject({ camera: 7, manual: 3, done: 10, full: true });
+    expect(applyCorrection(base, reps, 0)).toBe(base);
+    const sided = { ...base, exerciseId: 'reverse_lunge', target: 5, done: 7, camera: 7, sides: { left: 5, right: 2 } };
+    const lunge = { kind: 'reps' as const, sided: true };
+    expect(missing(sided, lunge)).toBe(3);
+    expect(applyCorrection(sided, lunge, 3)).toMatchObject({ sides: { left: 5, right: 5 }, manual: 3, full: true });
+    const hold = { ...base, exerciseId: 'plank', target: 30, done: 22, camera: 0, holdMs: 22_000 };
+    const plank = { kind: 'hold' as const, sided: false };
+    expect(missing(hold, plank)).toBe(8);
+    expect(applyCorrection(hold, plank, 8)).toMatchObject({ holdMs: 30_000, done: 30, manualMs: 8000, full: true, camera: 0 });
+  });
+});

@@ -178,11 +178,22 @@ The battle is staged side-on, in the style of a turn-based JRPG. The hero stands
 
 Say **"Finish set"**, press **F** or gamepad **Y**, tap *Finish set* on the TV or the phone, or choose *Finish this set* in the pause menu. The verified reps (or whole seconds held) resolve as a **partial ability**:
 
-- strength = 35% + 65% × (done ÷ target);
-- 5 of 8 push-ups ≈ 76%;
-- even one rep is worth 40%;
-- sided exercises credit each side up to its target, so a lopsided set can't count double;
-- a set with no verified work fizzles, and the ability isn't used up.
+- **full strength from 90% of the target** (9 of 10 is a full set), so a missed rep doesn't cost you;
+- below that, **25% for any verified work plus 75% of the share done**: half the target is about 67%, one rep of ten about 33%;
+- **binary effects** (disrupt, armour break, burn, Storm Charge, stagger) need **half the target or more**; below that only the numbers land;
+- sided exercises credit each side up to its target, so a lopsided set can't count double. A side plank counts by its weaker side;
+- a set with no verified work fizzles, and the ability isn't used up;
+- the constants live in `PARTIAL` in `src/rpg/engine.ts`, to be tuned from real play (bible §15).
+
+**Did the camera miss any?** When a set ends short, you're asked: keep the count, add the few it missed (+1, +2… or +5 s for holds), or count the full target.
+- What you add is recorded as **manual**, apart from what the camera counted, in the set, the summary and the playtest report.
+- It isn't asked when you're saving and leaving.
+
+**Bosses and openings (bible §17):**
+- **Openings:** a staggered or disrupted foe takes **+50% from your next hit**.
+- **Disrupt** also interrupts a shown self-repair: a ward or armour being rebuilt.
+- **Self-repair is limited per phase:** the Acolyte re-weaves its ward twice at most.
+- **The Warden has two phases.** Half-way down it casts off its iron: its wisps scatter, its shroud falls and its armour goes, and it fights harder but plainer.
 
 Pausing, hesitating or losing tracking never ends a set by itself. Reaching the target still completes it automatically. Nothing invents reps. Exhaustion never costs HP; only missed dodges do.
 

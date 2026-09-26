@@ -31,19 +31,40 @@ export interface SetWork {
 }
 
 /**
- * How strongly a set powers its ability, 0..1. A full set is 1. A partial set
- * scales modestly — even a single rep is worth 35% + a share — so stopping
- * early is always fine. Sided sets credit each side only up to its target, so
- * lopsided work doesn't count double. No verified work: 0 (the ability fizzles).
+ * Partial-set rules (bible §15; approved as the initial balancing approach,
+ * constants tunable from physical playtesting):
+ *  - numeric effects are full from 90% of the target; below that, 25% for any
+ *    verified work plus 75% of the share done (of the 90%);
+ *  - binary effects (disrupt, armour break, burn, Storm Charge, stagger) need
+ *    half the target or more;
+ *  - an opening (a staggered or disrupted foe) takes +50% from the next hit.
  */
-export function effectiveness(w: SetWork, floor = 0): number {
+export const PARTIAL = { fullAt: 0.9, floor: 0.25, binaryAt: 0.5, opening: 0.5 };
+
+/**
+ * Share of the target done, 0..1. Sided sets credit each side only up to its
+ * target, so lopsided work doesn't count double. (A split hold arrives here
+ * already as its weaker side, doubled.)
+ */
+export function share(w: SetWork): number {
   let p: number;
   if (w.full) p = 1;
   else if (w.sided && w.sides) p = (Math.min(w.sides.left, w.target) + Math.min(w.sides.right, w.target)) / (2 * Math.max(1, w.target));
   else p = w.done / Math.max(1, w.target);
-  p = Math.max(0, Math.min(1, p));
+  return Math.max(0, Math.min(1, p));
+}
+
+/** How strongly a set powers its ability's numbers, 0..1. No verified work: 0 (the ability fizzles). */
+export function effectiveness(w: SetWork, floor = 0): number {
+  const p = share(w);
   if (p <= 0) return 0;
-  return Math.max(floor, 0.35 + 0.65 * p);
+  if (w.full || p >= PARTIAL.fullAt) return 1;
+  return Math.max(floor, PARTIAL.floor + (1 - PARTIAL.floor) * (p / PARTIAL.fullAt));
+}
+
+/** Whether a set is enough for the ability's binary effects (disrupt, armour break, burn, charge, stagger). */
+export function triggersBinary(w: SetWork): boolean {
+  return w.full || share(w) >= PARTIAL.binaryAt;
 }
 
 export interface Foe {
@@ -60,6 +81,14 @@ export interface Foe {
   /** A wound-up attack that lands next enemy turn unless disrupted or staggered. */
   charging: { name: string; strikes: Strike[] } | null;
   alive: boolean;
+  /** Boss phase reached (0 = the first). */
+  phase?: number;
+  /** Self-repair uses in this phase, by intent name. */
+  repairs?: Record<string, number>;
+  /** An opening: this foe takes extra damage from the player's hits on this turn number. */
+  exposedTurn?: number;
+  /** Summoned by this foe (its summons leave when it changes phase). */
+  summoner?: number;
 }
 
 export interface Hero {
@@ -86,6 +115,8 @@ export type RpgFx =
   | { kind: 'armorBreak'; uid: number; armor: number }
   | { kind: 'stagger'; uid: number }
   | { kind: 'disrupt'; uid: number }
+  | { kind: 'opening'; uid: number }
+  | { kind: 'phase'; uid: number; name: string }
   | { kind: 'burn'; uid: number; stacks: number }
   | { kind: 'burnTick'; uid: number; damage: number; hp: number }
   | { kind: 'shield'; amount: number; total: number }
@@ -128,6 +159,17 @@ export interface EngineOptions {
 
 const ARMOR_PER_STACK = 0.18;
 const MAX_FOES = 4;
+
+/** A foe's current pattern (its phase's, once it has changed phase). */
+function patternOf(f: Foe): Intent[] {
+  const ph = f.phase ?? 0;
+  return ph > 0 && f.def.phases?.[ph - 1] ? f.def.phases[ph - 1].pattern : f.def.pattern;
+}
+
+/** Shown intents a disrupt can interrupt: a wind-up, or self-repair. */
+function interruptible(i: Intent): boolean {
+  return i.kind === 'charge' || i.kind === 'ward' || i.kind === 'armor';
+}
 
 export class RpgEngine {
   readonly foes: Foe[] = [];
@@ -227,7 +269,8 @@ export class RpgEngine {
   /** What this foe will do on the next enemy turn (shown before you choose). */
   shownIntent(f: Foe): Intent {
     if (f.charging) return { kind: 'attack', name: `${f.charging.name} (charged!)`, strikes: f.charging.strikes };
-    return f.def.pattern[f.intentIdx % f.def.pattern.length];
+    const p = patternOf(f);
+    return p[f.intentIdx % p.length];
   }
 
   /** How well an ability fits the current fight, for the ability cards. */
@@ -266,6 +309,8 @@ export class RpgEngine {
       return fx;
     }
     const a = this.abilityFor(family);
+    // Binary effects need half the target (or Echo of Resolve's promise of 70%).
+    this.binaryOk = triggersBinary(work) || this.has('echo_of_resolve');
     const cardio = family === 'cardio';
     let power = e;
     if (this.lastFamily && this.lastFamily !== family) power *= 1.1;
@@ -285,7 +330,7 @@ export class RpgEngine {
       this.hero.hp = Math.min(this.hero.maxHp, this.hero.hp + amt);
       fx.push({ kind: 'heal', amount: amt, hp: this.hero.hp });
     }
-    if (a.counter) this.hero.counter = Math.max(this.hero.counter, a.counter);
+    if (a.counter) this.hero.counter = Math.max(this.hero.counter, a.counter * e);
 
     if (a.damage) {
       let flat = 0;
@@ -295,7 +340,7 @@ export class RpgEngine {
       this.hitting = null;
     }
 
-    if (a.charge) {
+    if (a.charge && this.binaryOk) {
       this.hero.charge = Math.min(3, this.hero.charge + a.charge + (this.has('stormcaller') ? 1 : 0));
       fx.push({ kind: 'charge', charge: this.hero.charge });
     }
@@ -319,7 +364,7 @@ export class RpgEngine {
     const foes = this.living;
     if (!foes.length) return null;
     if (a.disrupt) {
-      const c = foes.find((f) => f.charging || this.shownIntent(f).kind === 'charge');
+      const c = foes.find((f) => f.charging || interruptible(this.shownIntent(f)));
       if (c) return c;
     }
     if (a.armorBreak) {
@@ -336,9 +381,9 @@ export class RpgEngine {
     const perHit = (a.damage ?? 0) * power;
     if (a.target === 'all') {
       for (const f of foes) {
-        this.breakArmor(fx, f, a);
+        if (this.binaryOk) this.breakArmor(fx, f, a);
         for (let h = 0; h < hits; h++) this.damageFoe(fx, f, perHit + (h === 0 ? flat : 0), a.element, true);
-        this.addStagger(fx, f, a.stagger ?? 0);
+        if (this.binaryOk) this.addStagger(fx, f, a.stagger ?? 0);
       }
       return;
     }
@@ -358,15 +403,17 @@ export class RpgEngine {
     }
     const t = this.target(a);
     if (!t) return;
-    this.breakArmor(fx, t, a);
-    if (a.disrupt && (t.charging || this.shownIntent(t).kind === 'charge')) {
+    if (this.binaryOk) this.breakArmor(fx, t, a);
+    if (a.disrupt && this.binaryOk && (t.charging || interruptible(this.shownIntent(t)))) {
+      // Cancels a wind-up, or interrupts a shown self-repair; either way it opens the foe up.
       t.charging = null;
-      if (this.shownIntent(t).kind === 'charge') t.intentIdx++;
+      if (interruptible(this.shownIntent(t))) t.intentIdx++;
+      t.exposedTurn = this.turn + 1;
       fx.push({ kind: 'disrupt', uid: t.uid });
     }
     for (let h = 0; h < hits; h++) if (t.alive) this.damageFoe(fx, t, perHit + (h === 0 ? flat : 0), a.element);
-    if (t.alive) this.addStagger(fx, t, a.stagger ?? 0);
-    if (a.burn && t.alive) {
+    if (t.alive && this.binaryOk) this.addStagger(fx, t, a.stagger ?? 0);
+    if (a.burn && t.alive && this.binaryOk) {
       t.burn += a.burn + (this.has('kindling') ? 2 : 0);
       fx.push({ kind: 'burn', uid: t.uid, stacks: t.burn });
     }
@@ -394,6 +441,12 @@ export class RpgEngine {
     const armored = f.armor > 0;
     d *= 1 - ARMOR_PER_STACK * Math.min(3, f.armor);
     if (!armored && this.has('tempered_edge') && this.hitting === 'upper') d *= 1.25;
+    // An opening: a staggered or disrupted foe takes more from the player's next hit.
+    if (this.hitting && f.exposedTurn === this.turn) {
+      d *= 1 + PARTIAL.opening;
+      f.exposedTurn = undefined;
+      fx.push({ kind: 'opening', uid: f.uid });
+    }
     let toWard = 0;
     if (f.ward > 0) {
       const wm = (el === 'lightning' ? 2 : 1) * (area && this.has('gravity_well') ? 1.5 : 1);
@@ -414,10 +467,34 @@ export class RpgEngine {
     f.hp = Math.max(0, f.hp - dmg);
     fx.push({ kind: 'hit', uid: f.uid, damage: dmg, toWard, element: el, weak, resisted, armored, hp: f.hp, maxHp: f.maxHp, ward: f.ward });
     if (f.hp <= 0) this.kill(fx, f);
+    else this.checkPhase(fx, f);
   }
 
   /** The family whose ability is resolving (Tempered Edge's bonus). */
   private hitting: Family | null = null;
+  /** The resolving set was enough for binary effects. */
+  private binaryOk = true;
+
+  /**
+   * A boss crossing into its next phase: a new pattern, and (per phase) its
+   * summons leave and its ward drops, so progress never undoes itself.
+   */
+  private checkPhase(fx: RpgFx[], f: Foe): void {
+    const phases = f.def.phases;
+    const cur = f.phase ?? 0;
+    if (!phases || cur >= phases.length || !f.alive) return;
+    const next = phases[cur];
+    if (f.hp > f.maxHp * next.below) return;
+    f.phase = cur + 1;
+    f.intentIdx = 0;
+    f.charging = null;
+    f.repairs = {};
+    if (next.dropWard) f.ward = 0;
+    if (next.setArmor !== undefined) f.armor = next.setArmor;
+    if (next.clearSummons) for (const o of this.foes) if (o.alive && o.summoner === f.uid) this.kill(fx, o);
+    fx.push({ kind: 'phase', uid: f.uid, name: next.name });
+    fx.push({ kind: 'enemyAct', uid: f.uid, text: `${f.def.name}: ${next.name}` });
+  }
 
   private addStagger(fx: RpgFx[], f: Foe, n: number): void {
     if (!n || !f.alive || f.staggered) return;
@@ -425,6 +502,7 @@ export class RpgEngine {
     if (f.stagger < f.def.staggerAt) return;
     f.stagger = 0;
     f.staggered = true;
+    f.exposedTurn = this.turn + 1;
     // A staggered foe loses its next action — including a wound-up charge —
     // and its armour cracks, so armour never *requires* upper-body work.
     f.charging = null;
@@ -477,6 +555,7 @@ export class RpgEngine {
       f.burn--;
       fx.push({ kind: 'burnTick', uid: f.uid, damage: dmg, hp: f.hp });
       if (f.hp <= 0) this.kill(fx, f);
+      else this.checkPhase(fx, f);
     }
     for (const f of [...this.living]) {
       if (f.staggered) {
@@ -492,7 +571,13 @@ export class RpgEngine {
         for (const s of c.strikes) this.strikes.push({ ...s, from: f.uid, attack: c.name });
         continue;
       }
-      const i = f.def.pattern[f.intentIdx % f.def.pattern.length];
+      let i = this.shownIntent(f);
+      // Self-repair has a per-phase limit; past it, the foe does its next thing instead.
+      if ((i.kind === 'ward' || i.kind === 'armor') && i.limit !== undefined && (f.repairs?.[i.name] ?? 0) >= i.limit) {
+        f.intentIdx++;
+        i = this.shownIntent(f);
+      }
+      if (i.kind === 'ward' || i.kind === 'armor') (f.repairs ??= {})[i.name] = (f.repairs[i.name] ?? 0) + 1;
       f.intentIdx++;
       switch (i.kind) {
         case 'attack':
@@ -516,7 +601,11 @@ export class RpgEngine {
         case 'summon': {
           const room = Math.max(0, MAX_FOES - this.living.length);
           const uids: number[] = [];
-          for (let k = 0; k < Math.min(room, i.count); k++) uids.push(this.spawn(rpgEnemy(i.enemyId)).uid);
+          for (let k = 0; k < Math.min(room, i.count); k++) {
+            const s = this.spawn(rpgEnemy(i.enemyId));
+            s.summoner = f.uid;
+            uids.push(s.uid);
+          }
           fx.push({ kind: 'enemyAct', uid: f.uid, text: `${f.def.name}: ${i.name}` });
           if (uids.length) fx.push({ kind: 'summon', uids });
           break;

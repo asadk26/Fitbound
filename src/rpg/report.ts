@@ -54,9 +54,9 @@ function setLine(s: SetRecord): string {
   const ex = getExercise(s.exerciseId);
   const done =
     ex.kind === 'hold'
-      ? `${Math.floor(s.holdMs / 1000)}/${s.target} s`
+      ? `${Math.floor(s.holdMs / 1000)}/${s.target} s${s.manualMs ? ` (${Math.round(s.manualMs / 1000)} s added manually)` : ''}`
       : ex.sided
-        ? `L ${s.left} R ${s.right} / ${s.target} per side`
+        ? `L ${s.left} R ${s.right} / ${s.target} per side${s.manual ? ` (${s.manual} manual)` : ''}`
         : `${s.camera}/${s.target}${s.manual ? ` +${s.manual} manual` : ''}`;
   const how = s.full ? 'full' : s.finishedEarly ? 'finished early' : 'partial';
   return `${ex.name} ${done} · ${how} · ${Math.round(s.activeMs / 1000)} s`;

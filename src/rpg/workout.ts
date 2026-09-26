@@ -21,6 +21,8 @@ export interface SetRecord {
   holdMs: number;
   /** Split holds (side planks): the camera-counted part of holdMs per side, ms. */
   holdSides?: { left: number; right: number };
+  /** Holds: the part of holdMs the player added as a correction (manual, not seen by the camera). */
+  manualMs?: number;
   target: number;
   full: boolean;
   /** The player chose "Finish set" before the target. */

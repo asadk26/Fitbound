@@ -30,8 +30,9 @@ export type Intent =
   | { kind: 'attack'; name: string; strikes: Strike[] }
   /** Winds up: next turn it unleashes `then`, unless disrupted or staggered first. */
   | { kind: 'charge'; name: string; then: { name: string; strikes: Strike[] } }
-  | { kind: 'ward'; name: string; amount: number }
-  | { kind: 'armor'; name: string; stacks: number }
+  /** Self-repair (ward or armour): shown ahead, so it can be interrupted; `limit` caps its uses per phase. */
+  | { kind: 'ward'; name: string; amount: number; limit?: number }
+  | { kind: 'armor'; name: string; stacks: number; limit?: number }
   | { kind: 'summon'; name: string; enemyId: string; count: number }
   | { kind: 'rest'; name: string };
 
@@ -53,6 +54,12 @@ export interface RpgEnemyDef {
   staggerAt: number;
   /** Intents, cycled. */
   pattern: Intent[];
+  /**
+   * Boss phases (bible §17): below a share of its HP the foe changes — a new
+   * pattern, and optionally its summons leave and its ward drops, so progress
+   * never undoes itself.
+   */
+  phases?: { below: number; name: string; pattern: Intent[]; clearSummons?: boolean; dropWard?: boolean; setArmor?: number }[];
   intro: string;
   /** One line on how to beat it. */
   tip: string;
@@ -81,7 +88,7 @@ export const RPG_ENEMIES: Record<string, RpgEnemyDef> = {
     name: 'Iron Husk',
     sprite: 'golem',
     scale: 1.15,
-    maxHp: 80,
+    maxHp: 60,
     armor: 3,
     staggerAt: 3,
     pattern: [
@@ -126,14 +133,14 @@ export const RPG_ENEMIES: Record<string, RpgEnemyDef> = {
     id: 'hollow_acolyte',
     name: 'Hollow Acolyte',
     sprite: 'mage',
-    maxHp: 70,
+    maxHp: 52,
     ward: 28,
     weak: ['lightning'],
     resist: ['fire'],
     staggerAt: 3,
     pattern: [
       { kind: 'attack', name: 'Hex Bolt', strikes: [hi(8)] },
-      { kind: 'ward', name: 'Reweave the Ward', amount: 24 },
+      { kind: 'ward', name: 'Reweave the Ward', amount: 24, limit: 2 },
       { kind: 'attack', name: 'Void Sweep', strikes: [lo(9)] },
     ],
     intro: 'A hooded shape murmurs the Haze into a shimmering ward.',
@@ -144,19 +151,35 @@ export const RPG_ENEMIES: Record<string, RpgEnemyDef> = {
     name: 'Warden of the Haze',
     sprite: 'warden',
     scale: 1.3,
-    maxHp: 160,
+    maxHp: 120,
     armor: 2,
     staggerAt: 4,
     pattern: [
       { kind: 'attack', name: 'Iron Maul', strikes: [hi(10)] },
       { kind: 'summon', name: 'Calls the Haze', enemyId: 'haze_wisp', count: 2 },
       { kind: 'charge', name: 'Draws the Haze inward…', then: { name: 'Haze Cataclysm', strikes: [lo(9), hi(9), lo(11)] } },
-      { kind: 'ward', name: 'Haze Shroud', amount: 36 },
-      { kind: 'armor', name: 'Reforge', stacks: 2 },
+      { kind: 'ward', name: 'Haze Shroud', amount: 36, limit: 1 },
+      { kind: 'armor', name: 'Reforge', stacks: 2, limit: 1 },
       { kind: 'attack', name: 'Crossing Blows', strikes: [hi(8), lo(8)] },
     ],
+    // Half-way, it casts off its iron: its wisps scatter and its shroud falls, and it fights harder but plainer.
+    phases: [
+      {
+        below: 0.5,
+        name: 'The Warden casts off its iron',
+        clearSummons: true,
+        dropWard: true,
+        setArmor: 0,
+        pattern: [
+          { kind: 'attack', name: 'Unbound Maul', strikes: [hi(11)] },
+          { kind: 'charge', name: 'Gathers the last of the Haze…', then: { name: 'Final Cataclysm', strikes: [lo(10), hi(10)] } },
+          { kind: 'attack', name: 'Crossing Blows', strikes: [hi(8), lo(8)] },
+          { kind: 'ward', name: 'A thin shroud', amount: 18, limit: 1 },
+        ],
+      },
+    ],
     intro: 'The Warden of the Haze rises between you and the Spark.',
-    tip: 'Everything at once: break its armour, cancel its charge, clear its wisps, overload its shroud.',
+    tip: 'Break its armour, cancel its charge, clear its wisps, overload its shroud. Halfway down, it casts all that off and fights plainly. Disrupt a repair before it lands.',
   },
   // ── Medieval, role A: the Green Knight (a two-stage miniboss) ───────────
   green_knight: {

@@ -351,6 +351,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
         right: r.sides?.right ?? 0,
         holdMs: r.holdMs,
         ...(r.holdSides ? { holdSides: r.holdSides } : {}),
+        ...(r.manualMs ? { manualMs: r.manualMs } : {}),
         target: r.target,
         full: r.full,
         finishedEarly: r.ending === 'finished',

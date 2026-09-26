@@ -27,6 +27,7 @@ import { GestureMenu, HoldRing, useInputEvents, useMotion } from '../motionUi';
 import { PausableTimers } from '../pausableTimers';
 import { DodgeSource } from './dodgeSource';
 import { SetRunner, type SetResult } from './setRunner';
+import { applyCorrection, missing } from './correction';
 
 /**
  * One expedition fight.
@@ -41,9 +42,9 @@ import { SetRunner, type SetResult } from './setRunner';
  * Enemy attacks never happen during a set. After a floor exercise there is
  * extra time to get up before the first strike.
  */
-export type BattleStage = 'intro' | 'interlude' | 'choose' | 'set' | 'resolve' | 'ready' | 'enemy' | 'dodge' | 'victory' | 'defeat';
+export type BattleStage = 'intro' | 'interlude' | 'count' | 'choose' | 'set' | 'resolve' | 'ready' | 'enemy' | 'dodge' | 'victory' | 'defeat';
 
-const MODE_FOR: Record<BattleStage, InputMode> = { intro: 'menu', interlude: 'menu', choose: 'menu', set: 'exercise', resolve: 'menu', ready: 'ready', enemy: 'menu', dodge: 'dodge', victory: 'menu', defeat: 'menu' };
+const MODE_FOR: Record<BattleStage, InputMode> = { intro: 'menu', interlude: 'menu', count: 'menu', choose: 'menu', set: 'exercise', resolve: 'menu', ready: 'ready', enemy: 'menu', dodge: 'dodge', victory: 'menu', defeat: 'menu' };
 
 export interface FightResult {
   outcome: 'victory' | 'defeat';
@@ -317,12 +318,30 @@ export function RpgBattle(p: RpgBattleProps) {
     audio.say(`${engine.abilityFor(f).name}. ${targetLabel(ex, target)} ${ex.name}. ${ex.camera.instructions[0] ?? ''}`);
   }
 
+  // ── Missed repetitions ──────────────────────────────────────────────────
+  // After a set that ended short, the player can say how many the camera
+  // missed (bible §15). They count as manual work, never as camera-counted.
+  const [countCheck, setCountCheck] = useState<{ f: Family; res: SetResult } | null>(null);
   function afterSet(f: Family, res: SetResult) {
     runner.current = null;
     audio.duck(false);
+    const ex = getExercise(res.exerciseId);
+    if (!res.full && !leaving.current && missing(res, ex) > 0) {
+      setCountCheck({ f, res });
+      setStage('count');
+      audio.say(res.done > 0 ? `${res.done} ${ex.kind === 'hold' ? 'seconds' : ''} counted. Did the camera miss any?` : 'Did the camera miss any?');
+      return;
+    }
+    resolveSet(f, res);
+  }
+
+  function resolveSet(f: Family, res: SetResult) {
+    setCountCheck(null);
     props.current.onSet(res);
     const ex = getExercise(res.exerciseId);
-    const work: SetWork = { done: res.done, target: res.target, sided: ex.sided, sides: res.sides, full: res.full };
+    // A split hold (side plank) powers its ability by its weaker side.
+    const done = ex.holdSplit && res.holdSides ? Math.floor((2 * Math.min(res.holdSides.left, res.holdSides.right) + (res.manualMs ?? 0)) / 1000) : res.done;
+    const work: SetWork = { done, target: res.target, sided: ex.sided, sides: res.sides, full: res.full };
     if (res.full) {
       audio.setComplete();
       audio.say('Set complete!');
@@ -771,6 +790,11 @@ export function RpgBattle(p: RpgBattleProps) {
       )}
 
       {(stage === 'intro' || stage === 'enemy' || stage === 'resolve') && note && <div className="tvb-note">{note}</div>}
+      {stage === 'count' && countCheck && (
+        <div className="tv-overlay">
+          <CountCheck res={countCheck.res} onChoose={(n) => resolveSet(countCheck.f, applyCorrection(countCheck.res, getExercise(countCheck.res.exerciseId), n))} />
+        </div>
+      )}
       {stage === 'interlude' && scene && (
         <div className="tv-overlay interlude" onClick={() => sceneStep(false)}>
           <div className="gmenu interlude-card">
@@ -859,3 +883,29 @@ function intentText(engine: RpgEngine, f: Foe): string {
       return '…';
   }
 }
+
+/**
+ * "Did the camera miss any?" — keep the count, add the few it missed, or
+ * count the full target. Whatever is added is recorded as manual work.
+ */
+function CountCheck({ res, onChoose }: { res: SetResult; onChoose: (n: number) => void }) {
+  const ex = getExercise(res.exerciseId);
+  const miss = missing(res, ex);
+  const hold = ex.kind === 'hold';
+  const unit = hold ? 's' : '';
+  const steps = (hold ? [5, 10, 15] : [1, 2, 3, 5]).filter((n) => n < miss);
+  const counted = hold ? `${Math.floor(res.holdMs / 1000)} s` : res.sides && ex.sided ? `left ${res.sides.left}, right ${res.sides.right}` : `${res.done}`;
+  return (
+    <GestureMenu
+      title="Did the camera miss any?"
+      text={`Counted: ${counted} of ${targetLabel(ex, res.target)}. Add what you really did — it's recorded as manual, apart from what the camera saw.`}
+      options={[
+        { id: '0', label: `That's right (${counted})`, icon: 'star' },
+        ...steps.map((n) => ({ id: String(n), label: `+${n}${unit}`, icon: 'heart' })),
+        { id: String(miss), label: `All of it (${targetLabel(ex, res.target)})`, detail: 'The camera missed the rest', icon: 'shield' },
+      ]}
+      onChoose={(id) => onChoose(Number(id))}
+    />
+  );
+}
+

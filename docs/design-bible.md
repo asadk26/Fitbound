@@ -1421,9 +1421,19 @@ Since then, the following have also been implemented (not yet physically playtes
     - In the harness, a careful player beats him in a median 5 sets (7 at p90).
     - It is playable as a development **scenario preview** from the Movement Lab. New expeditions still use the legacy route until Prehistoric B exists.
 
+- **Combat balance (approved rules, built 2026-09-26):**
+  - **Partial sets:** full from 90%; below that 25% plus a share; binary effects at half the target; counter stance scales with the curve; a side plank counts by its weaker side.
+  - **Missed-rep corrections:** "Did the camera miss any?" after a set that ended short. Additions are recorded as manual work.
+  - **Openings:** +50% from the next hit after a stagger or disrupt.
+  - **Self-repair** is interruptible by disrupt and limited per phase.
+  - **The Warden has two phases:** half-way down, its wisps leave, its shroud drops and its armour goes.
+  - **HP retuned after the mechanics** (Iron Husk 80→60, Acolyte 70→52, Warden 160→120). In the harness, ordinary fights now take a careful player 3–4 sets, the Warden 6 (p90 9), the Green Knight 5, and the route about 21 (was 28).
+  - **Regression tests assert** each encounter's band.
+  - **Found, needs a decision:** a player doing a flat 40% of every set, just under the half-target line, gets no armour breaks, staggers or disrupts, so armoured fights take about twice as long (Husk 11 sets, Warden 21). At 50% completion the numbers are reasonable. Options: lower the line (it's tunable), make armour break reduced below half instead of binary, or accept it. Synthetic only; real sets aren't a flat 40%.
+
 Validation to date:
 
-- **Automated:** 368 passing unit tests. These include the new detectors, soreness, progression, the Journal, the lag measurement, the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
+- **Automated:** 375 passing unit tests. These include the new detectors, soreness, progression, the Journal, the lag measurement, the refined hero's faces and fallback, the cinematic runner, the opening's agreed lines and staging rules, the ritual's length and lines, and story progress in the save.
 - **Headless browser:** the full opening (every line in order), the ritual on the next launch (the opening does not repeat), skip, the Sanctuary screen over the garden, and the dry garden after restoration. Screenshots were reviewed; the visuals are a first version for the creator to evaluate.
 - **Headless browser runs through the local relay with a scripted synthetic body:**
   - a full standard expedition (19 sets, all march legs, the shrine detour, and victory);

@@ -354,6 +354,16 @@ export class RpgScene extends Phaser.Scene {
         if (!foe) return 0;
         this.float(foe.x, this.foeTop(foe) - 20, 'DISRUPTED!', PAL.orange);
         return 420;
+      case 'opening':
+        if (!foe) return 0;
+        this.float(foe.x, this.foeTop(foe) - 34, 'OPENING!', PAL.gold);
+        return 300;
+      case 'phase':
+        if (!foe) return 0;
+        this.cameras.main.shake(260, 0.006);
+        this.burst(foe.x, this.foeTop(foe), [hex(PAL.gold)], 16, 60);
+        this.float(foe.x, this.foeTop(foe) - 24, fx.name.toUpperCase(), PAL.gold);
+        return 900;
       case 'burn':
         if (!foe) return 0;
         this.burst(foe.x, this.foeTop(foe), ELEMENT_TINT.fire, 10, 40);

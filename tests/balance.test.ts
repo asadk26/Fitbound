@@ -21,12 +21,27 @@ describe('balance harness', () => {
     expect(capped.sets).toBeLessThanOrEqual(5);
   });
 
-  it('a careful player wins every ordinary fight of today’s route in a handful of sets', () => {
-    for (const n of fights.filter((f) => f.kind === 'fight')) {
-      const [careful] = measure(n.enemies!, rng(7), 200, { hpScale: n.hpScale });
-      expect(careful.winRate, n.title).toBeGreaterThan(0.9);
-      expect(careful.median, n.title).toBeLessThanOrEqual(6);
+  it('every encounter of today’s route sits in its band (bible §17: targets, not limits)', () => {
+    // Ordinary fights: careful 3–4 sets (the warm-up dummy and the wisp pack are lighter), partial p90 ≤ 7.
+    // The main boss: careful 6–7, partial p90 ≤ 11 (the phase-one tail; see combat-balance.md).
+    for (const n of fights) {
+      const [careful, partial] = measure(n.enemies!, rng(31), 400, { hpScale: n.hpScale });
+      expect(careful.winRate, n.title).toBeGreaterThan(0.98);
+      if (n.kind === 'boss') {
+        expect(careful.median, n.title).toBeGreaterThanOrEqual(5);
+        expect(careful.median, n.title).toBeLessThanOrEqual(7);
+        expect(partial.p90, n.title).toBeLessThanOrEqual(11);
+      } else {
+        expect(careful.median, n.title).toBeLessThanOrEqual(4);
+        expect(partial.p90, n.title).toBeLessThanOrEqual(7);
+      }
     }
+  });
+
+  it('the whole route is about 21 sets for a careful player (sum of medians)', () => {
+    const total = fights.reduce((a, n) => a + measure(n.enemies!, rng(31), 300, { hpScale: n.hpScale })[0].median, 0);
+    expect(total).toBeGreaterThanOrEqual(17);
+    expect(total).toBeLessThanOrEqual(23);
   });
 
   it('the Green Knight (both stages) sits in the miniboss band: about 5 sets careful, no long tail', () => {
@@ -35,15 +50,16 @@ describe('balance harness', () => {
     expect(careful.median).toBeGreaterThanOrEqual(4);
     expect(careful.median).toBeLessThanOrEqual(6);
     expect(partial.p90).toBeLessThanOrEqual(8);
+    // A flat 40% (below the half-target line for binary effects) is much slower; see combat-balance.md.
     expect(tired.winRate).toBeGreaterThan(0.9);
-    expect(tired.p90).toBeLessThanOrEqual(12);
   });
 
   it('writes the full table on request', () => {
     const out = process.env.BALANCE_OUT;
     if (!out) return;
     const curves: Record<string, (w: SetWork, floor: number) => number> = {
-      'today (35% floor)': effectiveness,
+      'approved (90% band, 25% floor)': effectiveness,
+      'earlier (35% floor)': (w, floor) => (w.done <= 0 ? 0 : Math.max(floor, w.full ? 1 : 0.35 + 0.65 * Math.min(1, w.done / w.target))),
       linear: (w, floor) => (w.done <= 0 ? 0 : Math.max(floor, w.full ? 1 : Math.min(1, w.done / w.target))),
       'floor 20%': (w, floor) => (w.done <= 0 ? 0 : Math.max(floor, w.full ? 1 : 0.2 + 0.8 * Math.min(1, w.done / w.target))),
     };

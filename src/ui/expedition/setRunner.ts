@@ -27,8 +27,11 @@ export interface SetResult {
   holdMs: number;
   /** Split holds (side planks): camera-credited time per side, ms. */
   holdSides?: SideCounts;
+  /** Holds: seconds added by the player's own correction (not seen by the camera), ms. */
+  manualMs?: number;
   activeMs: number;
 }
+
 
 export interface SetRunnerOptions {
   connected: boolean;
