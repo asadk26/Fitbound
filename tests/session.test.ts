@@ -163,7 +163,7 @@ describe('fights saved at a safe point', () => {
 });
 
 describe('workout time', () => {
-  it('counts sets, dodging, recovery, setup, active marching and the Haven; exercise time stays separate', async () => {
+  it('six categories: the warm-up is core; optional yoga, cooldown and marching are counted apart (bible §18)', async () => {
     const { addPhysical, workoutTime, newWorkout, toRecord } = await import('../src/rpg/workout');
     const w = newWorkout('normal', 21, 0);
     addSet(w, { ...set('squat', 1000), activeMs: 60_000 });
@@ -174,10 +174,15 @@ describe('workout time', () => {
     addPhysical(w, 'march', 90_000);
     addPhysical(w, 'march', 0);
     w.recoveryMs = 180_000;
+    addPhysical(w, 'warmup', 300_000);
+    addPhysical(w, 'cooldown', 120_000);
     const t = workoutTime(w);
-    expect(t).toEqual({ exercise: 90_000, dodge: 45_000, recovery: 120_000, setup: 15_000, march: 90_000, haven: 180_000, total: 540_000 });
+    // Core = warm-up + exercise + dodging + recovery + setup; optional yoga, cooldown and marching are separate.
+    expect(t).toEqual({ warmup: 300_000, exercise: 90_000, dodge: 45_000, recovery: 120_000, setup: 15_000, core: 570_000, optional: 180_000, cooldown: 120_000, march: 90_000, total: 960_000 });
     const r = toRecord(w);
-    expect(r.workoutMin).toBe(9);
+    expect(r.workoutMin).toBe(9.5);
     expect(r.exerciseMin).toBe(1.5);
+    expect(r.activeMin).toBe(16);
+    expect(r.warmupMin).toBe(5);
   });
 });

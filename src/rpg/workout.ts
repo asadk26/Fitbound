@@ -59,16 +59,24 @@ export interface WorkoutData {
   dodgeLog?: DodgeEntry[];
   /** Physically active time outside the sets themselves, by kind (see workoutTime). */
   physical?: Partial<Record<PhysicalBucket, number>>;
+  /** The Awakening this session: done fully, shortened, or skipped. */
+  warmup?: { length: 'full' | 'short' | 'skipped'; completed: boolean };
 }
 
 /**
- * Workout time (bible §18) counts what the body is doing: sets and holds,
- * dodging, normal recovery between sets (getting up, standing ready),
- * physical setup (getting into position, camera checks), marching when you
- * chose to march, and Haven recovery. It leaves out controller travel,
- * choosing, dialogue, cutscenes, menus and paused time.
+ * Workout time (bible §18), in six categories:
+ *  1. warm-up (the Awakening)                    } the core target,
+ *  2. core combat and physical recovery: sets and } ~20 ± 5 min per
+ *     holds, dodging, recovery between sets,      } expedition
+ *     physical setup (getting into position, camera checks)
+ *  3. optional Haven / Stillpoint yoga (`recoveryMs`)  } total physical
+ *  4. optional cooldown (the Heart's Rest)             } activity, shown
+ *  5. other activity: marching you chose               } separately
+ *  6. passive adventure (not recorded here): controller travel, choosing,
+ *     dialogue, cutscenes, menus, paused time.
+ * Optional activity never shrinks the core budget or makes it look longer.
  */
-export type PhysicalBucket = 'dodge' | 'recovery' | 'setup' | 'march';
+export type PhysicalBucket = 'warmup' | 'dodge' | 'recovery' | 'setup' | 'march' | 'cooldown';
 
 export function addPhysical(w: WorkoutData, b: PhysicalBucket, ms: number): void {
   if (!(ms > 0)) return;
@@ -76,12 +84,37 @@ export function addPhysical(w: WorkoutData, b: PhysicalBucket, ms: number): void
   p[b] = (p[b] ?? 0) + ms;
 }
 
-/** Workout time, with the time actually spent exercising (sets and holds) kept separate. */
-export function workoutTime(w: WorkoutData): { exercise: number; dodge: number; recovery: number; setup: number; march: number; haven: number; total: number } {
+export interface WorkoutTime {
+  warmup: number;
+  /** Sets and holds themselves (also part of core). */
+  exercise: number;
+  dodge: number;
+  recovery: number;
+  setup: number;
+  /** Warm-up + exercise + dodging + recovery + setup: what the ~20-minute target is about. */
+  core: number;
+  /** Optional Haven / Stillpoint yoga and mobility. */
+  optional: number;
+  cooldown: number;
+  /** Marching you chose. */
+  march: number;
+  /** Everything physical: core + optional + cooldown + marching. */
+  total: number;
+}
+
+/** Workout time by category (bible §18). */
+export function workoutTime(w: WorkoutData): WorkoutTime {
   const exercise = w.sets.reduce((a, s) => a + s.activeMs, 0);
   const p = w.physical ?? {};
-  const out = { exercise, dodge: p.dodge ?? 0, recovery: p.recovery ?? 0, setup: p.setup ?? 0, march: p.march ?? 0, haven: w.recoveryMs };
-  return { ...out, total: out.exercise + out.dodge + out.recovery + out.setup + out.march + out.haven };
+  const warmup = p.warmup ?? 0;
+  const dodge = p.dodge ?? 0;
+  const recovery = p.recovery ?? 0;
+  const setup = p.setup ?? 0;
+  const core = warmup + exercise + dodge + recovery + setup;
+  const optional = w.recoveryMs;
+  const cooldown = p.cooldown ?? 0;
+  const march = p.march ?? 0;
+  return { warmup, exercise, dodge, recovery, setup, core, optional, cooldown, march, total: core + optional + cooldown + march };
 }
 
 export type TimeBucket = 'march' | 'encounters' | 'other';
@@ -202,9 +235,13 @@ export interface WorkoutRecord {
   sore?: string[];
   /** Steps marched between fights. */
   steps?: number;
-  /** Workout time and, within it, time exercising (sets and holds), in minutes to one decimal. */
+  /** Core workout time (warm-up included) and, within it, time exercising (sets and holds), in minutes to one decimal. */
   workoutMin?: number;
   exerciseMin?: number;
+  /** All physical activity, optional yoga, cooldown and marching included. */
+  activeMin?: number;
+  /** Warm-up done this session (the Awakening), minutes. */
+  warmupMin?: number;
 }
 
 /** A quick post-run check-in. Every answer is optional. */
@@ -236,7 +273,9 @@ export function toRecord(w: WorkoutData, sore: string[] = []): WorkoutRecord {
     intensity: w.intensity,
     ...(sore.length ? { sore } : {}),
     ...(w.march?.steps ? { steps: w.march.steps } : {}),
-    workoutMin: Math.round(workoutTime(w).total / 6000) / 10,
+    workoutMin: Math.round(workoutTime(w).core / 6000) / 10,
     exerciseMin: Math.round(workoutTime(w).exercise / 6000) / 10,
+    activeMin: Math.round(workoutTime(w).total / 6000) / 10,
+    ...(workoutTime(w).warmup ? { warmupMin: Math.round(workoutTime(w).warmup / 6000) / 10 } : {}),
   };
 }

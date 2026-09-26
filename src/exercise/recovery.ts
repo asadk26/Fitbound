@@ -17,12 +17,17 @@ export interface RecoveryMove {
   steps: RecoveryStep[];
   /** Floor movement: stand up slowly afterwards. */
   floor: boolean;
+  /** Which looping demonstration figure to show (see ui/expedition/Demo.tsx). */
+  demo?: DemoKind;
 }
+
+export type DemoKind = 'march' | 'armCircles' | 'twist' | 'hips' | 'legSwing' | 'kneeLift' | 'squat' | 'reach' | 'shoulders' | 'catCow' | 'child' | 'heelRaise';
 
 export const RECOVERY: RecoveryMove[] = [
   {
     id: 'standing_reach',
     name: 'Standing side reach',
+    demo: 'reach',
     position: 'Stand comfortably, feet hip-width apart.',
     floor: false,
     steps: [
@@ -36,6 +41,7 @@ export const RECOVERY: RecoveryMove[] = [
   {
     id: 'cat_cow',
     name: 'Cat-cow',
+    demo: 'catCow',
     position: 'On hands and knees, hands under shoulders, knees under hips.',
     floor: true,
     steps: [
@@ -50,6 +56,7 @@ export const RECOVERY: RecoveryMove[] = [
   {
     id: 'childs_pose',
     name: 'Child’s pose',
+    demo: 'child',
     position: 'Kneel, then sit back toward your heels.',
     floor: true,
     steps: [
@@ -62,6 +69,7 @@ export const RECOVERY: RecoveryMove[] = [
   {
     id: 'neck_shoulders',
     name: 'Shoulder rolls',
+    demo: 'shoulders',
     position: 'Stand or sit tall.',
     floor: false,
     steps: [

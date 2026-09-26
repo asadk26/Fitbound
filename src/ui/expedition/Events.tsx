@@ -412,8 +412,11 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
             </p>
             {workoutTime(w).total > 0 && (
               <p className="sum-pace">
-                <b>Workout time {mins(workoutTime(w).total)} min</b> · exercising {mins(workoutTime(w).exercise)} · dodging {mins(workoutTime(w).dodge)} · recovery between sets {mins(workoutTime(w).recovery)}
-                {workoutTime(w).march ? ` · marching ${mins(workoutTime(w).march)}` : ''}
+                <b>Workout {mins(workoutTime(w).core)} min</b>
+                {workoutTime(w).warmup ? ` · warm-up ${mins(workoutTime(w).warmup)}` : ''} · exercising {mins(workoutTime(w).exercise)} · dodging {mins(workoutTime(w).dodge)} · recovery between sets {mins(workoutTime(w).recovery)}
+                {workoutTime(w).total > workoutTime(w).core
+                  ? ` · plus ${[workoutTime(w).optional ? `yoga ${mins(workoutTime(w).optional)}` : '', workoutTime(w).cooldown ? `cooldown ${mins(workoutTime(w).cooldown)}` : '', workoutTime(w).march ? `marching ${mins(workoutTime(w).march)}` : ''].filter(Boolean).join(', ')} min of other activity`
+                  : ''}
               </p>
             )}
             {pace.total > 0 && (

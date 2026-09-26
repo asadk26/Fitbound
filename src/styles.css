@@ -3307,3 +3307,124 @@ details summary {
   font-style: italic;
   color: var(--mist);
 }
+
+/* Guided-movement demonstrations (the Awakening, Haven yoga) */
+.demo {
+  width: min(22vh, 40vw);
+  height: auto;
+  overflow: visible;
+}
+.demo line,
+.demo path {
+  stroke: var(--gold);
+  stroke-width: 7;
+  stroke-linecap: round;
+  fill: none;
+}
+.demo .demo-head {
+  fill: var(--gold);
+  stroke: none;
+}
+.demo .demo-shadow {
+  fill: rgba(0, 0, 0, 0.25);
+}
+.demo g {
+  transform-box: view-box;
+}
+.demo-leg-l,
+.demo-leg-r {
+  transform-origin: 60px 92px;
+}
+.demo-arm-l,
+.demo-arm-r {
+  transform-origin: 60px 54px;
+}
+.demo-torso {
+  transform-origin: 60px 94px;
+}
+.demo-body {
+  transform-origin: 60px 150px;
+}
+.demo-paused * {
+  animation-play-state: paused !important;
+}
+@keyframes demo-step-l { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-38deg) translateY(-4px); } }
+@keyframes demo-step-r { 0%, 100% { transform: rotate(-38deg) translateY(-4px); } 50% { transform: rotate(0); } }
+@keyframes demo-swing-l { 0%, 100% { transform: rotate(-25deg); } 50% { transform: rotate(25deg); } }
+@keyframes demo-swing-r { 0%, 100% { transform: rotate(25deg); } 50% { transform: rotate(-25deg); } }
+@keyframes demo-circle { to { transform: rotate(360deg); } }
+@keyframes demo-circle-back { to { transform: rotate(-360deg); } }
+@keyframes demo-twist { 0%, 100% { transform: scaleX(1); } 25% { transform: scaleX(0.55) skewY(4deg); } 75% { transform: scaleX(0.55) skewY(-4deg); } }
+@keyframes demo-hips { 0% { transform: translate(0, 0); } 25% { transform: translate(5px, -2px); } 50% { transform: translate(0, -4px); } 75% { transform: translate(-5px, -2px); } 100% { transform: translate(0, 0); } }
+@keyframes demo-leg-swing { 0%, 100% { transform: rotate(-30deg); } 50% { transform: rotate(30deg); } }
+@keyframes demo-squat { 0%, 100% { transform: translateY(0) scaleY(1); } 50% { transform: translateY(14px) scaleY(0.86); } }
+@keyframes demo-reach-arm-l { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(150deg); } }
+@keyframes demo-reach-arm-r { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-150deg); } }
+@keyframes demo-lean { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-10deg); } }
+@keyframes demo-shrug { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes demo-rise { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+@keyframes demo-breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.06); } }
+@keyframes demo-arch { 0%, 100% { d: path('M30 110 Q60 96 90 110'); } 50% { d: path('M30 110 Q60 122 90 110'); } }
+.demo-march .demo-leg-l { animation: demo-step-l 1.1s ease-in-out infinite; }
+.demo-march .demo-leg-r { animation: demo-step-r 1.1s ease-in-out infinite; }
+.demo-march .demo-arm-l { animation: demo-swing-r 1.1s ease-in-out infinite; }
+.demo-march .demo-arm-r { animation: demo-swing-l 1.1s ease-in-out infinite; }
+.demo-armCircles .demo-arm-l { animation: demo-circle 1.8s linear infinite; }
+.demo-armCircles .demo-arm-r { animation: demo-circle-back 1.8s linear infinite; }
+.demo-twist .demo-torso { animation: demo-twist 2.4s ease-in-out infinite; }
+.demo-hips .demo-body { animation: demo-hips 2.4s ease-in-out infinite; }
+.demo-legSwing .demo-leg-r { animation: demo-leg-swing 1.6s ease-in-out infinite; }
+.demo-kneeLift .demo-leg-l { animation: demo-step-l 1.6s ease-in-out infinite; }
+.demo-kneeLift .demo-leg-r { animation: demo-step-r 1.6s ease-in-out infinite; }
+.demo-squat .demo-body { animation: demo-squat 2.4s ease-in-out infinite; }
+.demo-reach .demo-arm-l { animation: demo-reach-arm-l 4s ease-in-out infinite; }
+.demo-reach .demo-arm-r { animation: demo-reach-arm-r 4s ease-in-out infinite; }
+.demo-reach .demo-torso { animation: demo-lean 8s ease-in-out infinite; }
+.demo-shoulders .demo-arm-l,
+.demo-shoulders .demo-arm-r { animation: demo-shrug 2s ease-in-out infinite; }
+.demo-heelRaise .demo-body { animation: demo-rise 2s ease-in-out infinite; }
+.demo-breathe,
+.demo-child .demo-body { animation: demo-breathe 4s ease-in-out infinite; transform-origin: 60px 146px; }
+.demo-catCow .demo-spine { animation: demo-arch 5s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .demo * { animation-duration: 6s !important; }
+}
+
+/* A guided routine (the Awakening, Haven yoga, the Heart's Rest) */
+.guided {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(86vw, 1100px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.6vh;
+  padding: 3vh 3vw;
+  text-align: center;
+  background: rgba(20, 40, 50, 0.86);
+  border: 4px solid var(--teal);
+  border-radius: 20px;
+}
+.guided-label {
+  font-family: var(--pixel);
+  color: var(--cyan);
+  font-size: max(10px, 2.2vh);
+}
+.guided-cue {
+  font-size: max(16px, 4vh);
+  line-height: 1.3;
+}
+.guided-pos {
+  color: var(--mist);
+  font-size: max(13px, 2.6vh);
+}
+.guided-timer {
+  font-family: var(--pixel);
+  font-size: max(20px, 7vh);
+  color: var(--gold);
+}
+.awakening-card .elara {
+  font-size: max(15px, 3.2vh);
+}

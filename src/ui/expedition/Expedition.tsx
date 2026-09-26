@@ -28,6 +28,8 @@ import { Journal } from './Journal';
 import { MovementLab } from './MovementLab';
 import { RpgBattle } from './RpgBattle';
 import { Returning } from './Returning';
+import { Awakening, type WarmupResult } from './Awakening';
+import { dayOf } from '../../rpg/session';
 import { Sanctuary } from './Sanctuary';
 import { marchNeedsBody, Travel, type MarchTally } from './Travel';
 import type { SetResult } from './setRunner';
@@ -40,7 +42,7 @@ import type { SetResult } from './setRunner';
  * choices and the Haven work from the couch with a gamepad, and the camera
  * check happens right before the first fight rather than at the start.
  */
-type View = 'cinema' | 'sanctuary' | 'journal' | 'lab' | 'calibrate' | 'return' | 'path' | 'travel' | 'node' | 'fallen' | 'summary';
+type View = 'cinema' | 'sanctuary' | 'journal' | 'lab' | 'calibrate' | 'return' | 'awakening' | 'path' | 'travel' | 'node' | 'fallen' | 'summary';
 
 export function Expedition({ connected, resume, onExit }: { connected: boolean; resume: boolean; onExit: () => void }) {
   // Resuming is a new workout session of the same expedition (bible §18): the
@@ -65,7 +67,10 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
   const xRef = useRef(x);
   // Arriving at the Sanctuary: the opening the first time, the short reconstruction ritual after that.
   const [cine, setCine] = useState<{ script: Script; restored: boolean; then: () => void } | null>(() => (resume && x ? null : arrival(() => setView('sanctuary'))));
-  const [view, setView] = useState<View>(() => (resume && x ? (newDay ? 'return' : 'path') : 'cinema'));
+  // A resumed session: the readiness check on a new day, then (after the camera check) a brief Awakening.
+  const [view, setView] = useState<View>(() => (resume && x ? (newDay ? 'return' : warmedUpToday() ? 'path' : 'awakening') : 'cinema'));
+  /** Where the Awakening leads, and whether it's a resumed session's brief version. */
+  const afterWarmup = useRef<{ then: () => void; resumed: boolean }>({ then: () => setView('path'), resumed: true });
   const viewRef = useRef(view);
   viewRef.current = view;
   const [debug, setDebug] = useState<ExNode | null>(null);
@@ -218,7 +223,21 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
       }
     });
     commit(next);
-    routeNext();
+    warmUp(false, routeNext);
+  };
+
+  /** The Awakening at the start of a real workout session (bible §18), then `then`. */
+  const warmUp = (resumed: boolean, then: () => void) => {
+    afterWarmup.current = { then, resumed };
+    setView('awakening');
+  };
+  const onWarmup = (r: WarmupResult) => {
+    if (!debug)
+      mutate((d) => {
+        d.workout.warmup = { length: r.length, completed: r.completed };
+        addPhysical(d.workout, 'warmup', r.ms);
+      });
+    afterWarmup.current.then();
   };
 
   /** Give a new expedition its concrete fracture route (saved with the run). */
@@ -246,7 +265,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
       d.story.scenarios[scenarioId] = { ...(d.story.scenarios[scenarioId] ?? { bossReached: false, bossDefeated: false }), met: (d.story.scenarios[scenarioId]?.met ?? 0) + 1 };
     });
     commit(next);
-    routeNext();
+    warmUp(false, routeNext);
   };
 
   /** What comes after a node: march to the next stop, or (blessings) happen right here. */
@@ -428,10 +447,12 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
             const s = getSave();
             updateSave((d) => void (d.expeditionPrefs = { ...d.expeditionPrefs, intensity: prefs.intensity, sore: prefs.sore, soreAt: prefs.soreAt, dumbbells: prefs.dumbbells }));
             commit(applyReadiness({ ...xRef.current!, loadout }, prefs, s.exerciseTargets));
-            setView('path');
+            // A fresh warm-up after the readiness check and the camera check.
+            needCamera(() => warmUp(true, () => setView('path')));
           }}
         />
       )}
+      {view === 'awakening' && x && <Awakening prefs={x.prefs} resumed={afterWarmup.current.resumed} elara={getSave().story.reignitions < 2} onDone={onWarmup} />}
       {view === 'path' && x && <PathView x={x} onContinue={() => (currentNode(x)?.at && x.battle?.index !== x.index ? goTravel() : enter())} onStop={suspend} />}
       {view === 'travel' && x && (
         <Travel
@@ -648,6 +669,12 @@ function arrival(arrived: () => void): { script: Script; restored: boolean; then
     },
   };
 }
+/** Whether a warm-up was already done in an earlier sitting today (a same-day resume doesn't ask again). */
+function warmedUpToday(): boolean {
+  const today = dayOf(Date.now());
+  return getSave().workouts.some((r) => (r.warmupMin ?? 0) > 0 && dayOf(r.at) === today);
+}
+
 /** How an expedition ends when its route runs out: a reignition, unless it was a preview (or the hero fell). */
 function endOutcome(x: ExpeditionState): 'victory' | 'defeat' | 'ended' {
   if (x.fallen) return 'defeat';

@@ -21,7 +21,8 @@ export function playtestReport(x: ExpeditionState, fb: Feedback | undefined, ctx
   out.push(`Settings: travel ${ctx.travel} · attack cues ${ctx.cues} · intensity ${w.intensity}`);
   out.push('');
   const wt = workoutTime(w);
-  out.push(`Workout time: ${min(wt.total)} (exercising ${min(wt.exercise)} · dodging ${min(wt.dodge)} · recovery between sets ${min(wt.recovery)} · setup ${min(wt.setup)} · marching ${min(wt.march)} · Haven ${min(wt.haven)})`);
+  out.push(`Core workout time: ${min(wt.core)} (warm-up ${min(wt.warmup)} · exercising ${min(wt.exercise)} · dodging ${min(wt.dodge)} · recovery between sets ${min(wt.recovery)} · setup ${min(wt.setup)})`);
+  out.push(`Other activity: optional yoga ${min(wt.optional)} · cooldown ${min(wt.cooldown)} · marching ${min(wt.march)} · all physical activity ${min(wt.total)}`);
   out.push(`Time: ${min(p.total)} total`);
   out.push(`  sets ${min(p.sets)} · between sets (choosing, dodging, rests, enemy turns) ${min(p.between)} · marching ${min(p.march)} · Haven ${min(p.haven)} · menus and story ${min(p.other)}`);
   out.push('');

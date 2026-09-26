@@ -83,6 +83,8 @@ export function Journal({ onBack }: { onBack: () => void }) {
                     <td>
                       {r.sets ?? Object.values(r.volume).reduce((a, v) => a + v.sets, 0)} sets
                       {r.workoutMin !== undefined ? ` · ${Math.round(r.workoutMin)} min workout` : r.minutes ? ` · ${r.minutes} min` : ''}
+                      {r.activeMin !== undefined && r.workoutMin !== undefined && r.activeMin - r.workoutMin >= 1 ? ` (+${Math.round(r.activeMin - r.workoutMin)} min other activity)` : ''}
+                      {r.warmupMin ? ' · warmed up' : ''}
                       {r.steps ? ` · ${r.steps} steps` : ''}
                     </td>
                     <td className="muted">
