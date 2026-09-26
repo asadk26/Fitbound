@@ -310,6 +310,9 @@ function Jump({ onJump, onPreview }: { onJump: (kind: NodeKind, enemies?: string
         <button className="btn btn-sm" onClick={() => onJump('mirror')}>
           ◈ Mirror of Unlived Lives
         </button>
+        <button className="btn btn-sm" onClick={() => onJump('crossing')}>
+          ≈ The Stillpoint
+        </button>
         <button className="btn btn-sm" onClick={() => onJump('haven')}>
           ❀ Haven
         </button>

@@ -94,3 +94,13 @@ export function havenSequence(rng: () => number = Math.random, length: 'short' |
   else out.push(...floor);
   return out;
 }
+
+/**
+ * The Heart's Rest (bible §20): an optional cooldown after a reignition —
+ * static stretches, standing then on the floor, about two and a half minutes.
+ */
+export function heartsRestSequence(): RecoveryMove[] {
+  const by = (id: string) => RECOVERY.find((m) => m.id === id)!;
+  return [by('standing_reach'), by('neck_shoulders'), by('childs_pose')];
+}
+

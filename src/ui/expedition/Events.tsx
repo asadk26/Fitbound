@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FAMILIES, FAMILY_INFO, getExercise, targetLabel, type Family } from '../../exercise/registry';
-import { havenSequence, recoveryDuration, type RecoveryMove } from '../../exercise/recovery';
+import { havenSequence, heartsRestSequence, recoveryDuration, type RecoveryMove } from '../../exercise/recovery';
 import { audio } from '../../game/audio';
 import { getSave, updateSave } from '../../game/store';
 import { input } from '../../input/InputHub';
@@ -15,6 +15,7 @@ import { applyProposals, propose } from '../../rpg/progression';
 import { expeditionSets, hasWork } from '../../rpg/session';
 import { completion, pacing, totals, workingSets, workoutTime, type Feedback } from '../../rpg/workout';
 import { GestureMenu, useInputEvents } from '../motionUi';
+import { Guided } from './Guided';
 
 const NODE_ICON: Record<NodeKind, string> = { fight: '⚔', blessing: '✦', mirror: '◈', haven: '❀', boss: '☼', crossing: '≈' };
 
@@ -54,40 +55,118 @@ export function PathView({ x, onContinue, onStop }: { x: ExpeditionState; onCont
 }
 
 /**
- * The temporal crossing between the two fractures (bible §9.3): a natural
- * place to stop (never the only one), and a chance to look into the Mirror.
- * The first time, a few lines of what it is; after that, one.
+ * The Stillpoint (bible §20): after the first fracture's miniboss, the Heart
+ * opens a quiet space between the ages. Rest (HP, through the Haven
+ * system), optional gentle stretches, a look at the build, the Mirror, and
+ * "Save and return later" — none of them exclusive. It's the recommended
+ * place to stop, never the only one.
  */
-export function Crossing({ x, firstTime, onSeen, onContinue, onStop, onLoadout }: { x: ExpeditionState; firstTime: boolean; onSeen: () => void; onContinue: () => void; onStop: () => void; onLoadout: (l: ExLoadout | null) => void }) {
-  const [mirror, setMirror] = useState(false);
+export function Stillpoint({
+  x,
+  firstTime,
+  onSeen,
+  onRest,
+  onStretch,
+  onContinue,
+  onStop,
+  onLoadout,
+}: {
+  x: ExpeditionState;
+  firstTime: boolean;
+  onSeen: () => void;
+  onRest: () => void;
+  onStretch: (ms: number) => void;
+  onContinue: () => void;
+  onStop: () => void;
+  onLoadout: (l: ExLoadout | null) => void;
+}) {
+  const [view, setView] = useState<'menu' | 'mirror' | 'stretch' | 'review'>('menu');
+  // Remember whether this is the first visit as it was on arrival (marking it seen mustn't change the text).
+  const [first] = useState(firstTime);
+  const [seq] = useState<RecoveryMove[]>(() => havenSequence(Math.random, 'short'));
+  const rested = x.hp >= x.maxHp;
   useEffect(() => {
     input.setMode('menu');
     onSeen();
-    audio.say(firstTime ? STORY.crossingFirst : STORY.crossing);
+    audio.calm(true);
+    audio.say(first ? STORY.stillpointFirst : STORY.stillpoint);
+    return () => audio.calm(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  if (mirror)
+  if (view === 'mirror')
     return (
       <Mirror
         x={x}
         onDone={(l) => {
           onLoadout(l);
-          setMirror(false);
+          setView('menu');
         }}
       />
     );
+  if (view === 'stretch')
+    return (
+      <div className="stillpoint">
+        <Guided
+          seq={seq}
+          label="The Stillpoint"
+          onDone={(ms) => {
+            onStretch(ms);
+            setView('menu');
+          }}
+        />
+      </div>
+    );
+  if (view === 'review')
+    return (
+      <div className="stillpoint">
+        <div className="tv-overlay">
+          <GestureMenu
+            title="Your build"
+            text={[
+              `♥ ${x.hp}/${x.maxHp} · ${expeditionSets(x)} sets across the expedition so far`,
+              `Loadout: ${FAMILIES.map((f) => (x.loadout[f] ? `${FAMILY_INFO[f].name}: ${getExercise(x.loadout[f]!.exerciseId).name} (${ability(getExercise(x.loadout[f]!.exerciseId).rpgAbility).name})` : `${FAMILY_INFO[f].name}: —`)).join(' · ')}`,
+              `Blessings: ${x.blessings.length ? x.blessings.map((b) => blessingName(b)).join(', ') : 'none yet'}`,
+              `Ahead: ${routeNodes(x)
+                .slice(x.index + 1)
+                .filter((n) => n.kind === 'fight' || n.kind === 'boss')
+                .map((n) => n.title)
+                .join(' → ') || 'the Spark'}`,
+            ].join('\n')}
+            options={[
+              { id: 'back', label: 'Back', icon: 'star' },
+              { id: 'mirror', label: 'Look into the Mirror', detail: 'Change a movement or reroll', icon: 'wind' },
+            ]}
+            onChoose={(id) => setView(id === 'mirror' ? 'mirror' : 'menu')}
+          />
+        </div>
+      </div>
+    );
   return (
-    <div className="tv-overlay">
-      <GestureMenu
-        title="The Crossing"
-        text={`${firstTime ? STORY.crossingFirst : STORY.crossing}\n\n♥ ${x.hp}/${x.maxHp} · ${expeditionSets(x)} sets so far. A good place to stop if you need to — the expedition will wait.`}
-        options={[
-          { id: 'go', label: 'Cross into the next age', icon: 'star' },
-          { id: 'mirror', label: 'Look into the Mirror', detail: 'Change a movement or reroll before crossing', icon: 'wind' },
-          { id: 'stop', label: 'Save and stop here', detail: 'Resume later from the other side', icon: 'lock' },
-        ]}
-        onChoose={(id) => (id === 'go' ? onContinue() : id === 'mirror' ? setMirror(true) : onStop())}
-      />
+    <div className="stillpoint">
+      <div className="tv-overlay">
+        <GestureMenu
+          title="The Stillpoint"
+          text={`${first ? STORY.stillpointFirst : STORY.stillpoint} ♥ ${x.hp}/${x.maxHp}.`}
+          initial={rested ? 4 : 0}
+          options={[
+            rested ? { id: 'rested', label: 'Rested ✓', icon: 'heart' } : { id: 'rest', label: 'Rest', detail: 'Recover your HP', icon: 'heart' },
+            { id: 'stretch', label: 'Stretch (optional)', detail: 'A few calm minutes', icon: 'wind' },
+            { id: 'review', label: 'Your build & the Mirror', icon: 'shield' },
+            { id: 'stop', label: 'Save, return later', detail: 'Back to the Stillpoint', icon: 'lock' },
+            { id: 'go', label: 'Continue', detail: 'Into the next age', icon: 'star' },
+          ]}
+          onChoose={(id) => {
+            if (id === 'rest') {
+              audio.heal();
+              onRest();
+            } else if (id === 'stretch') setView('stretch');
+            else if (id === 'review') setView('review');
+            else if (id === 'mirror') setView('mirror');
+            else if (id === 'stop') onStop();
+            else if (id === 'go') onContinue();
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -215,79 +294,26 @@ export function Mirror({ x, onDone }: { x: ExpeditionState; onDone: (l: ExLoadou
 export function Haven({ onDone }: { onDone: (recoveryMs: number) => void }) {
   const [seq] = useState<RecoveryMove[]>(() => havenSequence(Math.random, 'standard'));
   const [phase, setPhase] = useState<'intro' | 'move' | 'memory'>('intro');
-  const [m, setM] = useState(0);
-  const [st, setSt] = useState(0);
-  const [left, setLeft] = useState(0);
-  const [paused, setPaused] = useState(false);
   const done = useRef(0);
-  const pausedRef = useRef(false);
-  pausedRef.current = paused;
 
   useEffect(() => {
     input.setMode('menu');
     audio.say(STORY.havenIntro);
-    return () => audio.calm(false);
   }, []);
-
-  useEffect(() => {
-    if (phase !== 'move') return;
-    const step = seq[m]?.steps[st];
-    if (!step) return;
-    audio.say(step.say);
-    setLeft(step.s);
-    const id = window.setInterval(() => {
-      if (pausedRef.current) return;
-      done.current += 1000;
-      setLeft((x) => x - 1);
-    }, 1000);
-    return () => clearInterval(id);
-  }, [phase, m, st, seq]);
-
-  useEffect(() => {
-    if (phase === 'move' && left <= 0 && seq[m]?.steps[st]) {
-      const t = window.setTimeout(advance, 400);
-      return () => clearTimeout(t);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [left, phase]);
-
-  function advance() {
-    const move = seq[m];
-    if (st + 1 < move.steps.length) return setSt(st + 1);
-    if (m + 1 < seq.length) {
-      setM(m + 1);
-      setSt(0);
-      audio.say(`Next: ${seq[m + 1].name}. ${seq[m + 1].position}`);
-      return;
-    }
-    audio.calm(false);
-    setPhase('memory');
-    // The narrator reads the memory; Elara's part is only ever read, never synthesised.
-    window.setTimeout(() => audio.say(STORY.havenMemory), 1200);
-  }
-
-  useInputEvents((e) => {
-    if (phase !== 'move') return;
-    if (e.type === 'confirm') advance();
-    if (e.type === 'pause' || e.type === 'back') setPaused((p) => !p);
-    if (e.type === 'resume') setPaused(false);
-  });
 
   if (phase === 'intro')
     return (
       <div className="tv-overlay">
         <GestureMenu
           title="A Quiet Haven"
-          text={`${STORY.havenIntro} You’re fully restored. A few gentle minutes: ${seq.map((x) => x.name).join(', ')} (about ${Math.round(seq.reduce((a, x) => a + recoveryDuration(x), 0) / 60)} min). No camera needed.`}
+          text={`${STORY.havenIntro} You’re fully restored — resting is enough. If you like, a few gentle minutes: ${seq.map((x) => x.name).join(', ')} (about ${Math.round(seq.reduce((a, x) => a + recoveryDuration(x), 0) / 60)} min). No camera needed.`}
           options={[
-            { id: 'go', label: 'Begin the stretches', icon: 'heart' },
+            { id: 'go', label: 'Begin the stretches (optional)', icon: 'heart' },
             { id: 'skip', label: 'Just rest and move on', icon: 'star' },
           ]}
           onChoose={(id) => {
             if (id === 'skip') return onDone(0);
-            audio.calm(true);
             setPhase('move');
-            audio.say(`${seq[0].name}. ${seq[0].position}`);
           }}
         />
       </div>
@@ -298,22 +324,20 @@ export function Haven({ onDone }: { onDone: (recoveryMs: number) => void }) {
         <GestureMenu title="A memory" text={`${STORY.havenMemory}\n\n${STORY.havenElara}`} options={[{ id: 'on', label: 'Carry on', icon: 'star' }]} onChoose={() => onDone(done.current)} />
       </div>
     );
-  const move = seq[m];
-  const step = move.steps[st];
   return (
-    <div className="haven">
-      <small>
-        {move.name} · {m + 1} of {seq.length}
-      </small>
-      <b>{step?.say}</b>
-      <span className="haven-pos">{move.position}</span>
-      <div className="haven-timer">{paused ? '❚❚' : Math.max(0, left)}</div>
-      <span className="muted small">Raise your right hand or press A to move on · Start / P to pause</span>
-    </div>
+    <Guided
+      seq={seq}
+      label="A Quiet Haven"
+      onDone={(ms) => {
+        done.current = ms;
+        // Memories come after the movements, never while holding a pose. The narrator reads it; Elara's part is only ever read.
+        setPhase('memory');
+        window.setTimeout(() => audio.say(STORY.havenMemory), 1200);
+      }}
+    />
   );
 }
 
-/** A fall ends the expedition (bible §17). Everything physical, and everything discovered, is kept. */
 export function Fallen({ onEnd }: { onEnd: () => void }) {
   useEffect(() => {
     input.setMode('menu');
@@ -333,7 +357,7 @@ const CHECKIN: { key: keyof Feedback; title: string; options: { id: string; labe
   { key: 'pacing', title: 'How was the pacing?', options: [ { id: 'slow', label: 'Dragged', icon: 'wind' }, { id: 'right', label: 'About right', icon: 'star' }, { id: 'rushed', label: 'Rushed', icon: 'bolt' } ] },
 ];
 
-export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState; onAgain: () => void; onExit: () => void; onFeedback: (fb: Feedback) => void }) {
+export function Summary({ x, onAgain, onExit, onFeedback, onCooldown }: { x: ExpeditionState; onAgain: () => void; onExit: () => void; onFeedback: (fb: Feedback) => void; onCooldown?: (ms: number) => void }) {
   const w = x.workout;
   const pace = pacing(w);
   // A quick check-in after every session that did some work (a saved one too); every question can be skipped.
@@ -392,15 +416,32 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
   };
   const rows = totals(w);
   const won = w.outcome === 'victory';
+  // The Heart's Rest (bible §20): an optional cooldown after a reignition, never before the payoff.
+  const [cooling, setCooling] = useState(false);
+  const [cooled, setCooled] = useState(0);
+  const [coolSeq] = useState<RecoveryMove[]>(() => heartsRestSequence());
   useEffect(() => {
     input.setMode('menu');
     audio.say(won ? STORY.victory : x.status === 'suspended' ? STORY.suspended : STORY.fallenEnd);
   }, [won, x.status]);
   const mins = (ms: number) => Math.max(0, Math.round(ms / 60000));
+  if (cooling)
+    return (
+      <Guided
+        seq={coolSeq}
+        label="The Heart’s Rest"
+        onDone={(ms) => {
+          setCooling(false);
+          setCooled(ms || 1);
+          onCooldown?.(ms);
+        }}
+      />
+    );
   return (
     <div className="tv-overlay">
       <div className="gmenu summary exp-summary">
         <h2>{x.preview && !x.fallen && x.status !== 'suspended' ? 'Scenario preview complete' : won ? 'The Spark is reignited — for now' : x.status === 'suspended' ? 'Expedition saved' : 'Back to the Sanctuary'}</h2>
+        {cooled > 0 && <p className="muted small">The Heart’s Rest: {Math.max(1, Math.round(cooled / 60000))} min of gentle stretching, counted apart from the workout.</p>}
         <p className="gmenu-text">{won ? STORY.victoryElara : x.fallen ? 'You fell, and the expedition is over. Everything you did physically is kept.' : x.status === 'suspended' ? STORY.suspended : 'The expedition ended here. Everything you did physically is kept.'}</p>
         <div className="sum-cols">
           <div>
@@ -508,6 +549,7 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
             active={!report}
             options={[
               { id: 'again', label: 'Back to the Sanctuary', icon: 'star' },
+              ...(won && onCooldown && !cooled ? [{ id: 'cool', label: 'The Heart’s Rest (optional)', detail: 'A few minutes of gentle stretching to close the session', icon: 'heart' }] : []),
               ...(plan.proposals.length
                 ? [{ id: 'keepall', label: plan.proposals.every((p) => kept[p.exerciseId]) ? 'Use the new targets' : 'Keep my targets as they are', detail: 'Changes to next time’s targets', icon: 'heart' }]
                 : []),
@@ -516,6 +558,7 @@ export function Summary({ x, onAgain, onExit, onFeedback }: { x: ExpeditionState
             ]}
             onChoose={(id) => {
               if (id === 'again') leave(onAgain);
+              else if (id === 'cool') setCooling(true);
               else if (id === 'keepall') {
                 const all = plan.proposals.every((p) => kept[p.exerciseId]);
                 setKept(Object.fromEntries(plan.proposals.map((p) => [p.exerciseId, !all])));

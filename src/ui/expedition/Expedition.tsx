@@ -23,7 +23,7 @@ import { enterExpeditionTravel, leaveExpeditionTravel, toggleExpeditionTravel } 
 import { CinemaPlayer } from '../Cinema';
 import type { Script } from '../../story/cinema';
 import { OPENING, ritualReason, ritualScript, type RitualReason } from '../../story/scripts';
-import { BlessingPick, Crossing, Fallen, Haven, Mirror, PathView, Summary } from './Events';
+import { BlessingPick, Fallen, Haven, Mirror, PathView, Stillpoint, Summary } from './Events';
 import { Journal } from './Journal';
 import { MovementLab } from './MovementLab';
 import { RpgBattle } from './RpgBattle';
@@ -570,11 +570,13 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
         />
       )}
       {view === 'node' && x && node?.kind === 'crossing' && (
-        <Crossing
+        <Stillpoint
           key={nodeKey}
           x={x}
-          firstTime={!getSave().story.seen.includes('crossing')}
-          onSeen={() => updateSave((d) => void (d.story.seen.includes('crossing') || d.story.seen.push('crossing')))}
+          firstTime={!getSave().story.seen.includes('stillpoint')}
+          onSeen={() => updateSave((d) => void (d.story.seen.includes('stillpoint') || d.story.seen.push('stillpoint')))}
+          onRest={() => mutate((d) => void (d.hp = d.maxHp))}
+          onStretch={(ms) => mutate((d) => void (d.workout.recoveryMs += ms))}
           onContinue={advance}
           onLoadout={(l) => {
             if (l)
@@ -583,10 +585,7 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
                 for (const slot of Object.values(l)) if (slot && !d.targets[slot.exerciseId]) d.targets[slot.exerciseId] = setTarget(getExercise(slot.exerciseId), d.prefs, getSave().exerciseTargets);
               });
           }}
-          onStop={() => {
-            mutate((d) => void d.index++);
-            suspend();
-          }}
+          onStop={() => (debug ? backToLab() : suspend())}
         />
       )}
       {view === 'node' && x && node?.kind === 'haven' && (
@@ -628,6 +627,11 @@ export function Expedition({ connected, resume, onExit }: { connected: boolean; 
             firstRestoration.current = false;
           }}
           onExit={onExit}
+          onCooldown={(ms) => {
+            // The Heart's Rest: optional, after the victory is already recorded; counted apart from the core workout.
+            mutate((d) => addPhysical(d.workout, 'cooldown', ms), false);
+            recordHistory(xRef.current!);
+          }}
         />
       )}
 

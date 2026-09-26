@@ -90,7 +90,7 @@ describe('materialised routes', () => {
     const nodes = materialize(['medieval.A', 'prehistoric.B'], all, rng(3), { expeditions: 0 });
     expect(nodes.map((n) => n.kind)).toEqual(['fight', 'fight', 'blessing', 'boss', 'crossing', 'fight', 'fight', 'blessing', 'boss']);
     expect(nodes[0].phase).toBe(1);
-    expect(nodes[4].phase).toBe(2);
+    expect(nodes[4]).toMatchObject({ kind: 'crossing', title: 'The Stillpoint', phase: 2 });
     expect(nodes[3]).toMatchObject({ boss: 'A', intro: 'medieval.A.intro', enemies: ['iron_husk'], stages: [{ enemies: ['iron_husk'] }, { enemies: ['bone_charger'], interlude: 'medieval.A.rise' }] });
     expect(['iron_husk', 'bone_charger']).toContain(nodes[0].enemies![0]);
     const later = materialize(['medieval.A', 'prehistoric.B'], all, rng(3), { expeditions: 5 });

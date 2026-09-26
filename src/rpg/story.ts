@@ -33,6 +33,8 @@ export const STORY = {
   shrine: 'The Mossy Shrine hums as you pass. Some of your strength returns.',
   crossingFirst: 'The ground thins under your feet. Through the Haze, another age is waiting — close enough to touch, and nothing like this one.',
   crossing: 'The Haze thins. Another age waits on the other side.',
+  stillpointFirst: 'The fighting falls away. The Heart has opened a quiet place between the ages: no wind, no Haze, only a slow warm pulse underfoot. Rest here. The next age can wait.',
+  stillpoint: 'The Stillpoint again: quiet between the ages. Rest, if you like.',
   /** A line as each march begins, keyed by the destination's title. */
   legs: {
     'The Training Yard': 'The Sanctuary gate opens onto a meadow the Haze has only half remembered. Somewhere ahead, straw rustles.',

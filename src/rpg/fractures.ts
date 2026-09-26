@@ -131,7 +131,8 @@ export function materialize(plan: string[], scenarios: Scenario[], rng: () => nu
   plan.forEach((id, half) => {
     const s = scenarios.find((x) => x.id === id);
     if (!s) return;
-    if (half > 0) out.push({ kind: 'crossing', phase: 2, title: 'The Crossing', scenario: id });
+    // Between the ages: the Stillpoint (bible §20), a guaranteed Haven-like stop.
+    if (half > 0) out.push({ kind: 'crossing', phase: 2, title: 'The Stillpoint', scenario: id });
     const phase = half === 0 ? 1 : 2;
     for (const t of s.nodes) {
       if (t.kind === 'fight') {
